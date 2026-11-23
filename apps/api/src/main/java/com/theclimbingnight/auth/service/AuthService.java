@@ -9,15 +9,14 @@ import com.theclimbingnight.auth.social.SocialIdentity;
 import com.theclimbingnight.auth.social.SocialProvider;
 import com.theclimbingnight.auth.social.SocialTokenVerifiers;
 import com.theclimbingnight.common.BusinessException;
+import com.theclimbingnight.common.ConstraintViolations;
 import com.theclimbingnight.common.ErrorCode;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
 import com.theclimbingnight.user.service.NicknamePolicy;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Locale;
 import java.util.Optional;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -121,7 +120,7 @@ public class AuthService {
 	}
 
 	private static RuntimeException toBusinessException(DataIntegrityViolationException e) {
-		String violated = violatedConstraints(e);
+		String violated = ConstraintViolations.violated(e);
 		if (violated.contains(CONSTRAINT_IDENTITY)) {
 			return new BusinessException(ErrorCode.AUTH_ALREADY_REGISTERED);
 		}
@@ -129,20 +128,6 @@ public class AuthService {
 			return new BusinessException(ErrorCode.USER_NICKNAME_TAKEN);
 		}
 		return e;
-	}
-
-	/** 원인 사슬의 제약 이름과 메시지를 소문자로 이어 붙인다. (DB마다 이름이 메시지에만 실리기도 한다.) */
-	private static String violatedConstraints(Throwable e) {
-		StringBuilder sb = new StringBuilder();
-		for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
-			if (t instanceof ConstraintViolationException cve && cve.getConstraintName() != null) {
-				sb.append(cve.getConstraintName()).append(' ');
-			}
-			if (t.getMessage() != null) {
-				sb.append(t.getMessage()).append(' ');
-			}
-		}
-		return sb.toString().toLowerCase(Locale.ROOT);
 	}
 
 	private Optional<AuthIdentity> findIdentity(SocialIdentity identity) {
