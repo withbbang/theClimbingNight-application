@@ -23,8 +23,9 @@ def is_env(name):
 
 if tool == "Bash":
     command = args.get("command") or ""
-    # 경로 구분자·공백·따옴표·리다이렉션 뒤에 오는 .env 토큰
-    for match in re.finditer(r"(?:^|[\s/\"'"'"'=<>:;|&(`])(\.env(?:\.[\w.-]+)?)(?=$|[\s\"'"'"';|&)<>`])", command):
+    # 경로 구분자·공백·따옴표·리다이렉션 뒤에 오는 .env 토큰.
+    # 뒤에 글롭·중괄호(`*?[{.`)가 붙은 `.env*`, `.env.*` 형태도 잡는다.
+    for match in re.finditer(r"(?:^|[\s/\"'"'"'=<>:;|&(`])(\.env(?:\.[\w.-]+)?)(?=$|[\s\"'"'"';|&)<>`*?\[{.])", command):
         if is_env(match.group(1)):
             print("bash:" + match.group(1))
             break
