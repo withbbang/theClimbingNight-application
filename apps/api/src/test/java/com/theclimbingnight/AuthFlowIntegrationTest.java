@@ -13,6 +13,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.theclimbingnight.auth.social.SocialIdentity;
 import com.theclimbingnight.auth.social.SocialProvider;
 import com.theclimbingnight.auth.social.SocialTokenVerifier;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,10 +23,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @SpringBootTest(properties = "spring.main.allow-bean-definition-overriding=true")
 @AutoConfigureMockMvc
 class AuthFlowIntegrationTest {
+
+	/** 소셜 검증기가 호출된 순간 DB 트랜잭션이 열려 있었는지 기록한다. */
+	static final AtomicBoolean TX_ACTIVE_DURING_VERIFY = new AtomicBoolean(true);
 
 	@TestConfiguration
 	static class FakeKakaoConfig {
@@ -41,6 +46,7 @@ class AuthFlowIntegrationTest {
 
 				@Override
 				public SocialIdentity verify(String token) {
+					TX_ACTIVE_DURING_VERIFY.set(TransactionSynchronizationManager.isActualTransactionActive());
 					return new SocialIdentity(SocialProvider.KAKAO, token);
 				}
 			};
@@ -149,6 +155,18 @@ class AuthFlowIntegrationTest {
 		// then
 		refresh(refreshToken).andExpect(status().isUnauthorized())
 				.andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+	}
+
+	@Test
+	void 소셜_검증은_DB_트랜잭션_밖에서_호출된다() throws Exception {
+		// given
+		TX_ACTIVE_DURING_VERIFY.set(true);
+
+		// when
+		login("tx-check");
+
+		// then
+		assertThat(TX_ACTIVE_DURING_VERIFY.get()).isFalse();
 	}
 
 	@Test

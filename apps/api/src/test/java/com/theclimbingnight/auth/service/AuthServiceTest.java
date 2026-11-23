@@ -36,6 +36,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -62,7 +64,8 @@ class AuthServiceTest {
 				Duration.ofMinutes(10), null, null, null, null);
 		jwtTokenService = new JwtTokenService(props, clock);
 		service = new AuthService(userRepository, authIdentityRepository, refreshTokenRepository, verifiers,
-				jwtTokenService, new RefreshTokens(new SecureRandom()), new NicknamePolicy(), props, clock);
+				jwtTokenService, new RefreshTokens(new SecureRandom()), new NicknamePolicy(), props, clock,
+				new TransactionTemplate(org.mockito.Mockito.mock(PlatformTransactionManager.class)));
 		given(verifiers.get(SocialProvider.KAKAO)).willReturn(verifier);
 		given(verifier.verify("social-token")).willReturn(KAKAO_42);
 		given(userRepository.saveAndFlush(any(User.class))).willAnswer(inv -> {

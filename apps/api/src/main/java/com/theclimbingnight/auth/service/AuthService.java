@@ -20,7 +20,9 @@ import java.time.Instant;
 import java.util.Optional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @Transactional(readOnly = true)
@@ -40,11 +42,12 @@ public class AuthService {
 	private final NicknamePolicy nicknamePolicy;
 	private final AuthProperties properties;
 	private final Clock clock;
+	private final TransactionTemplate transactionTemplate;
 
 	public AuthService(UserRepository userRepository, AuthIdentityRepository authIdentityRepository,
 			RefreshTokenRepository refreshTokenRepository, SocialTokenVerifiers socialTokenVerifiers,
 			JwtTokenService jwtTokenService, RefreshTokens refreshTokens, NicknamePolicy nicknamePolicy,
-			AuthProperties properties, Clock clock) {
+			AuthProperties properties, Clock clock, TransactionTemplate transactionTemplate) {
 		this.userRepository = userRepository;
 		this.authIdentityRepository = authIdentityRepository;
 		this.refreshTokenRepository = refreshTokenRepository;
@@ -54,20 +57,26 @@ public class AuthService {
 		this.nicknamePolicy = nicknamePolicy;
 		this.properties = properties;
 		this.clock = clock;
+		this.transactionTemplate = transactionTemplate;
 	}
 
-	@Transactional
+	/**
+	 * 외부 HTTP(소셜 검증)는 DB 트랜잭션 밖에서 호출한다. 클래스의 readOnly 트랜잭션도 이 메서드에서는 빠지고,
+	 * DB 조회와 토큰 발급만 TransactionTemplate으로 묶는다.
+	 */
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public LoginResult login(SocialProvider provider, String socialToken) {
 		SocialIdentity identity = socialTokenVerifiers.get(provider).verify(socialToken);
-		return authIdentityRepository.findByProviderAndProviderUserId(identity.provider(), identity.providerUserId())
-				.<LoginResult>map(linked -> {
-					User user = linked.getUser();
-					if (!user.isActive()) {
-						throw new BusinessException(ErrorCode.AUTH_REQUIRED);
-					}
-					return new LoginResult.LoggedIn(issueTokens(user));
-				})
-				.orElseGet(() -> new LoginResult.SignupRequired(jwtTokenService.issueSignupToken(identity)));
+		return transactionTemplate.execute(status ->
+				authIdentityRepository.findByProviderAndProviderUserId(identity.provider(), identity.providerUserId())
+						.<LoginResult>map(linked -> {
+							User user = linked.getUser();
+							if (!user.isActive()) {
+								throw new BusinessException(ErrorCode.AUTH_REQUIRED);
+							}
+							return new LoginResult.LoggedIn(issueTokens(user));
+						})
+						.orElseGet(() -> new LoginResult.SignupRequired(jwtTokenService.issueSignupToken(identity))));
 	}
 
 	@Transactional
