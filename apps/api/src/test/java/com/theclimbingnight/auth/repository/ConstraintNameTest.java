@@ -17,6 +17,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 /** 실제 DB(H2 MySQL 모드)가 위반한 제약 이름을 원인 사슬에 싣는지 확인한다. AuthService의 분기가 이에 기댄다. */
 @DataJpaTest
+@org.springframework.context.annotation.Import({com.theclimbingnight.common.config.ClockConfig.class,
+		com.theclimbingnight.common.config.JpaAuditingConfig.class})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class ConstraintNameTest {
 

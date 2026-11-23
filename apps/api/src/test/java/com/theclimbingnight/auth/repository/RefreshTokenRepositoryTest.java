@@ -14,6 +14,8 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 
 @DataJpaTest
+@org.springframework.context.annotation.Import({com.theclimbingnight.common.config.ClockConfig.class,
+		com.theclimbingnight.common.config.JpaAuditingConfig.class})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class RefreshTokenRepositoryTest {
 
