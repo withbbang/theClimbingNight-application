@@ -25,7 +25,10 @@ public enum ErrorCode {
 	ROSTER_CSV_ENCODING(HttpStatus.BAD_REQUEST, "CSV 파일을 UTF-8로 저장해 다시 올려 주세요."),
 	ROSTER_CSV_TOO_MANY_ROWS(HttpStatus.BAD_REQUEST, "CSV는 한 번에 5,000행까지 올릴 수 있습니다."),
 	MEMBERSHIP_ALREADY_MEMBER(HttpStatus.CONFLICT, "이미 동호회원입니다."),
-	MEMBERSHIP_REQUEST_PENDING(HttpStatus.CONFLICT, "이미 심사 중인 신청이 있습니다.");
+	MEMBERSHIP_REQUEST_PENDING(HttpStatus.CONFLICT, "이미 심사 중인 신청이 있습니다."),
+	MEMBERSHIP_REQUEST_ALREADY_REVIEWED(HttpStatus.CONFLICT, "이미 처리된 신청입니다."),
+	ROSTER_ALREADY_LINKED(HttpStatus.CONFLICT, "다른 회원과 연결된 명부 항목입니다."),
+	MEMBERSHIP_LINKED_ELSEWHERE(HttpStatus.CONFLICT, "이 회원은 이미 다른 명부 항목에 연결되어 있습니다.");
 
 	private final HttpStatus status;
 	private final String message;

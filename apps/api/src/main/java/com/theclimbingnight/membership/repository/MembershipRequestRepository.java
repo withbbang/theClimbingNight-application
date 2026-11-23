@@ -18,6 +18,13 @@ public interface MembershipRequestRepository extends JpaRepository<MembershipReq
 
 	Optional<MembershipRequest> findFirstByUserIdOrderByIdDesc(long userId);
 
+	/**
+	 * 잠그기 전에 신청자 ID만 읽는다. 엔티티를 영속성 컨텍스트에 올리지 않아야
+	 * 뒤이은 findByIdForUpdate가 캐시된 옛 상태 대신 잠근 시점의 행을 돌려준다.
+	 */
+	@Query("select m.user.id from MembershipRequest m where m.id = :id")
+	Optional<Long> findUserIdById(@Param("id") long id);
+
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select m from MembershipRequest m where m.id = :id")
 	Optional<MembershipRequest> findByIdForUpdate(@Param("id") long id);

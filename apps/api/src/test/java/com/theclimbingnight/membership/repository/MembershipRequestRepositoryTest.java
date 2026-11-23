@@ -6,6 +6,7 @@ import com.theclimbingnight.membership.entity.MembershipRequest;
 import com.theclimbingnight.membership.entity.MembershipRequestStatus;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,9 @@ class MembershipRequestRepositoryTest {
 
 	@Autowired
 	UserRepository userRepository;
+
+	@Autowired
+	EntityManager entityManager;
 
 	@Test
 	void 사용자의_가장_최근_신청을_찾는다() {
@@ -61,5 +65,22 @@ class MembershipRequestRepositoryTest {
 
 		// then
 		assertThat(pending).extracting(MembershipRequest::getSomoimNickname).containsExactly("first", "third");
+	}
+
+	@Test
+	void 신청자_ID만_읽고_신청_엔티티는_올리지_않는다() {
+		// given
+		User user = userRepository.save(User.create("u"));
+		MembershipRequest saved = membershipRequestRepository.saveAndFlush(MembershipRequest.create(user, "철수"));
+		entityManager.clear();
+
+		// when
+		var userId = membershipRequestRepository.findUserIdById(saved.getId());
+
+		// then
+		assertThat(userId).contains(user.getId());
+		assertThat(entityManager.getEntityManagerFactory().getPersistenceUnitUtil()
+				.isLoaded(entityManager.getReference(MembershipRequest.class, saved.getId()))).isFalse();
+		assertThat(membershipRequestRepository.findUserIdById(saved.getId() + 1000)).isEmpty();
 	}
 }
