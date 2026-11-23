@@ -1,0 +1,8 @@
+spring:
+  datasource:
+    url: jdbc:h2:file:./.data/theclimbingnight;MODE=MySQL
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: validate

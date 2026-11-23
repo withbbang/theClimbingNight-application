@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: theclimbingnight-api
+  profiles:
+    default: local
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+# Task 3·5에서 채운다.
+app:
+  auth: {}
