@@ -23,7 +23,9 @@ public enum ErrorCode {
 	USER_NICKNAME_TAKEN(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
 	ROSTER_CSV_INVALID(HttpStatus.BAD_REQUEST, "CSV 첫 줄에 '소모임닉네임' 머리글이 있어야 합니다."),
 	ROSTER_CSV_ENCODING(HttpStatus.BAD_REQUEST, "CSV 파일을 UTF-8로 저장해 다시 올려 주세요."),
-	ROSTER_CSV_TOO_MANY_ROWS(HttpStatus.BAD_REQUEST, "CSV는 한 번에 5,000행까지 올릴 수 있습니다.");
+	ROSTER_CSV_TOO_MANY_ROWS(HttpStatus.BAD_REQUEST, "CSV는 한 번에 5,000행까지 올릴 수 있습니다."),
+	MEMBERSHIP_ALREADY_MEMBER(HttpStatus.CONFLICT, "이미 동호회원입니다."),
+	MEMBERSHIP_REQUEST_PENDING(HttpStatus.CONFLICT, "이미 심사 중인 신청이 있습니다.");
 
 	private final HttpStatus status;
 	private final String message;
