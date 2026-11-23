@@ -15,7 +15,9 @@ import com.theclimbingnight.user.repository.UserRepository;
 import com.theclimbingnight.user.service.NicknamePolicy;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Optional;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 public class AuthService {
+
+	private static final String CONSTRAINT_NICKNAME = "uk_users_nickname";
+	private static final String CONSTRAINT_IDENTITY = "uk_auth_identities_provider";
 
 	private final UserRepository userRepository;
 	private final AuthIdentityRepository authIdentityRepository;
@@ -80,11 +85,8 @@ public class AuthService {
 			authIdentityRepository.saveAndFlush(
 					AuthIdentity.link(user, identity.provider(), identity.providerUserId()));
 		} catch (DataIntegrityViolationException e) {
-			// 동시 가입: 같은 소셜 계정이 먼저 저장됐으면 이미 가입, 아니면 닉네임 충돌.
-			if (findIdentity(identity).isPresent()) {
-				throw new BusinessException(ErrorCode.AUTH_ALREADY_REGISTERED);
-			}
-			throw new BusinessException(ErrorCode.USER_NICKNAME_TAKEN);
+			// 동시 가입. 실패한 세션·스냅샷으로 재조회하지 않고 위반된 제약 이름만으로 판단한다.
+			throw toBusinessException(e);
 		}
 		return issueTokens(user);
 	}
@@ -116,6 +118,31 @@ public class AuthService {
 		refreshTokenRepository.save(RefreshToken.issue(user.getId(), RefreshTokens.hash(refreshToken),
 				clock.instant().plus(properties.refreshTtl())));
 		return new TokenPair(accessToken, accessExpiresAt, refreshToken, user);
+	}
+
+	private static RuntimeException toBusinessException(DataIntegrityViolationException e) {
+		String violated = violatedConstraints(e);
+		if (violated.contains(CONSTRAINT_IDENTITY)) {
+			return new BusinessException(ErrorCode.AUTH_ALREADY_REGISTERED);
+		}
+		if (violated.contains(CONSTRAINT_NICKNAME)) {
+			return new BusinessException(ErrorCode.USER_NICKNAME_TAKEN);
+		}
+		return e;
+	}
+
+	/** 원인 사슬의 제약 이름과 메시지를 소문자로 이어 붙인다. (DB마다 이름이 메시지에만 실리기도 한다.) */
+	private static String violatedConstraints(Throwable e) {
+		StringBuilder sb = new StringBuilder();
+		for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
+			if (t instanceof ConstraintViolationException cve && cve.getConstraintName() != null) {
+				sb.append(cve.getConstraintName()).append(' ');
+			}
+			if (t.getMessage() != null) {
+				sb.append(t.getMessage()).append(' ');
+			}
+		}
+		return sb.toString().toLowerCase(Locale.ROOT);
 	}
 
 	private Optional<AuthIdentity> findIdentity(SocialIdentity identity) {

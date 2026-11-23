@@ -186,16 +186,23 @@ class AuthServiceTest {
 		assertCode(() -> service.signup(signupToken, "Climber"), ErrorCode.USER_NICKNAME_TAKEN);
 	}
 
+	private static DataIntegrityViolationException violation(String constraintName) {
+		java.sql.SQLException sql = new java.sql.SQLException("Duplicate entry for key '" + constraintName + "'");
+		return new DataIntegrityViolationException("could not execute statement",
+				new org.hibernate.exception.ConstraintViolationException("could not execute statement", sql,
+						constraintName));
+	}
+
 	@Test
-	void 동시_가입으로_닉네임_유니크_인덱스가_깨지면_409다() {
+	void 동시_가입으로_닉네임_유니크_제약이_깨지면_409다() {
 		// given
 		String signupToken = jwtTokenService.issueSignupToken(KAKAO_42);
-		given(userRepository.saveAndFlush(any(User.class))).willThrow(new DataIntegrityViolationException("dup"));
-		given(authIdentityRepository.findByProviderAndProviderUserId(SocialProvider.KAKAO, "42"))
-				.willReturn(Optional.empty());
+		given(userRepository.saveAndFlush(any(User.class))).willThrow(violation("uk_users_nickname"));
 
 		// when, then
 		assertCode(() -> service.signup(signupToken, "climber"), ErrorCode.USER_NICKNAME_TAKEN);
+		verify(authIdentityRepository, org.mockito.Mockito.times(1))
+				.findByProviderAndProviderUserId(SocialProvider.KAKAO, "42");
 	}
 
 	@Test
@@ -203,12 +210,35 @@ class AuthServiceTest {
 		// given
 		String signupToken = jwtTokenService.issueSignupToken(KAKAO_42);
 		given(authIdentityRepository.saveAndFlush(any(AuthIdentity.class)))
-				.willThrow(new DataIntegrityViolationException("dup"));
-		given(authIdentityRepository.findByProviderAndProviderUserId(SocialProvider.KAKAO, "42"))
-				.willReturn(Optional.empty(), Optional.of(AuthIdentity.link(user(1L), SocialProvider.KAKAO, "42")));
+				.willThrow(violation("uk_auth_identities_provider"));
 
 		// when, then
 		assertCode(() -> service.signup(signupToken, "climber"), ErrorCode.AUTH_ALREADY_REGISTERED);
+		verify(authIdentityRepository, org.mockito.Mockito.times(1))
+				.findByProviderAndProviderUserId(SocialProvider.KAKAO, "42");
+	}
+
+	@Test
+	void 제약_이름이_메시지에만_있어도_구분한다() {
+		// given
+		String signupToken = jwtTokenService.issueSignupToken(KAKAO_42);
+		given(authIdentityRepository.saveAndFlush(any(AuthIdentity.class))).willThrow(
+				new DataIntegrityViolationException("x", new java.sql.SQLException(
+						"Unique index or primary key violation: \"PUBLIC.UK_AUTH_IDENTITIES_PROVIDER_INDEX_3\"")));
+
+		// when, then
+		assertCode(() -> service.signup(signupToken, "climber"), ErrorCode.AUTH_ALREADY_REGISTERED);
+	}
+
+	@Test
+	void 알_수_없는_제약_위반은_그대로_던진다() {
+		// given
+		String signupToken = jwtTokenService.issueSignupToken(KAKAO_42);
+		DataIntegrityViolationException unknown = violation("uk_something_else");
+		given(userRepository.saveAndFlush(any(User.class))).willThrow(unknown);
+
+		// when, then
+		assertThatThrownBy(() -> service.signup(signupToken, "climber")).isSameAs(unknown);
 	}
 
 	@Test
