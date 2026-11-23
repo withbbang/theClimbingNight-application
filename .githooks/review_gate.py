@@ -71,22 +71,29 @@ def unverified_commits(base, new):
     """base..new 중 리뷰 기록에 닿지 않고 문서만 바꾸지도 않은 커밋. 확인할 수 없으면 [new].
 
     리뷰한 커밋 위에 문서 커밋을 얹은 경우처럼, 리뷰 기록 이후 커밋이 모두 문서만 바꾸면 빈 목록이다.
-    이미 검증된 커밋만 병합한 병합 커밋은 허용한다.
+    이미 검증된 커밋만 병합한 병합 커밋은 허용한다. 병합한 쪽 부모가 검증 대상(pending)에 있어도,
+    그 부모가 검증을 통과했으면(예: 리뷰 뒤 Docs 커밋) 검증된 것으로 본다.
     """
     excluded = [f"^{sha}" for sha in reviewed_shas() if resolve(sha)]
     if base and resolve(base):
         excluded.append(f"^{base}")
-    listed = git("rev-list", new, *excluded)
+    # 부모를 자식보다 먼저 판정해야 병합 커밋이 부모의 판정 결과를 쓸 수 있다.
+    listed = git("rev-list", "--topo-order", "--reverse", new, *excluded)
     if listed is None:
         return [new]
     pending = listed.split()
     bad = []
+    bad_set = set()
     for commit in pending:
         commit_parents = parents(commit)
         if not commit_parents:
+            is_bad = True
+        elif len(commit_parents) > 1:
+            # pending 밖의 부모는 리뷰 기록·base에 포함된 검증된 커밋이다.
+            is_bad = any(p in bad_set for p in commit_parents[1:])
+        else:
+            is_bad = not docs_only(changes(commit_parents[0], commit))
+        if is_bad:
             bad.append(commit)
-        elif len(commit_parents) > 1 and not set(commit_parents[1:]) & set(pending):
-            continue
-        elif not docs_only(changes(commit_parents[0], commit)):
-            bad.append(commit)
+            bad_set.add(commit)
     return bad

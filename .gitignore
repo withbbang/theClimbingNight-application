@@ -12,7 +12,7 @@ build/
 .gradle/
 *.class
 *.jar
-!gradle/wrapper/gradle-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.jar
 
 # Expo / React Native
 .expo/
@@ -29,6 +29,9 @@ apps/mobile/android/
 *.key
 *.mobileprovision
 *.pem
+# EAS 로컬 자격증명 (키스토어 비밀번호 포함)
+credentials.json
+credentials/
 
 # env
 .env

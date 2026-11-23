@@ -10,8 +10,14 @@ BODY_MAX = 72
 
 
 def check(message):
+    # `git commit -v` 는 scissors 줄 아래에 diff 를 붙여 넘긴다. git 이 버리는 부분이니 검사하지 않는다.
+    kept = []
+    for line in message.splitlines():
+        if line.startswith("#") and ">8" in line:
+            break
+        kept.append(line)
     # 에디터로 작성하면 템플릿 주석이 포함된 채로 넘어온다.
-    lines = [l.rstrip() for l in message.splitlines() if not l.startswith("#")]
+    lines = [l.rstrip() for l in kept if not l.startswith("#")]
     while lines and not lines[0]:
         lines.pop(0)
     if not lines:
