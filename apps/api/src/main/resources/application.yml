@@ -10,6 +10,19 @@ spring:
         jdbc:
           time_zone: UTC
 
-# Task 3·5에서 채운다.
 app:
-  auth: {}
+  auth:
+    jwt-secret: ${JWT_SECRET}
+    access-ttl: 30m
+    refresh-ttl: 30d
+    signup-ttl: 10m
+    kakao:
+      base-url: https://kapi.kakao.com
+    naver:
+      base-url: https://openapi.naver.com
+    google:
+      client-ids: ${GOOGLE_CLIENT_IDS:}
+      jwks-url: https://www.googleapis.com/oauth2/v3/certs
+    apple:
+      audiences: ${APPLE_AUDIENCES:}
+      jwks-url: https://appleid.apple.com/auth/keys

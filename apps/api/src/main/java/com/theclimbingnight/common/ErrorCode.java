@@ -12,7 +12,8 @@ public enum ErrorCode {
 	COMMON_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 항목을 찾을 수 없습니다."),
 	COMMON_INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
 	AUTH_REQUIRED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
-	AUTH_FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다.");
+	AUTH_FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다."),
+	AUTH_SIGNUP_EXPIRED(HttpStatus.BAD_REQUEST, "가입 시간이 지났습니다. 처음부터 다시 로그인해 주세요.");
 
 	private final HttpStatus status;
 	private final String message;
