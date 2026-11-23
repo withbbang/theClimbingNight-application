@@ -53,6 +53,10 @@ public class User extends BaseTimeEntity {
 		this.nickname = nickname;
 	}
 
+	public void changeRole(Role role) {
+		this.role = role;
+	}
+
 	public void withdraw(Instant now) {
 		this.status = UserStatus.WITHDRAWN;
 		this.withdrawnAt = now;
