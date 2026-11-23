@@ -6,3 +6,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
+app:
+  auth:
+    # 로컬 개발 전용 기본값. 운영(prod)에서는 쓰면 안 되며 prod 프로파일은 JWT_SECRET을 반드시 받는다.
+    jwt-secret: ${JWT_SECRET:local-only-dev-secret-never-use-in-production-0123456789}
