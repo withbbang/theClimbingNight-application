@@ -99,7 +99,10 @@ public class AuthService {
 		User user = userRepository.findById(stored.getUserId())
 				.filter(User::isActive)
 				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
-		stored.revoke(now);
+		// 조회 뒤 다른 요청이 먼저 폐기했을 수 있으므로 조건부 UPDATE로 한 요청만 통과시킨다.
+		if (refreshTokenRepository.revokeIfActive(stored.getId(), now) == 0) {
+			throw new BusinessException(ErrorCode.AUTH_REQUIRED);
+		}
 		return issueTokens(user);
 	}
 

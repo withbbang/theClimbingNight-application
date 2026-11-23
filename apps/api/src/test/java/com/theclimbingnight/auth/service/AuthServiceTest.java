@@ -278,15 +278,31 @@ class AuthServiceTest {
 		User user = user(7L);
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		ReflectionTestUtils.setField(old, "id", 99L);
 		given(userRepository.findById(7L)).willReturn(Optional.of(user));
+		given(refreshTokenRepository.revokeIfActive(any(Long.class), any(Instant.class))).willReturn(1);
 
 		// when
 		TokenPair tokens = service.refresh("old-token");
 
 		// then
-		assertThat(old.getRevokedAt()).isEqualTo(START);
+		verify(refreshTokenRepository).revokeIfActive(99L, START);
 		assertThat(tokens.refreshToken()).isNotEqualTo("old-token");
 		assertThat(savedRefresh().getTokenHash()).isEqualTo(RefreshTokens.hash(tokens.refreshToken()));
+	}
+
+	@Test
+	void 동시에_다른_요청이_먼저_폐기했으면_401이고_새_토큰을_저장하지_않는다() {
+		// given: 조회 시점에는 유효했지만 조건부 폐기가 0건이다
+		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		ReflectionTestUtils.setField(old, "id", 99L);
+		given(userRepository.findById(7L)).willReturn(Optional.of(user(7L)));
+		given(refreshTokenRepository.revokeIfActive(any(Long.class), any(Instant.class))).willReturn(0);
+
+		// when, then
+		assertCode(() -> service.refresh("old-token"), ErrorCode.AUTH_REQUIRED);
+		verify(refreshTokenRepository, never()).save(any());
 	}
 
 	@Test

@@ -21,6 +21,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 @SpringBootTest(properties = "spring.main.allow-bean-definition-overriding=true")
 @AutoConfigureMockMvc
@@ -98,6 +99,7 @@ class AuthFlowIntegrationTest {
 				.andExpect(status().isNoContent());
 		mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + access))
 				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.success").value(false))
 				.andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
 
 		// then: 같은 소셜 계정은 새 계정으로 가입해야 하고, 탈퇴자의 닉네임은 다시 쓸 수 있다
@@ -105,6 +107,48 @@ class AuthFlowIntegrationTest {
 		assertThat(again.at("/data/status").asText()).isEqualTo("SIGNUP_REQUIRED");
 		JsonNode reSignedUp = signup(again.at("/data/signupToken").asText(), "클라이머");
 		assertThat(reSignedUp.at("/data/user/nickname").asText()).isEqualTo("클라이머");
+	}
+
+	private ResultActions refresh(String refreshToken) throws Exception {
+		return mockMvc.perform(post("/api/v1/auth/refresh").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"refreshToken\":\"" + refreshToken + "\"}"));
+	}
+
+	@Test
+	void 리프레시하면_새_토큰을_받고_이전_토큰은_거절된다() throws Exception {
+		// given
+		JsonNode first = json(login("u2"));
+		JsonNode signedUp = signup(first.at("/data/signupToken").asText(), "회전왕");
+		String oldRefresh = signedUp.at("/data/refreshToken").asText();
+
+		// when
+		JsonNode rotated = json(refresh(oldRefresh).andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString());
+
+		// then
+		String newRefresh = rotated.at("/data/refreshToken").asText();
+		assertThat(newRefresh).isNotBlank().isNotEqualTo(oldRefresh);
+		refresh(oldRefresh).andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.success").value(false))
+				.andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+		refresh(newRefresh).andExpect(status().isOk());
+	}
+
+	@Test
+	void 탈퇴_전에_발급된_리프레시_토큰은_탈퇴_후_거절된다() throws Exception {
+		// given
+		JsonNode first = json(login("u3"));
+		JsonNode signedUp = signup(first.at("/data/signupToken").asText(), "탈퇴예정");
+		String access = signedUp.at("/data/accessToken").asText();
+		String refreshToken = signedUp.at("/data/refreshToken").asText();
+
+		// when
+		mockMvc.perform(delete("/api/v1/users/me").header("Authorization", "Bearer " + access))
+				.andExpect(status().isNoContent());
+
+		// then
+		refresh(refreshToken).andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
 	}
 
 	@Test

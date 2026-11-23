@@ -8,7 +8,7 @@ CREATE TABLE users (
     updated_at   DATETIME(6) NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT uk_users_nickname UNIQUE (nickname)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE auth_identities (
     id               BIGINT       NOT NULL AUTO_INCREMENT,
@@ -20,7 +20,7 @@ CREATE TABLE auth_identities (
     PRIMARY KEY (id),
     CONSTRAINT fk_auth_identities_user FOREIGN KEY (user_id) REFERENCES users (id),
     CONSTRAINT uk_auth_identities_provider UNIQUE (provider, provider_user_id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE refresh_tokens (
     id         BIGINT      NOT NULL AUTO_INCREMENT,
@@ -33,6 +33,6 @@ CREATE TABLE refresh_tokens (
     PRIMARY KEY (id),
     CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users (id),
     CONSTRAINT uk_refresh_tokens_hash UNIQUE (token_hash)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens (user_id);
