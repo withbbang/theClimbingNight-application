@@ -47,7 +47,7 @@ public class RosterMemberController {
 	@GetMapping
 	public ApiResponse<PageResponse<RosterMemberResponse>> search(@RequestParam(required = false) String q,
 			@RequestParam(required = false) Boolean linked,
-			@RequestParam(defaultValue = "0") @Min(0) int page,
+			@RequestParam(defaultValue = "0") @Min(0) @Max(10000) int page,
 			@RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
 		return ApiResponse.success(rosterQueryService.search(q, linked, page, size));
 	}

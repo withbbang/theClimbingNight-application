@@ -21,7 +21,7 @@ public enum ErrorCode {
 	AUTH_ALREADY_REGISTERED(HttpStatus.CONFLICT, "이미 가입된 계정입니다. 다시 로그인해 주세요."),
 	USER_NICKNAME_INVALID(HttpStatus.BAD_REQUEST, "닉네임은 2~16자의 한글, 영문, 숫자, 밑줄(_)만 쓸 수 있습니다."),
 	USER_NICKNAME_TAKEN(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
-	ROSTER_CSV_INVALID(HttpStatus.BAD_REQUEST, "CSV 첫 줄에 '소모임닉네임' 머리글이 있어야 합니다."),
+	ROSTER_CSV_INVALID(HttpStatus.BAD_REQUEST, "CSV 형식이 올바르지 않습니다. 첫 줄에 '소모임닉네임' 머리글이 있어야 하고 따옴표가 올바르게 닫혀야 합니다."),
 	ROSTER_CSV_ENCODING(HttpStatus.BAD_REQUEST, "CSV 파일을 UTF-8로 저장해 다시 올려 주세요."),
 	ROSTER_CSV_TOO_MANY_ROWS(HttpStatus.BAD_REQUEST, "CSV는 한 번에 5,000행까지 올릴 수 있습니다."),
 	MEMBERSHIP_ALREADY_MEMBER(HttpStatus.CONFLICT, "이미 동호회원입니다."),

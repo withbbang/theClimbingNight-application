@@ -132,4 +132,15 @@ class RosterMemberControllerTest {
 				.andExpect(status().isForbidden());
 	}
 
+	@Test
+	void 명부_검색의_page가_10001이면_400이다() throws Exception {
+		// given
+		String admin = bearer(2L, Role.ADMIN);
+
+		// when, then
+		mockMvc.perform(get("/api/v1/roster-members?page=10001").header("Authorization", admin))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("COMMON_VALIDATION_FAILED"));
+	}
+
 }

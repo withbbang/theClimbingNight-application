@@ -64,7 +64,7 @@ public class MembershipRequestController {
 	@GetMapping
 	public ApiResponse<PageResponse<MembershipReviewItemResponse>> list(
 			@RequestParam(defaultValue = "PENDING") MembershipRequestStatus status,
-			@RequestParam(defaultValue = "0") @Min(0) int page,
+			@RequestParam(defaultValue = "0") @Min(0) @Max(10000) int page,
 			@RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
 		return ApiResponse.success(membershipReviewService.list(status, page, size));
 	}

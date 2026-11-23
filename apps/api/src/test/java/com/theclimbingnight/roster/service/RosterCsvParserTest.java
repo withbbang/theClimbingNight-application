@@ -92,6 +92,41 @@ class RosterCsvParserTest {
 	}
 
 	@Test
+	void 닫히지_않은_따옴표가_있으면_ROSTER_CSV_INVALID다() {
+		// given
+		String csv = "소모임닉네임,메모\n\"철수,x\n";
+
+		// when, then
+		assertThatThrownBy(() -> parse(csv))
+				.isInstanceOfSatisfying(BusinessException.class,
+						e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ROSTER_CSV_INVALID));
+	}
+
+	@Test
+	void 따옴표로_시작하는_값이_따옴표로_끝나지_않으면_ROSTER_CSV_INVALID다() {
+		// given
+		String csv = "소모임닉네임,메모\n\"별\"이,x\n";
+
+		// when, then
+		assertThatThrownBy(() -> parse(csv))
+				.isInstanceOfSatisfying(BusinessException.class,
+						e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ROSTER_CSV_INVALID));
+	}
+
+	@Test
+	void 전각_공백도_값_앞뒤에서_제거한다() {
+		// given
+		String csv = "소모임닉네임,메모\n철수\u3000,\u3000메모\u3000\n";
+
+		// when
+		RosterCsvResult result = parse(csv);
+
+		// then
+		assertThat(result.errors()).isEmpty();
+		assertThat(result.rows()).containsExactly(new RosterCsvRow(2, "철수", "메모"));
+	}
+
+	@Test
 	void 빈_파일이면_ROSTER_CSV_INVALID다() {
 		// given, when, then
 		assertThatThrownBy(() -> parse(""))

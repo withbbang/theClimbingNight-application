@@ -13,6 +13,7 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.csv.CSVException;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -20,7 +21,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 명부 CSV 파서. 형식: UTF-8(BOM 허용), 첫 줄 머리글 `소모임닉네임,메모`(메모 열은 생략 가능),
- * 빈 줄 무시, 값 앞뒤 공백 제거, 데이터 최대 5,000행.
+ * 빈 줄 무시, 값 앞뒤 공백(전각 포함) 제거, 데이터 최대 5,000행.
  */
 @Component
 public class RosterCsvParser {
@@ -52,8 +53,12 @@ public class RosterCsvParser {
 				return readRows(parser);
 			}
 		} catch (IOException | UncheckedIOException e) {
-			if (isEncodingFailure(e)) {
+			if (hasCause(e, CharacterCodingException.class)) {
 				throw new BusinessException(ErrorCode.ROSTER_CSV_ENCODING);
+			}
+			if (hasCause(e, CSVException.class)) {
+				// 닫히지 않은 따옴표, 따옴표로 시작하는 값 등 형식이 깨진 CSV
+				throw new BusinessException(ErrorCode.ROSTER_CSV_INVALID);
 			}
 			throw e instanceof UncheckedIOException unchecked ? unchecked : new UncheckedIOException((IOException) e);
 		} catch (IllegalArgumentException e) {
@@ -76,7 +81,7 @@ public class RosterCsvParser {
 				errors.add(new RowError(line, error));
 				continue;
 			}
-			rows.add(new RosterCsvRow(line, record.get(NICKNAME_HEADER), note(record)));
+			rows.add(new RosterCsvRow(line, nickname(record), note(record)));
 		}
 		return new RosterCsvResult(rows, errors);
 	}
@@ -85,7 +90,7 @@ public class RosterCsvParser {
 		if (!record.isConsistent()) {
 			return "열 개수가 머리글과 다릅니다.";
 		}
-		String nickname = record.get(NICKNAME_HEADER);
+		String nickname = nickname(record);
 		if (nickname.isEmpty()) {
 			return "소모임닉네임이 비어 있습니다.";
 		}
@@ -99,11 +104,16 @@ public class RosterCsvParser {
 		return null;
 	}
 
+	// setTrim은 U+0020 이하만 자르므로 전각 공백까지 strip()으로 정규화한다 (CandidateMatcher와 동일).
+	private static String nickname(CSVRecord record) {
+		return record.get(NICKNAME_HEADER).strip();
+	}
+
 	private static String note(CSVRecord record) {
 		if (!record.isMapped(NOTE_HEADER)) {
 			return null;
 		}
-		String note = record.get(NOTE_HEADER);
+		String note = record.get(NOTE_HEADER).strip();
 		return note.isEmpty() ? null : note;
 	}
 
@@ -114,9 +124,9 @@ public class RosterCsvParser {
 		}
 	}
 
-	private static boolean isEncodingFailure(Throwable e) {
+	private static boolean hasCause(Throwable e, Class<? extends Throwable> type) {
 		for (Throwable t = e; t != null; t = t.getCause()) {
-			if (t instanceof CharacterCodingException) {
+			if (type.isInstance(t)) {
 				return true;
 			}
 		}

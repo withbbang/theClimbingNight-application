@@ -39,6 +39,7 @@ public interface RosterMemberRepository extends JpaRepository<RosterMember, Long
 			+ "or (:linked = false and r.user is null))")
 	Page<RosterMember> search(@Param("q") String q, @Param("linked") Boolean linked, Pageable pageable);
 
+	// 주의: clearAutomatically로 영속성 컨텍스트가 비워진다. 같은 트랜잭션에서 이 리스너 뒤에 도는 탈퇴 리스너가 미리 읽어 둔 엔티티의 변경은 사라질 수 있다.
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query("update RosterMember r set r.user = null where r.user.id = :userId")
 	int unlinkUser(@Param("userId") long userId);

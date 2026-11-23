@@ -30,7 +30,7 @@ public class MemberController {
 	@RequireRole(Role.ADMIN)
 	@GetMapping
 	public ApiResponse<PageResponse<MemberResponse>> list(@RequestParam(required = false) String q,
-			@RequestParam(defaultValue = "0") @Min(0) int page,
+			@RequestParam(defaultValue = "0") @Min(0) @Max(10000) int page,
 			@RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
 		return ApiResponse.success(memberService.list(q, page, size));
 	}
