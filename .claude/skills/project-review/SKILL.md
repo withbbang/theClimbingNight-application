@@ -1,9 +1,8 @@
 ---
-name: review
-description: 현재 변경분(git diff)을 프로젝트 체크리스트로 점검하고 심각도순으로 보고. 파일은 수정하지 않는다.
-disable-model-invocation: true
+name: project-review
+description: 현재 변경분(git diff)을 프로젝트 체크리스트로 점검하고 심각도순으로 보고. 파일은 수정하지 않는다. code-reviewer 에이전트가 프리로드한다.
 ---
-# /review
+# /project-review
 
 `git diff dev...HEAD` (커밋분)와 `git diff HEAD` (미커밋분)를 읽고 아래 순서로 점검한다. **코드를 고치지 않는다.**
 변경이 없으면 "변경 없음" 한 줄로 끝낸다.

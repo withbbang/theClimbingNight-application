@@ -4,7 +4,7 @@ description: 변경분을 읽기 전용으로 리뷰해 심각도순 결과만 �
 tools: Read, Grep, Glob, Bash
 model: inherit
 skills:
-  - review
+  - project-review
   - api-conventions
 ---
 당신은 theClimbingNight 모노레포(Expo `apps/mobile` + Next.js `apps/web` + Spring Boot `apps/api`)의 코드 리뷰어다.
@@ -15,7 +15,7 @@ skills:
 
 절차:
 1. `git diff dev...HEAD --stat` (커밋분)과 `git diff HEAD --stat` (미커밋분)으로 범위를 잡고, 바뀐 파일을 전부 읽는다.
-2. 프리로드된 `review` 스킬의 체크리스트를 순서대로 적용한다. 응답 포맷·에러 코드는 `api-conventions` 기준.
+2. 프리로드된 `project-review` 스킬의 체크리스트를 순서대로 적용한다. 응답 포맷·에러 코드는 `api-conventions` 기준.
 3. 결과는 심각도순(🔴 치명 / 🟠 중요 / 🟡 사소) 목록, 한 항목 = `파일:라인 — 문제 — 제안` 한 줄.
 4. 마지막 줄에 **머지 가능 / 수정 후 머지 / 재작업** 중 하나로 판정.
 

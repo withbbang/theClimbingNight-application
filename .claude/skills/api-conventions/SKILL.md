@@ -43,7 +43,7 @@ description: apps/api 와 apps/mobile · apps/web 이 공유하는 REST 규약 �
 
 ## 네이밍
 - JSON 키 camelCase. 날짜·시각은 ISO-8601 오프셋 포함 문자열.
-- DTO 클래스: `XxxCreateRequest` / `XxxResponse`. 앱·웹 타입도 같은 이름으로 `types/api/xxx.ts`.
+- DTO 클래스: 요청 `Xxx<행위>Request`(`PostCreateRequest`, `PostUpdateRequest`) / 응답 `XxxResponse`. 앱·웹 타입도 같은 이름으로 `types/api/xxx.ts`.
 
 ## 클라이언트 쪽 구현
 - `lib/api.ts` 의 `apiFetch<T>()` 하나로 호출한다. `success: false` 면 `ApiError(code, message)` 를 throw.

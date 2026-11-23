@@ -6,7 +6,7 @@ paths:
 
 - 패키지: `com.theclimbingnight.<domain>` 아래 `controller` / `service` / `repository` / `dto` / `entity`. 도메인 단위 수직 분할, 공통은 `com.theclimbingnight.common`.
 - 레이어: Controller는 요청 검증·DTO 매핑·응답만. 비즈니스 로직은 Service. Repository는 Spring Data JPA 인터페이스.
-- DTO: 요청 `XxxRequest`, 응답 `XxxResponse`, **Java `record`** 로. Entity는 Controller 밖으로 절대 노출하지 않는다.
+- DTO: 요청 `Xxx<행위>Request`(`PostCreateRequest`, `PostUpdateRequest`), 응답 `XxxResponse`, **Java `record`** 로. Entity는 Controller 밖으로 절대 노출하지 않는다.
 - 응답 래퍼·에러 코드·페이징은 `api-conventions` 스킬 그대로. 새 포맷 만들지 않는다.
 - 검증: `@Valid` + `jakarta.validation`. 도메인 예외는 `BusinessException(ErrorCode)` 하나를 상속, `GlobalExceptionHandler`(`@RestControllerAdvice`) 한 곳에서 변환.
 - 권한: 역할은 `USER`(일반회원) · `MEMBER`(동호회원) · `ADMIN`(운영진). 동호회원 전용 API(벙 신청·일정·참석률)는 서버에서 역할을 검사한다. 화면에서 숨기는 것만으로 막지 않는다.

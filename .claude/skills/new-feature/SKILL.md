@@ -12,7 +12,7 @@ API → 앱/웹 순서로 간다. 각 단계는 테스트가 통과해야 다음
 - 새 API가 필요하면 `api-conventions` 스킬 포맷으로 URL·요청·응답 초안을 먼저 보여주고 **사용자 확인 후** 진행.
 
 ## 2. API (apps/api)
-1. DTO(`XxxRequest` / `XxxResponse` record) → Service → Controller 순으로 작성.
+1. DTO(`Xxx<행위>Request` / `XxxResponse` record) → Service → Controller 순으로 작성.
 2. 레이어 규칙은 `.claude/rules/api.md`를 따른다.
 3. Service 단위 테스트(Mockito) + Controller `@WebMvcTest` 작성. 권한이 있으면 거부되는 경우도 테스트한다.
 4. `./gradlew test` 통과 확인. 실패하면 여기서 고친다.

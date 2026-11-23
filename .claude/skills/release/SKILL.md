@@ -18,8 +18,9 @@ disable-model-invocation: true
    ```
 4. `apps/mobile`:
    ```bash
-   pnpm install --frozen-lockfile && pnpm lint && pnpm test && pnpm expo-doctor
+   pnpm install --frozen-lockfile && pnpm lint && pnpm test && pnpm dlx expo-doctor
    ```
+   `expo-doctor`·`eas-cli`는 의존성으로 설치하지 않고 `pnpm dlx`로 그때그때 실행한다.
    앱 버전(`app.config.ts`의 `version`)이 이번 릴리스 버전과 맞는지 확인한다. 네이티브 코드가 바뀌었으면 스토어 빌드가 필요하고, JS만 바뀌었으면 OTA 업데이트로 충분하다고 구분해서 알린다.
 5. 직전 태그 찾기: `git describe --tags --abbrev=0` (없으면 첫 커밋부터).
 6. `git log <직전 태그>..HEAD --oneline` 을 `.gitmessage.txt` 타입별로 묶어 변경 요약 작성.
@@ -27,7 +28,7 @@ disable-model-invocation: true
    ```bash
    git tag v<version> && git push origin v<version>
    # 앱 스토어 빌드가 필요하면
-   cd apps/mobile && pnpm eas build --platform all --profile production
+   cd apps/mobile && pnpm dlx eas-cli build --platform all --profile production
    # JS만 바뀌었으면
-   cd apps/mobile && pnpm eas update --branch production
+   cd apps/mobile && pnpm dlx eas-cli update --branch production
    ```

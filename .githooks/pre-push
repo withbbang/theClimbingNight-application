@@ -5,6 +5,8 @@
   이미 검증된 커밋만 병합한 병합 커밋이어야 한다.
 - master: 원격 dev 에 있거나 함께 푸시하는 dev 에 있는 커밋만 올릴 수 있다.
   (피처 → dev → master 순서)
+- 모든 브랜치: 원격 커밋을 덮어쓰는 강제 푸시(`--force`, `+ref`)와 dev·master 삭제를 막는다.
+  권한 규칙의 문자열 매칭은 `git push origin dev --force` 같은 형태를 놓치므로 여기서 결과로 판정한다.
 """
 import sys
 
@@ -30,8 +32,18 @@ def main():
     pushed_dev = next((u[1] for u in updates if u[2] == DEV and set(u[1]) != {"0"}), None)
     for _, new, remote_ref, remote in updates:
         if set(new) == {"0"}:
+            if remote_ref in (DEV, MASTER):
+                print(f"차단: 원격 {remote_ref.removeprefix('refs/heads/')} 브랜치는 삭제할 수 없습니다.", file=sys.stderr)
+                return 1
             continue
         remote = None if set(remote) == {"0"} else remote
+        if remote and (resolve(remote) is None or not is_ancestor(remote, new)):
+            print(
+                f"차단: {remote_ref.removeprefix('refs/heads/')} 푸시가 원격 커밋 {remote[:7]} 을(를) 덮어씁니다 (강제 푸시). "
+                "원격에 로컬에 없는 커밋이 있으면 `git pull` 로 받아 병합한 뒤 푸시하세요.",
+                file=sys.stderr,
+            )
+            return 1
         if remote_ref == MASTER:
             dev = pushed_dev or resolve(ORIGIN_DEV)
             if dev is None or not is_ancestor(new, dev):
