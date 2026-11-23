@@ -18,6 +18,7 @@ app:
     signup-ttl: 10m
     kakao:
       base-url: https://kapi.kakao.com
+      app-id: ${KAKAO_APP_ID:}
     naver:
       base-url: https://openapi.naver.com
     google:

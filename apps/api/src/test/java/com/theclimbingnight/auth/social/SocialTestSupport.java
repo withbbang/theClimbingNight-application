@@ -51,8 +51,12 @@ final class SocialTestSupport {
 	}
 
 	static AuthProperties props(List<String> googleAud, List<String> appleAud) {
+		return props(googleAud, appleAud, "12345");
+	}
+
+	static AuthProperties props(List<String> googleAud, List<String> appleAud, String kakaoAppId) {
 		return new AuthProperties("secret", Duration.ofMinutes(30), Duration.ofDays(30), Duration.ofMinutes(10),
-				new AuthProperties.Provider("https://kapi.kakao.com"),
+				new AuthProperties.Kakao("https://kapi.kakao.com", kakaoAppId),
 				new AuthProperties.Provider("https://openapi.naver.com"),
 				new AuthProperties.Google(googleAud, "https://example.invalid/google"),
 				new AuthProperties.Apple(appleAud, "https://example.invalid/apple"));

@@ -35,10 +35,10 @@ class KakaoTokenVerifierTest {
 	@Test
 	void 응답의_id를_사용자ID로_돌려준다() {
 		// given
-		server.expect(requestTo("https://kapi.kakao.com/v2/user/me"))
+		server.expect(requestTo("https://kapi.kakao.com/v1/user/access_token_info"))
 				.andExpect(method(HttpMethod.GET))
 				.andExpect(header("Authorization", "Bearer tok"))
-				.andRespond(withSuccess("{\"id\":1234567}", MediaType.APPLICATION_JSON));
+				.andRespond(withSuccess("{\"id\":1234567,\"expires_in\":3600,\"app_id\":12345}", MediaType.APPLICATION_JSON));
 
 		// when
 		SocialIdentity identity = verifier.verify("tok");
@@ -48,10 +48,47 @@ class KakaoTokenVerifierTest {
 		server.verify();
 	}
 
+	private BusinessException verifyWith(String kakaoAppId, String body) {
+		RestClient.Builder builder = RestClient.builder();
+		MockRestServiceServer mock = MockRestServiceServer.bindTo(builder).build();
+		KakaoTokenVerifier custom = new KakaoTokenVerifier(builder.build(),
+				SocialTestSupport.props(List.of(), List.of(), kakaoAppId));
+		mock.expect(requestTo("https://kapi.kakao.com/v1/user/access_token_info"))
+				.andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+		return catchThrowableOfType(BusinessException.class, () -> custom.verify("tok"));
+	}
+
+	@Test
+	void app_id가_다른_앱의_토큰이면_AUTH_INVALID_SOCIAL_TOKEN이다() {
+		// given, when
+		BusinessException e = verifyWith("12345", "{\"id\":1,\"expires_in\":3600,\"app_id\":99999}");
+
+		// then
+		assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_INVALID_SOCIAL_TOKEN);
+	}
+
+	@Test
+	void 설정한_앱ID가_비어_있으면_AUTH_INVALID_SOCIAL_TOKEN이다() {
+		// given, when
+		BusinessException e = verifyWith("", "{\"id\":1,\"expires_in\":3600,\"app_id\":12345}");
+
+		// then
+		assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_INVALID_SOCIAL_TOKEN);
+	}
+
+	@Test
+	void 응답에_app_id가_없으면_AUTH_INVALID_SOCIAL_TOKEN이다() {
+		// given, when
+		BusinessException e = verifyWith("12345", "{\"id\":1,\"expires_in\":3600}");
+
+		// then
+		assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_INVALID_SOCIAL_TOKEN);
+	}
+
 	@Test
 	void 제공자가_401이면_AUTH_INVALID_SOCIAL_TOKEN이다() {
 		// given
-		server.expect(requestTo("https://kapi.kakao.com/v2/user/me")).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+		server.expect(requestTo("https://kapi.kakao.com/v1/user/access_token_info")).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
 
 		// when
 		BusinessException e = catchThrowableOfType(BusinessException.class, () -> verifier.verify("tok"));
@@ -63,7 +100,7 @@ class KakaoTokenVerifierTest {
 	@Test
 	void 제공자가_500이면_AUTH_PROVIDER_UNAVAILABLE이다() {
 		// given
-		server.expect(requestTo("https://kapi.kakao.com/v2/user/me")).andRespond(withServerError());
+		server.expect(requestTo("https://kapi.kakao.com/v1/user/access_token_info")).andRespond(withServerError());
 
 		// when
 		BusinessException e = catchThrowableOfType(BusinessException.class, () -> verifier.verify("tok"));

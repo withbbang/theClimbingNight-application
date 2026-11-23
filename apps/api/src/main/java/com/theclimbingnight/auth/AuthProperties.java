@@ -10,12 +10,16 @@ public record AuthProperties(
 		Duration accessTtl,
 		Duration refreshTtl,
 		Duration signupTtl,
-		Provider kakao,
+		Kakao kakao,
 		Provider naver,
 		Google google,
 		Apple apple) {
 
 	public record Provider(String baseUrl) {
+	}
+
+	/** appId는 카카오 앱 ID. 토큰이 우리 앱에서 발급된 것인지 확인하는 데 쓴다. */
+	public record Kakao(String baseUrl, String appId) {
 	}
 
 	public record Google(List<String> clientIds, String jwksUrl) {
