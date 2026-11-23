@@ -53,7 +53,7 @@ pnpm build
 - 미디어: 원본은 NAS, 사용자에게 보여주는 압축본·썸네일은 Cloudflare R2. 앱은 API가 발급한 presigned URL로 R2에 직접 올린다. 영상 원본을 Cloudflare Tunnel을 거쳐 NAS로 직접 올리는 설계는 하지 않는다 (무료 플랜 100MB 요청 제한).
 - `.env*` 파일은 읽지도 고치지도 않는다. 예시는 `.env.example`에만 쓴다. (Read·Edit·Write·Bash 모두 `protect-env.sh` 훅으로 차단됨. Bash는 명령에 `.env` 경로가 들어 있으면 막으니, `.env.example`만 쓰는 명령으로 나눠서 실행한다)
 - 강제 푸시와 원격 `dev`·`master` 삭제는 `.githooks/pre-push`가 막는다.
-- API 환경변수를 추가하면 `application.yml`·`apps/api/.env.example`·`deploy/.env.example`·`deploy/compose.yml`(environment)·`deploy/README.md` 표를 함께 고친다.
+- API 환경변수를 추가하면 `application.yml`·`apps/api/.env.example`·`deploy/.env.example`·`deploy/compose.yml`(environment)·`deploy/README.md` 표를 함께 고친다. `deploy/`가 아직 없으면 앞의 둘만 고치고, `deploy/`를 만들 때 그때까지 추가된 키를 모두 반영한다.
 - API 응답 포맷·에러 코드는 `api-conventions` 스킬을 따른다. 임의로 새 포맷 만들지 않는다.
 - 운영 서버는 메모리 8GB NAS를 다른 프로젝트와 같이 쓴다. 새 컨테이너는 `mem_limit`을 걸고, JVM은 `-Xmx`로 제한한다.
 - 모르는 라이브러리 API는 추측하지 말고 `node_modules` / Gradle 캐시의 실제 타입·소스를 읽는다. Expo SDK·React Native는 버전마다 API가 바뀌니 설치된 버전 기준으로 확인한다.
