@@ -65,7 +65,10 @@ public class UserService {
 
 	@Transactional
 	public void withdraw(long userId) {
-		User user = findActive(userId);
+		// 승인·신청과 같은 잠금 순서(사용자 → 신청 → 명부)를 지켜, 동시 승인 결과를 낡은 상태로 덮어쓰지 않게 한다.
+		User user = userRepository.findByIdForUpdate(userId)
+				.filter(User::isActive)
+				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 		user.withdraw(clock.instant());
 		authIdentityRepository.deleteByUserId(userId);
 		refreshTokenRepository.revokeAllActiveByUserId(userId, clock.instant());

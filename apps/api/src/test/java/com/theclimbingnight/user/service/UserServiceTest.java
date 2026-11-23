@@ -127,6 +127,9 @@ class UserServiceTest {
 
 	@Test
 	void 탈퇴하면_상태와_닉네임을_지우고_소셜연결과_리프레시토큰을_정리한다() {
+		// given
+		given(userRepository.findByIdForUpdate(7L)).willReturn(Optional.of(user));
+
 		// when
 		service.withdraw(7L);
 
@@ -136,6 +139,19 @@ class UserServiceTest {
 		verify(authIdentityRepository).deleteByUserId(7L);
 		verify(refreshTokenRepository).revokeAllActiveByUserId(7L, NOW);
 		verify(eventPublisher).publishEvent(new UserWithdrawnEvent(7L));
+	}
+
+	@Test
+	void 탈퇴할_때_사용자_행을_잠근다() {
+		// given
+		given(userRepository.findByIdForUpdate(7L)).willReturn(Optional.of(user));
+
+		// when
+		service.withdraw(7L);
+
+		// then
+		verify(userRepository).findByIdForUpdate(7L);
+		verify(userRepository, never()).findById(7L);
 	}
 
 }
