@@ -35,20 +35,36 @@ class JwtTokenServiceTest {
 	@Test
 	void 발급한_액세스_토큰에서_사용자ID를_꺼낸다() {
 		// given
-		String token = service.issueAccessToken(42L);
+		String token = service.issueAccessToken(42L).token();
 
 		// when
 		long userId = service.parseAccessToken(token);
 
 		// then
 		assertThat(userId).isEqualTo(42L);
-		assertThat(service.accessTokenExpiresAt()).isEqualTo(START.plus(Duration.ofMinutes(30)));
+		assertThat(service.issueAccessToken(42L).expiresAt()).isEqualTo(START.plus(Duration.ofMinutes(30)));
+	}
+
+	@Test
+	void 만료_시각은_JWT_exp_클레임과_같고_초_단위로_잘린다() throws Exception {
+		// given
+		MutableClock millisClock = new MutableClock(Instant.parse("2026-01-01T00:00:00.789Z"));
+		JwtTokenService millisService = new JwtTokenService(props(SECRET), millisClock);
+
+		// when
+		IssuedAccessToken issued = millisService.issueAccessToken(42L);
+
+		// then
+		Instant exp = com.nimbusds.jwt.SignedJWT.parse(issued.token()).getJWTClaimsSet().getExpirationTime()
+				.toInstant();
+		assertThat(issued.expiresAt()).isEqualTo(exp);
+		assertThat(issued.expiresAt()).isEqualTo(Instant.parse("2026-01-01T00:30:00Z"));
 	}
 
 	@Test
 	void 액세스_토큰은_30분_직전까지_유효하다() {
 		// given
-		String token = service.issueAccessToken(42L);
+		String token = service.issueAccessToken(42L).token();
 
 		// when
 		clock.advance(Duration.ofMinutes(29).plusSeconds(59));
@@ -60,7 +76,7 @@ class JwtTokenServiceTest {
 	@Test
 	void 액세스_토큰은_30분이_지나면_401이다() {
 		// given
-		String token = service.issueAccessToken(42L);
+		String token = service.issueAccessToken(42L).token();
 
 		// when
 		clock.advance(Duration.ofMinutes(30).plusSeconds(1));
@@ -85,7 +101,7 @@ class JwtTokenServiceTest {
 	@Test
 	void 액세스_토큰은_가입_토큰으로_쓸_수_없다() {
 		// given
-		String access = service.issueAccessToken(42L);
+		String access = service.issueAccessToken(42L).token();
 
 		// when / then
 		assertThatThrownBy(() -> service.parseSignupToken(access))
@@ -112,7 +128,7 @@ class JwtTokenServiceTest {
 	@Test
 	void 서명이_바뀐_토큰은_401이다() {
 		// given
-		String token = service.issueAccessToken(42L);
+		String token = service.issueAccessToken(42L).token();
 		// 서명 마지막 글자는 base64url 패딩 비트라 바꿔도 바이트가 같을 수 있으므로 서명 첫 글자를 바꾼다.
 		int sigStart = token.lastIndexOf('.') + 1;
 		char first = token.charAt(sigStart);

@@ -114,12 +114,11 @@ public class AuthService {
 
 	@Transactional
 	public TokenPair issueTokens(User user) {
-		String accessToken = jwtTokenService.issueAccessToken(user.getId());
-		Instant accessExpiresAt = jwtTokenService.accessTokenExpiresAt();
+		IssuedAccessToken access = jwtTokenService.issueAccessToken(user.getId());
 		String refreshToken = refreshTokens.newToken();
 		refreshTokenRepository.save(RefreshToken.issue(user.getId(), RefreshTokens.hash(refreshToken),
 				clock.instant().plus(properties.refreshTtl())));
-		return new TokenPair(accessToken, accessExpiresAt, refreshToken, user);
+		return new TokenPair(access.token(), access.expiresAt(), refreshToken, user);
 	}
 
 	private static RuntimeException toBusinessException(DataIntegrityViolationException e) {

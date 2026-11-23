@@ -49,7 +49,7 @@ class AuthInterceptorTest {
 	}
 
 	private String bearer(long id) {
-		return "Bearer " + jwtTokenService.issueAccessToken(id);
+		return "Bearer " + jwtTokenService.issueAccessToken(id).token();
 	}
 
 	@Test

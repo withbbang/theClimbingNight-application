@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import org.springframework.stereotype.Service;
 
@@ -41,13 +42,9 @@ public class JwtTokenService {
 		this.secret = jwtSecret.getBytes(StandardCharsets.UTF_8);
 	}
 
-	public String issueAccessToken(long userId) {
-		return sign(String.valueOf(userId), TYPE_ACCESS, properties.accessTtl());
-	}
-
-	/** 지금 액세스 토큰을 발급하면 만료되는 시각. */
-	public Instant accessTokenExpiresAt() {
-		return clock.instant().plus(properties.accessTtl());
+	public IssuedAccessToken issueAccessToken(long userId) {
+		Instant expiresAt = clock.instant().plus(properties.accessTtl()).truncatedTo(ChronoUnit.SECONDS);
+		return new IssuedAccessToken(sign(String.valueOf(userId), TYPE_ACCESS, expiresAt), expiresAt);
 	}
 
 	public long parseAccessToken(String token) {
@@ -59,8 +56,8 @@ public class JwtTokenService {
 	}
 
 	public String issueSignupToken(SocialIdentity identity) {
-		return sign(identity.provider().name() + ":" + identity.providerUserId(), TYPE_SIGNUP,
-				properties.signupTtl());
+		Instant expiresAt = clock.instant().plus(properties.signupTtl()).truncatedTo(ChronoUnit.SECONDS);
+		return sign(identity.provider().name() + ":" + identity.providerUserId(), TYPE_SIGNUP, expiresAt);
 	}
 
 	public SocialIdentity parseSignupToken(String token) {
@@ -74,13 +71,13 @@ public class JwtTokenService {
 		}
 	}
 
-	private String sign(String subject, String type, java.time.Duration ttl) {
-		Instant now = clock.instant();
+	/** exp는 호출자가 계산한 값을 그대로 쓴다. JWT는 초 단위라 호출자가 미리 초 단위로 자른다. */
+	private String sign(String subject, String type, Instant expiresAt) {
 		JWTClaimsSet claims = new JWTClaimsSet.Builder()
 				.subject(subject)
 				.claim(TYPE_CLAIM, type)
-				.issueTime(Date.from(now))
-				.expirationTime(Date.from(now.plus(ttl)))
+				.issueTime(Date.from(clock.instant()))
+				.expirationTime(Date.from(expiresAt))
 				.build();
 		try {
 			SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
