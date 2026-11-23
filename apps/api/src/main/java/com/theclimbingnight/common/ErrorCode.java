@@ -20,7 +20,10 @@ public enum ErrorCode {
 	AUTH_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "로그인 서비스에 일시적인 문제가 있습니다. 잠시 후 다시 시도해 주세요."),
 	AUTH_ALREADY_REGISTERED(HttpStatus.CONFLICT, "이미 가입된 계정입니다. 다시 로그인해 주세요."),
 	USER_NICKNAME_INVALID(HttpStatus.BAD_REQUEST, "닉네임은 2~16자의 한글, 영문, 숫자, 밑줄(_)만 쓸 수 있습니다."),
-	USER_NICKNAME_TAKEN(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다.");
+	USER_NICKNAME_TAKEN(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
+	ROSTER_CSV_INVALID(HttpStatus.BAD_REQUEST, "CSV 첫 줄에 '소모임닉네임' 머리글이 있어야 합니다."),
+	ROSTER_CSV_ENCODING(HttpStatus.BAD_REQUEST, "CSV 파일을 UTF-8로 저장해 다시 올려 주세요."),
+	ROSTER_CSV_TOO_MANY_ROWS(HttpStatus.BAD_REQUEST, "CSV는 한 번에 5,000행까지 올릴 수 있습니다.");
 
 	private final HttpStatus status;
 	private final String message;

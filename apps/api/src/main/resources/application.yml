@@ -3,6 +3,10 @@ spring:
     name: theclimbingnight-api
   profiles:
     default: local
+  servlet:
+    multipart:
+      max-file-size: 1MB
+      max-request-size: 1MB
   jpa:
     open-in-view: false
     properties:
