@@ -5,12 +5,14 @@ import com.theclimbingnight.auth.web.CurrentUser;
 import com.theclimbingnight.auth.web.RequireRole;
 import com.theclimbingnight.common.ApiResponse;
 import com.theclimbingnight.common.PageResponse;
+import com.theclimbingnight.membership.dto.BulkApproveResponse;
 import com.theclimbingnight.membership.dto.MembershipApplyRequest;
 import com.theclimbingnight.membership.dto.MembershipApproveRequest;
 import com.theclimbingnight.membership.dto.MembershipRejectRequest;
 import com.theclimbingnight.membership.dto.MembershipRequestResponse;
 import com.theclimbingnight.membership.dto.MembershipReviewItemResponse;
 import com.theclimbingnight.membership.entity.MembershipRequestStatus;
+import com.theclimbingnight.membership.service.MembershipBulkApproveService;
 import com.theclimbingnight.membership.service.MembershipReviewService;
 import com.theclimbingnight.membership.service.MembershipService;
 import com.theclimbingnight.user.entity.Role;
@@ -34,11 +36,14 @@ public class MembershipRequestController {
 
 	private final MembershipService membershipService;
 	private final MembershipReviewService membershipReviewService;
+	private final MembershipBulkApproveService membershipBulkApproveService;
 
 	public MembershipRequestController(MembershipService membershipService,
-			MembershipReviewService membershipReviewService) {
+			MembershipReviewService membershipReviewService,
+			MembershipBulkApproveService membershipBulkApproveService) {
 		this.membershipService = membershipService;
 		this.membershipReviewService = membershipReviewService;
+		this.membershipBulkApproveService = membershipBulkApproveService;
 	}
 
 	@PostMapping
@@ -62,6 +67,12 @@ public class MembershipRequestController {
 			@RequestParam(defaultValue = "0") @Min(0) int page,
 			@RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
 		return ApiResponse.success(membershipReviewService.list(status, page, size));
+	}
+
+	@RequireRole(Role.ADMIN)
+	@PostMapping("/bulk-approve")
+	public ApiResponse<BulkApproveResponse> bulkApprove(@CurrentUser AuthenticatedUser user) {
+		return ApiResponse.success(membershipBulkApproveService.approveAll(user.id()));
 	}
 
 	@RequireRole(Role.ADMIN)

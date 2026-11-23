@@ -16,8 +16,10 @@ import com.theclimbingnight.common.GlobalExceptionHandler;
 import com.theclimbingnight.common.PageResponse;
 import com.theclimbingnight.common.config.ClockConfig;
 import com.theclimbingnight.common.config.WebConfig;
+import com.theclimbingnight.membership.dto.BulkApproveResponse;
 import com.theclimbingnight.membership.dto.MembershipRequestResponse;
 import com.theclimbingnight.membership.entity.MembershipRequestStatus;
+import com.theclimbingnight.membership.service.MembershipBulkApproveService;
 import com.theclimbingnight.membership.service.MembershipReviewService;
 import com.theclimbingnight.membership.service.MembershipService;
 import com.theclimbingnight.user.entity.Role;
@@ -56,6 +58,9 @@ class MembershipRequestControllerTest {
 
 	@MockitoBean
 	MembershipReviewService membershipReviewService;
+
+	@MockitoBean
+	MembershipBulkApproveService membershipBulkApproveService;
 
 	private String bearer(long id) {
 		return bearer(id, Role.USER);
@@ -179,6 +184,27 @@ class MembershipRequestControllerTest {
 		mockMvc.perform(post("/api/v1/membership-requests/5/reject").header("Authorization", bearer)
 				.contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"" + "a".repeat(200) + "\"}"))
 				.andExpect(status().isOk());
+	}
+
+	@Test
+	void 일괄_승인은_ADMIN이_호출하면_결과를_돌려준다() throws Exception {
+		// given
+		given(membershipBulkApproveService.approveAll(1L)).willReturn(new BulkApproveResponse(2, 1));
+
+		// when, then
+		mockMvc.perform(post("/api/v1/membership-requests/bulk-approve")
+				.header("Authorization", bearer(1L, Role.ADMIN)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.approvedCount").value(2))
+				.andExpect(jsonPath("$.data.skippedCount").value(1));
+	}
+
+	@Test
+	void 일괄_승인은_일반_회원이면_403이다() throws Exception {
+		// when, then
+		mockMvc.perform(post("/api/v1/membership-requests/bulk-approve")
+				.header("Authorization", bearer(2L, Role.USER)))
+				.andExpect(status().isForbidden());
 	}
 
 	private MembershipRequestResponse response() {
