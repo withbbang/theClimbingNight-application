@@ -15,6 +15,7 @@ import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
 import com.theclimbingnight.user.service.NicknamePolicy;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -26,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
 	private static final String CONSTRAINT_NICKNAME = "uk_users_nickname";
+	/** 폐기 직후 응답이 유실돼 앱이 재시도하는 경우를 살리는 유예. 이 안의 재사용은 전체 폐기하지 않는다. */
+	private static final Duration REUSE_GRACE = Duration.ofSeconds(30);
 	private static final String CONSTRAINT_IDENTITY = "uk_auth_identities_provider";
 
 	private final UserRepository userRepository;
@@ -90,16 +93,31 @@ public class AuthService {
 		return issueTokens(user);
 	}
 
-	@Transactional
+	/**
+	 * 재사용 감지로 전체 폐기를 한 뒤 BusinessException(401)을 던지므로, 그 예외로는 롤백하지 않는다.
+	 * noRollbackFor가 없으면 예외 때문에 트랜잭션이 롤백돼 전체 폐기가 사라진다.
+	 */
+	@Transactional(noRollbackFor = BusinessException.class)
 	public TokenPair refresh(String refreshToken) {
 		Instant now = clock.instant();
 		RefreshToken stored = refreshTokenRepository.findByTokenHash(RefreshTokens.hash(refreshToken))
-				.filter(token -> token.isUsable(now))
 				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
+		if (stored.getRevokedAt() != null) {
+			// 이미 폐기된 토큰이 다시 왔다. 만료 전이고 유예가 지났다면 탈취·재사용으로 보고 모두 폐기한다.
+			boolean withinGrace = now.isBefore(stored.getRevokedAt().plus(REUSE_GRACE));
+			if (!withinGrace && now.isBefore(stored.getExpiresAt())) {
+				refreshTokenRepository.revokeAllActiveByUserId(stored.getUserId(), now);
+			}
+			throw new BusinessException(ErrorCode.AUTH_REQUIRED);
+		}
+		if (!stored.isUsable(now)) {
+			throw new BusinessException(ErrorCode.AUTH_REQUIRED);
+		}
 		User user = userRepository.findById(stored.getUserId())
 				.filter(User::isActive)
 				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 		// 조회 뒤 다른 요청이 먼저 폐기했을 수 있으므로 조건부 UPDATE로 한 요청만 통과시킨다.
+		// 동시 경합은 재사용 공격이 아니므로 전체 폐기 없이 401만 준다.
 		if (refreshTokenRepository.revokeIfActive(stored.getId(), now) == 0) {
 			throw new BusinessException(ErrorCode.AUTH_REQUIRED);
 		}

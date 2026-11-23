@@ -317,6 +317,63 @@ class AuthServiceTest {
 		assertCode(() -> service.refresh("old-token"), ErrorCode.AUTH_REQUIRED);
 	}
 
+	private RefreshToken revokedToken(Instant revokedAt) {
+		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
+		ReflectionTestUtils.setField(old, "id", 99L);
+		old.revoke(revokedAt);
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		given(userRepository.findById(7L)).willReturn(Optional.of(user(7L)));
+		return old;
+	}
+
+	@Test
+	void 유예_시간이_지난_뒤_폐기된_토큰을_재사용하면_회원의_모든_토큰을_폐기하고_401이다() {
+		// given
+		revokedToken(START);
+		clock.advance(Duration.ofSeconds(31));
+
+		// when, then
+		assertCode(() -> service.refresh("old-token"), ErrorCode.AUTH_REQUIRED);
+		verify(refreshTokenRepository).revokeAllActiveByUserId(7L, START.plusSeconds(31));
+		verify(refreshTokenRepository, never()).save(any());
+	}
+
+	@Test
+	void 유예_시간_안에_폐기된_토큰을_재사용하면_전체_폐기_없이_401이다() {
+		// given
+		revokedToken(START);
+		clock.advance(Duration.ofSeconds(29));
+
+		// when, then
+		assertCode(() -> service.refresh("old-token"), ErrorCode.AUTH_REQUIRED);
+		verify(refreshTokenRepository, never()).revokeAllActiveByUserId(any(Long.class), any(Instant.class));
+	}
+
+	@Test
+	void 동시_경합으로_조건부_폐기가_0건이면_전체_폐기_없이_401이다() {
+		// given
+		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
+		ReflectionTestUtils.setField(old, "id", 99L);
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		given(userRepository.findById(7L)).willReturn(Optional.of(user(7L)));
+		given(refreshTokenRepository.revokeIfActive(any(Long.class), any(Instant.class))).willReturn(0);
+
+		// when, then
+		assertCode(() -> service.refresh("old-token"), ErrorCode.AUTH_REQUIRED);
+		verify(refreshTokenRepository, never()).revokeAllActiveByUserId(any(Long.class), any(Instant.class));
+	}
+
+	@Test
+	void 만료된_뒤_폐기된_토큰을_재사용해도_전체_폐기는_하지_않는다() {
+		// given
+		revokedToken(START);
+		clock.advance(Duration.ofDays(31));
+
+		// when, then
+		assertCode(() -> service.refresh("old-token"), ErrorCode.AUTH_REQUIRED);
+		verify(refreshTokenRepository, never()).revokeAllActiveByUserId(any(Long.class), any(Instant.class));
+	}
+
 	@Test
 	void 없는_리프레시_토큰이면_401이다() {
 		// given
