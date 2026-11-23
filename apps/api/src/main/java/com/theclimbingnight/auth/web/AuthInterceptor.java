@@ -32,32 +32,26 @@ public class AuthInterceptor implements HandlerInterceptor {
 		if (!(handler instanceof HandlerMethod handlerMethod)) {
 			return true;
 		}
-		boolean publicApi = findAnnotation(handlerMethod, PublicApi.class) != null;
+		RequireRole requireRole = findAnnotation(handlerMethod, RequireRole.class);
+		// @RequireRole은 @PublicApi보다 우선한다: 역할이 필요하면 항상 유효한 사용자를 요구한다.
+		boolean anonymousAllowed = findAnnotation(handlerMethod, PublicApi.class) != null && requireRole == null;
 		AuthenticatedUser user;
 		try {
 			user = authenticate(request);
 		} catch (BusinessException e) {
-			if (publicApi) {
+			if (anonymousAllowed) {
 				return true;
 			}
 			throw e;
 		}
-		RequireRole requireRole = findAnnotation(handlerMethod, RequireRole.class);
-		if (requireRole != null) {
-			if (user == null) {
-				throw new BusinessException(ErrorCode.AUTH_REQUIRED);
-			}
-			if (!user.role().atLeast(requireRole.value())) {
-				throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-			}
+		if (requireRole != null && !user.role().atLeast(requireRole.value())) {
+			throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
 		}
-		if (user != null) {
-			request.setAttribute(ATTRIBUTE, user);
-		}
+		request.setAttribute(ATTRIBUTE, user);
 		return true;
 	}
 
-	/** 토큰이 없으면 null, 있는데 유효하지 않으면 AUTH_REQUIRED. 공개 API가 아니면 null도 AUTH_REQUIRED. */
+	/** 헤더가 없거나 Bearer가 아니거나 토큰·사용자가 유효하지 않으면 AUTH_REQUIRED. 성공하면 항상 non-null. */
 	private AuthenticatedUser authenticate(HttpServletRequest request) {
 		String header = request.getHeader(HttpHeaders.AUTHORIZATION);
 		if (header == null || !header.startsWith(BEARER_PREFIX)) {

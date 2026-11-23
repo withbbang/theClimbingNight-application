@@ -26,6 +26,13 @@ class ProbeController {
 		return describe(user);
 	}
 
+	@PublicApi
+	@RequireRole(Role.ADMIN)
+	@GetMapping("/api/probe/public-admin")
+	Map<String, Object> publicAdmin(@CurrentUser AuthenticatedUser user) {
+		return describe(user);
+	}
+
 	private static Map<String, Object> describe(AuthenticatedUser user) {
 		Map<String, Object> body = new HashMap<>();
 		body.put("id", user == null ? null : user.id());

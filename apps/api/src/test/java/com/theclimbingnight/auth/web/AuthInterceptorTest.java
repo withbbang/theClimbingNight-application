@@ -153,4 +153,36 @@ class AuthInterceptorTest {
 				.andExpect(jsonPath("$.anonymous").value(true));
 	}
 
+	@Test
+	void 공개_API라도_RequireRole이_있으면_토큰_없이는_401이다() throws Exception {
+		// given, when, then
+		mockMvc.perform(get("/api/probe/public-admin"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+	}
+
+	@Test
+	void 공개_API라도_RequireRole이_있으면_역할이_부족하면_403이다() throws Exception {
+		// given
+		given(userRepository.findById(7L)).willReturn(Optional.of(user(7L, Role.USER, false)));
+
+		// when, then
+		mockMvc.perform(get("/api/probe/public-admin").header("Authorization", bearer(7L)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error.code").value("AUTH_FORBIDDEN"));
+	}
+
+	@Test
+	void 공개_API에_유효한_토큰을_보내면_사용자가_주입된다() throws Exception {
+		// given
+		given(userRepository.findById(7L)).willReturn(Optional.of(user(7L, Role.USER, false)));
+
+		// when, then
+		mockMvc.perform(get("/api/probe/public").header("Authorization", bearer(7L)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.anonymous").value(false))
+				.andExpect(jsonPath("$.id").value(7))
+				.andExpect(jsonPath("$.role").value("USER"));
+	}
+
 }
