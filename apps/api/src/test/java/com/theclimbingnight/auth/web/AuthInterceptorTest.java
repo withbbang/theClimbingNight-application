@@ -81,6 +81,18 @@ class AuthInterceptorTest {
 	}
 
 	@Test
+	void Bearer_스킴은_대소문자를_구분하지_않는다() throws Exception {
+		// given
+		given(userRepository.findById(7L)).willReturn(Optional.of(user(7L, Role.USER, false)));
+		String lower = "bearer " + bearer(7L).substring("Bearer ".length());
+
+		// when, then
+		mockMvc.perform(get("/api/probe/user").header("Authorization", lower))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(7));
+	}
+
+	@Test
 	void 탈퇴한_사용자의_유효한_토큰이면_401이다() throws Exception {
 		// given
 		given(userRepository.findById(7L)).willReturn(Optional.of(user(7L, Role.USER, true)));

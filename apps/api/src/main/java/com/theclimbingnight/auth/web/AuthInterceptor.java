@@ -54,7 +54,7 @@ public class AuthInterceptor implements HandlerInterceptor {
 	/** 헤더가 없거나 Bearer가 아니거나 토큰·사용자가 유효하지 않으면 AUTH_REQUIRED. 성공하면 항상 non-null. */
 	private AuthenticatedUser authenticate(HttpServletRequest request) {
 		String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-		if (header == null || !header.startsWith(BEARER_PREFIX)) {
+		if (header == null || !header.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
 			throw new BusinessException(ErrorCode.AUTH_REQUIRED);
 		}
 		long userId = jwtTokenService.parseAccessToken(header.substring(BEARER_PREFIX.length()).trim());
