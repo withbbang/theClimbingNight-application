@@ -20,7 +20,7 @@ description: apps/api 와 apps/mobile · apps/web 이 공유하는 REST 규약 �
 { "success": false, "error": { "code": "COMMON_NOT_FOUND", "message": "요청한 항목을 찾을 수 없습니다." } }
 ```
 - `data` 는 객체 또는 배열. `null` 응답은 204 로.
-- HTTP 상태: 200 조회/수정 · 201 생성 · 204 삭제 · 400 검증 실패 · 401 인증 필요 · 403 권한 없음 · 404 없음 · 409 충돌 · 429 시도 제한 · 500 서버 오류.
+- HTTP 상태: 200 조회/수정 · 201 생성 · 204 삭제 · 400 검증 실패 · 401 인증 필요 · 403 권한 없음 · 404 없음 · 409 충돌 · 429 시도 제한 · 500 서버 오류 · 503 외부 서비스 일시 장애.
 
 ## 에러 코드
 - 형식 `<DOMAIN>_<REASON>` 대문자 스네이크. `ErrorCode` enum 한 곳에서 관리 (`apps/api/.../common/ErrorCode.java`).
@@ -32,8 +32,17 @@ description: apps/api 와 apps/mobile · apps/web 이 공유하는 REST 규약 �
 | `COMMON_VALIDATION_FAILED` | 400 | 요청 필드 검증 실패 |
 | `COMMON_NOT_FOUND` | 404 | 리소스 없음 |
 | `COMMON_INTERNAL_ERROR` | 500 | 처리되지 않은 서버 오류 |
-| `AUTH_REQUIRED` | 401 | 로그인 필요 또는 토큰 만료 |
+| `AUTH_REQUIRED` | 401 | 로그인 필요 또는 토큰 만료. 클라이언트는 재로그인으로 보낸다 |
 | `AUTH_FORBIDDEN` | 403 | 역할 부족 (예: 일반회원이 동호회원 전용 기능 호출) |
+| `AUTH_SIGNUP_EXPIRED` | 400 | 가입 시간이 지났습니다. 처음부터 다시 로그인해 주세요. |
+| `AUTH_INVALID_SOCIAL_TOKEN` | 401 | 소셜 로그인 정보를 확인하지 못했습니다. 세션 만료가 아니라 소셜 토큰 검증 실패이므로 재로그인 처리와 구분한다 |
+| `AUTH_PROVIDER_UNAVAILABLE` | 503 | 로그인 서비스에 일시적인 문제가 있습니다. 잠시 후 다시 시도해 주세요. |
+| `AUTH_ALREADY_REGISTERED` | 409 | 이미 가입된 계정입니다. 다시 로그인해 주세요. |
+| `USER_NICKNAME_INVALID` | 400 | 닉네임은 2~16자의 한글, 영문, 숫자, 밑줄(_)만 쓸 수 있습니다. |
+| `USER_NICKNAME_TAKEN` | 409 | 이미 사용 중인 닉네임입니다. |
+
+- 401은 두 종류다. `AUTH_REQUIRED`는 세션이 없거나 만료된 것이라 로그인 화면으로 보내고, `AUTH_INVALID_SOCIAL_TOKEN`은 소셜 토큰 검증 실패라 세션 만료가 아니다.
+- 리프레시 토큰은 회전하며 한 번만 쓸 수 있다. 클라이언트는 리프레시 요청을 single-flight(동시에 하나만)로 보내야 한다. 같은 토큰의 중복 요청은 `AUTH_REQUIRED`(401)를 받는다.
 
 도메인별 코드는 기능을 만들 때 이 표에 추가한다.
 
