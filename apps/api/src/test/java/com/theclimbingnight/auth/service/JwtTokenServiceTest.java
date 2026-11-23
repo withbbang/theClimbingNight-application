@@ -113,8 +113,10 @@ class JwtTokenServiceTest {
 	void 서명이_바뀐_토큰은_401이다() {
 		// given
 		String token = service.issueAccessToken(42L);
-		char last = token.charAt(token.length() - 1);
-		String tampered = token.substring(0, token.length() - 1) + (last == 'A' ? 'B' : 'A');
+		// 서명 마지막 글자는 base64url 패딩 비트라 바꿔도 바이트가 같을 수 있으므로 서명 첫 글자를 바꾼다.
+		int sigStart = token.lastIndexOf('.') + 1;
+		char first = token.charAt(sigStart);
+		String tampered = token.substring(0, sigStart) + (first == 'A' ? 'B' : 'A') + token.substring(sigStart + 1);
 
 		// when / then
 		assertThatThrownBy(() -> service.parseAccessToken(tampered))
