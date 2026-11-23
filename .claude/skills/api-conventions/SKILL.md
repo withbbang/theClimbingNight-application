@@ -20,7 +20,7 @@ description: apps/api 와 apps/mobile · apps/web 이 공유하는 REST 규약 �
 { "success": false, "error": { "code": "COMMON_NOT_FOUND", "message": "요청한 항목을 찾을 수 없습니다." } }
 ```
 - `data` 는 객체 또는 배열. `null` 응답은 204 로.
-- HTTP 상태: 200 조회/수정 · 201 생성 · 204 삭제 · 400 검증 실패 · 401 인증 필요 · 403 권한 없음 · 404 없음 · 409 충돌 · 429 시도 제한 · 500 서버 오류 · 503 외부 서비스 일시 장애.
+- HTTP 상태: 200 조회/수정 · 201 생성 · 204 삭제 · 400 검증 실패 · 401 인증 필요 · 403 권한 없음 · 404 없음 · 405 지원하지 않는 메서드 · 409 충돌 · 415 지원하지 않는 요청 형식 · 429 시도 제한 · 500 서버 오류 · 503 외부 서비스 일시 장애.
 
 ## 에러 코드
 - 형식 `<DOMAIN>_<REASON>` 대문자 스네이크. `ErrorCode` enum 한 곳에서 관리 (`apps/api/.../common/ErrorCode.java`).
@@ -31,6 +31,8 @@ description: apps/api 와 apps/mobile · apps/web 이 공유하는 REST 규약 �
 |---|---|---|
 | `COMMON_VALIDATION_FAILED` | 400 | 요청 필드 검증 실패 |
 | `COMMON_NOT_FOUND` | 404 | 리소스 없음 |
+| `COMMON_METHOD_NOT_ALLOWED` | 405 | 지원하지 않는 HTTP 메서드 |
+| `COMMON_UNSUPPORTED_MEDIA_TYPE` | 415 | 지원하지 않는 Content-Type |
 | `COMMON_INTERNAL_ERROR` | 500 | 처리되지 않은 서버 오류 |
 | `AUTH_REQUIRED` | 401 | 로그인 필요 또는 토큰 만료. 클라이언트는 재로그인으로 보낸다 |
 | `AUTH_FORBIDDEN` | 403 | 역할 부족 (예: 일반회원이 동호회원 전용 기능 호출) |

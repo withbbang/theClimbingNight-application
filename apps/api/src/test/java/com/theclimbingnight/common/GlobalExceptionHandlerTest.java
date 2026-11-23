@@ -66,6 +66,24 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	void 지원하지_않는_메서드는_405_COMMON_METHOD_NOT_ALLOWED다() throws Exception {
+		// given, when, then
+		mockMvc.perform(get("/test/valid"))
+				.andExpect(status().isMethodNotAllowed())
+				.andExpect(jsonPath("$.error.code").value("COMMON_METHOD_NOT_ALLOWED"))
+				.andExpect(jsonPath("$.error.message").value("지원하지 않는 요청 방식입니다."));
+	}
+
+	@Test
+	void 지원하지_않는_Content_Type은_415_COMMON_UNSUPPORTED_MEDIA_TYPE이다() throws Exception {
+		// given, when, then
+		mockMvc.perform(post("/test/valid").contentType(MediaType.TEXT_PLAIN).content("name"))
+				.andExpect(status().isUnsupportedMediaType())
+				.andExpect(jsonPath("$.error.code").value("COMMON_UNSUPPORTED_MEDIA_TYPE"))
+				.andExpect(jsonPath("$.error.message").value("지원하지 않는 요청 형식입니다."));
+	}
+
+	@Test
 	void 처리되지_않은_예외는_500이고_내부_메시지를_노출하지_않는다() throws Exception {
 		// given, when
 		String response = mockMvc.perform(get("/test/boom"))
