@@ -56,17 +56,19 @@ class MeetupWithdrawalListenerTest {
 	@Test
 	void 탈퇴하면_다가오는_벙_신청을_취소하고_대기자를_승격한다() {
 		// given
-		RosterMember roster = RosterMember.create("철수", null, RosterSource.APP);
-		ReflectionTestUtils.setField(roster, "id", 3L);
-		given(rosterMemberRepository.findByUserId(USER_ID)).willReturn(Optional.of(roster));
-		Meetup later = meetup(20L);
+		RosterMember roster = roster();
 		Meetup sooner = meetup(10L);
+		Meetup later = meetup(20L);
 		// 기준 시각 안쪽에서 확정된 신청이어도 탈퇴 취소는 늦은 취소가 아니다.
-		MeetupApplication confirmed = MeetupApplication.create(later, roster, true, NOW.minusSeconds(3600));
 		MeetupApplication waiting = MeetupApplication.create(sooner, roster, false, NOW.minusSeconds(3600));
-		given(applicationRepository.findActiveUpcoming(3L, NOW)).willReturn(List.of(confirmed, waiting));
+		MeetupApplication confirmed = MeetupApplication.create(later, roster, true, NOW.minusSeconds(3600));
+		given(applicationRepository.findActiveUpcomingMeetupIds(3L, NOW)).willReturn(List.of(10L, 20L));
 		given(meetupRepository.findByIdForUpdate(10L)).willReturn(Optional.of(sooner));
 		given(meetupRepository.findByIdForUpdate(20L)).willReturn(Optional.of(later));
+		given(applicationRepository.findByMeetupIdAndRosterMemberIdForUpdate(10L, 3L))
+				.willReturn(Optional.of(waiting));
+		given(applicationRepository.findByMeetupIdAndRosterMemberIdForUpdate(20L, 3L))
+				.willReturn(Optional.of(confirmed));
 
 		// when
 		listener.on(new UserWithdrawnEvent(USER_ID));
@@ -80,10 +82,54 @@ class MeetupWithdrawalListenerTest {
 		assertThat(waiting.isLateCancel()).isFalse();
 		verify(promoter).promote(later, NOW);
 		verify(promoter, never()).promote(sooner, NOW);
-		// 여러 벙을 잠글 때는 ID 순서로 잠가 동시 탈퇴끼리 교착하지 않게 한다.
-		InOrder order = inOrder(meetupRepository);
+		// 벙을 먼저 잠그고 신청을 다시 읽는다. 벙은 ID 순서로 잠근다.
+		InOrder order = inOrder(meetupRepository, applicationRepository);
 		order.verify(meetupRepository).findByIdForUpdate(10L);
+		order.verify(applicationRepository).findByMeetupIdAndRosterMemberIdForUpdate(10L, 3L);
 		order.verify(meetupRepository).findByIdForUpdate(20L);
+		order.verify(applicationRepository).findByMeetupIdAndRosterMemberIdForUpdate(20L, 3L);
+	}
+
+	@Test
+	void 잠금_뒤에_이미_내보내진_신청은_건드리지_않는다() {
+		// given
+		RosterMember roster = roster();
+		Meetup meetup = meetup(10L);
+		MeetupApplication removed = MeetupApplication.create(meetup, roster, true, NOW.minusSeconds(3600));
+		removed.remove(NOW.minusSeconds(10));
+		given(applicationRepository.findActiveUpcomingMeetupIds(3L, NOW)).willReturn(List.of(10L));
+		given(meetupRepository.findByIdForUpdate(10L)).willReturn(Optional.of(meetup));
+		given(applicationRepository.findByMeetupIdAndRosterMemberIdForUpdate(10L, 3L))
+				.willReturn(Optional.of(removed));
+
+		// when
+		listener.on(new UserWithdrawnEvent(USER_ID));
+
+		// then
+		assertThat(removed.getStatus()).isEqualTo(MeetupApplicationStatus.REMOVED);
+		assertThat(removed.getCancelReason()).isNull();
+		assertThat(removed.getCanceledAt()).isEqualTo(NOW.minusSeconds(10));
+		verify(promoter, never()).promote(any(), any());
+	}
+
+	@Test
+	void 잠금_뒤에_취소된_벙의_신청은_건드리지_않는다() {
+		// given
+		RosterMember roster = roster();
+		Meetup meetup = meetup(10L);
+		meetup.cancel(NOW.minusSeconds(10));
+		MeetupApplication confirmed = MeetupApplication.create(meetup, roster, true, NOW.minusSeconds(3600));
+		given(applicationRepository.findActiveUpcomingMeetupIds(3L, NOW)).willReturn(List.of(10L));
+		given(meetupRepository.findByIdForUpdate(10L)).willReturn(Optional.of(meetup));
+		given(applicationRepository.findByMeetupIdAndRosterMemberIdForUpdate(10L, 3L))
+				.willReturn(Optional.of(confirmed));
+
+		// when
+		listener.on(new UserWithdrawnEvent(USER_ID));
+
+		// then
+		assertThat(confirmed.getStatus()).isEqualTo(MeetupApplicationStatus.CONFIRMED);
+		verify(promoter, never()).promote(any(), any());
 	}
 
 	@Test
@@ -95,9 +141,16 @@ class MeetupWithdrawalListenerTest {
 		listener.on(new UserWithdrawnEvent(USER_ID));
 
 		// then
-		verify(applicationRepository, never()).findActiveUpcoming(anyLong(), any());
+		verify(applicationRepository, never()).findActiveUpcomingMeetupIds(anyLong(), any());
 		verify(meetupRepository, never()).findByIdForUpdate(anyLong());
 		verify(promoter, never()).promote(any(), any());
+	}
+
+	private RosterMember roster() {
+		RosterMember roster = RosterMember.create("철수", null, RosterSource.APP);
+		ReflectionTestUtils.setField(roster, "id", 3L);
+		given(rosterMemberRepository.findByUserId(USER_ID)).willReturn(Optional.of(roster));
+		return roster;
 	}
 
 	private static Meetup meetup(long id) {
