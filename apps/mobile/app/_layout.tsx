@@ -16,6 +16,9 @@ import { queryClient } from '@/lib/query-client';
 import { sessionStore } from '@/lib/session-store';
 import { cleanUpSession } from '@/lib/sign-out';
 
+// 푸시나 링크로 상세 화면을 바로 열어도 뒤로 가면 탭이 나온다.
+export const unstable_settings = { anchor: '(tabs)' };
+
 void SplashScreen.preventAutoHideAsync();
 
 function Navigation() {
