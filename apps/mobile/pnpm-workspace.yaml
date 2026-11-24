@@ -1,0 +1,9 @@
+# 네이티브 라이브러리가 중첩 경로를 찾지 못하는 문제를 막는다.
+nodeLinker: hoisted
+# 설치 스크립트 없이도 동작한다 (환영 문구 출력, 미리 빌드된 바이너리 사용).
+allowBuilds:
+  dooboolab-welcome: false
+  '@parcel/watcher': false
+# expo-router가 자동으로 끌어오는 react-dom을 react와 같은 버전으로 맞춘다.
+overrides:
+  react-dom: 19.3.0
