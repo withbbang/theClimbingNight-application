@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,7 +23,8 @@ export function Screen({ children, scroll = false, bottomInset = true }: ScreenP
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      // Android도 edge-to-edge라 창이 줄지 않으므로 직접 밀어 올린다.
+      behavior="padding"
       style={[styles.fill, { backgroundColor: colors.background }]}
     >
       {scroll ? (
