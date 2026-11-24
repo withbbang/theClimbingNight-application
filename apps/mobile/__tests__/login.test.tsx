@@ -102,6 +102,7 @@ it('signs in and returns to the tabs', async () => {
   const app = await renderApp('/login');
   await press('카카오 로그인');
   expect(server.calls[0]).toEqual({
+    method: 'POST',
     path: '/auth/login',
     body: { provider: 'KAKAO', token: 'social' },
   });

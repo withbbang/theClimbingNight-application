@@ -52,6 +52,7 @@ it('creates the account and returns to the tabs', async () => {
   const app = await renderApp('/signup');
   await submit(' 가나 ');
   expect(server.calls[0]).toEqual({
+    method: 'POST',
     path: '/auth/signup',
     body: { signupToken: 'st', nickname: '가나' },
   });

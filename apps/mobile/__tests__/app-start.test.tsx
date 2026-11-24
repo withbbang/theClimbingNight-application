@@ -49,7 +49,10 @@ jest.mock('@/lib/social', () => ({
   availableAdapters: () => [],
   signOutSocial: jest.fn(async () => {}),
 }));
-jest.mock('@/lib/api', () => ({ apiFetch: jest.fn(), setSessionExpiredHandler: jest.fn() }));
+jest.mock('@/lib/api', () => ({
+  apiFetch: jest.fn(async () => []),
+  setSessionExpiredHandler: jest.fn(),
+}));
 
 const getMe = jest.mocked(authApi.getMe);
 
@@ -108,9 +111,9 @@ it('asks a USER for membership verification on the meetups tab', async () => {
   expect(screen.getByText('동호회원 인증이 필요해요')).toBeOnTheScreen();
 });
 
-it.each(['MEMBER', 'ADMIN'] as const)('shows the meetups placeholder to %s', async (role) => {
+it.each(['MEMBER', 'ADMIN'] as const)('shows the meetups to %s', async (role) => {
   await start(tokens('1', role), '/meetups');
-  expect(screen.getByText('벙 일정을 준비하고 있어요')).toBeOnTheScreen();
+  expect(screen.getByText('다가오는 벙')).toBeOnTheScreen();
 });
 
 it('shows the nickname and logs out on the my tab', async () => {
@@ -125,7 +128,7 @@ it('shows the nickname and logs out on the my tab', async () => {
 it('refreshes the cached user after start', async () => {
   getMe.mockResolvedValue({ id: 1, nickname: '별이', role: 'MEMBER' });
   await start(tokens('1', 'USER'), '/meetups');
-  expect(await screen.findByText('벙 일정을 준비하고 있어요')).toBeOnTheScreen();
+  expect(await screen.findByText('다가오는 벙')).toBeOnTheScreen();
 });
 
 it('shows the server role again when a token refresh had changed it', async () => {
@@ -138,7 +141,7 @@ it('shows the server role again when a token refresh had changed it', async () =
   await act(async () => {
     await sessionStore.updateTokens(tokens('2', 'MEMBER'), sessionStore.getGeneration());
   });
-  expect(screen.getByText('벙 일정을 준비하고 있어요')).toBeOnTheScreen();
+  expect(screen.getByText('다가오는 벙')).toBeOnTheScreen();
   await act(async () => {
     await jest.advanceTimersByTimeAsync(10);
     await queryClient.refetchQueries({ queryKey: ['users', 'me'] });
