@@ -31,7 +31,15 @@ public class PushTokenService {
 			if (!ConstraintViolations.violated(e).contains(CONSTRAINT_TOKEN)) {
 				throw e;
 			}
-			writer.upsert(userId, token, platform);
+			try {
+				writer.upsert(userId, token, platform);
+			} catch (DataIntegrityViolationException second) {
+				if (ConstraintViolations.violated(second).contains(CONSTRAINT_TOKEN)) {
+					// 원인 예외·메시지에는 토큰 원문이 들어 있어 로그로 새므로 붙이지 않는다.
+					throw new IllegalStateException("푸시 토큰 등록이 동시 요청과 계속 충돌했습니다.");
+				}
+				throw second;
+			}
 		}
 	}
 

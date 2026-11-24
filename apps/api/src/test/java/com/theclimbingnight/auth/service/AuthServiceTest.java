@@ -451,6 +451,35 @@ class AuthServiceTest {
 	}
 
 	@Test
+	void 푸시_토큰은_리프레시_토큰_폐기를_반영한_뒤에_지운다() {
+		// given
+		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+
+		// when
+		service.logout("old-token", "ExponentPushToken[abc]");
+
+		// then
+		org.mockito.InOrder order = org.mockito.Mockito.inOrder(refreshTokenRepository, pushTokenService);
+		order.verify(refreshTokenRepository).flush();
+		order.verify(pushTokenService).deleteOwned(7L, "ExponentPushToken[abc]");
+	}
+
+	@Test
+	void 형식이_다른_푸시_토큰은_지우지_않고_로그아웃한다() {
+		// given
+		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+
+		// when
+		service.logout("old-token", "토큰[한글]");
+
+		// then
+		assertThat(old.getRevokedAt()).isEqualTo(START);
+		verify(pushTokenService, never()).deleteOwned(org.mockito.ArgumentMatchers.anyLong(), any());
+	}
+
+	@Test
 	void 푸시_토큰_없이도_로그아웃된다() {
 		// given
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));

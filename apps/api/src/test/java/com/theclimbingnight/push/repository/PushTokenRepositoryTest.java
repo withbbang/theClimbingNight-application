@@ -14,6 +14,9 @@ import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -23,6 +26,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 @org.springframework.context.annotation.Import({com.theclimbingnight.common.config.ClockConfig.class,
 		com.theclimbingnight.common.config.JpaAuditingConfig.class})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@ExtendWith(OutputCaptureExtension.class)
 class PushTokenRepositoryTest {
 
 	private static final Instant NOW = Instant.parse("2026-06-01T00:00:00Z");
@@ -56,8 +60,8 @@ class PushTokenRepositoryTest {
 		token(user, "ExponentPushToken[abc]");
 
 		// then
-		assertThat(pushTokenRepository.findByExpoPushToken("ExponentPushToken[AbC]")).isPresent();
-		assertThat(pushTokenRepository.findByExpoPushToken("ExponentPushToken[abc]")).isPresent();
+		assertThat(pushTokenRepository.findByExpoPushTokenForUpdate("ExponentPushToken[AbC]")).isPresent();
+		assertThat(pushTokenRepository.findByExpoPushTokenForUpdate("ExponentPushToken[abc]")).isPresent();
 		assertThat(pushTokenRepository.count()).isEqualTo(2);
 	}
 
@@ -214,5 +218,30 @@ class PushTokenRepositoryTest {
 		// then
 		assertThat(byOther).isEqualTo(0);
 		assertThat(byOwner).isEqualTo(1);
+	}
+
+	@Test
+	void 잠금_조회는_있는_토큰을_찾고_없으면_비어_있다() {
+		// given
+		User user = user("a", Role.USER);
+		token(user, "ExponentPushToken[here]");
+
+		// when, then
+		assertThat(pushTokenRepository.findByExpoPushTokenForUpdate("ExponentPushToken[here]")).isPresent();
+		assertThat(pushTokenRepository.findByExpoPushTokenForUpdate("ExponentPushToken[gone]")).isEmpty();
+	}
+
+	@Test
+	void 유니크_위반이_나도_토큰_원문이_로그에_남지_않는다(CapturedOutput output) {
+		// given
+		User user = user("a", Role.USER);
+		token(user, "ExponentPushToken[secretdup]");
+
+		// when
+		assertThatThrownBy(() -> token(user, "ExponentPushToken[secretdup]"))
+				.isInstanceOf(DataIntegrityViolationException.class);
+
+		// then
+		assertThat(output.getAll()).doesNotContain("secretdup");
 	}
 }

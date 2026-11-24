@@ -11,6 +11,7 @@ import com.theclimbingnight.auth.social.SocialTokenVerifiers;
 import com.theclimbingnight.common.BusinessException;
 import com.theclimbingnight.common.ConstraintViolations;
 import com.theclimbingnight.common.ErrorCode;
+import com.theclimbingnight.push.dto.PushTokenRegisterRequest;
 import com.theclimbingnight.push.service.PushTokenService;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
@@ -19,6 +20,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -29,6 +31,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Transactional(readOnly = true)
 public class AuthService {
 
+	private static final Pattern EXPO_PUSH_TOKEN = Pattern.compile(PushTokenRegisterRequest.EXPO_PUSH_TOKEN_PATTERN);
 	private static final String CONSTRAINT_NICKNAME = "uk_users_nickname";
 	/** 폐기 직후 응답이 유실돼 앱이 재시도하는 경우를 살리는 유예. 이 안의 재사용은 전체 폐기하지 않는다. */
 	private static final Duration REUSE_GRACE = Duration.ofSeconds(30);
@@ -142,7 +145,9 @@ public class AuthService {
 		refreshTokenRepository.findByTokenHash(RefreshTokens.hash(refreshToken)).ifPresent(token -> {
 			token.revoke(clock.instant());
 			// 한 기기에서 A가 로그아웃하고 B가 로그인할 수 있으므로, 리프레시 토큰 소유자의 토큰만 지운다.
-			if (expoPushToken != null && !expoPushToken.isBlank()) {
+			if (expoPushToken != null && EXPO_PUSH_TOKEN.matcher(expoPushToken).matches()) {
+				// 탈퇴(refresh_tokens → push_tokens)와 같은 잠금 순서가 되도록 폐기 UPDATE를 먼저 DB에 반영한다.
+				refreshTokenRepository.flush();
 				pushTokenService.deleteOwned(token.getUserId(), expoPushToken);
 			}
 		});

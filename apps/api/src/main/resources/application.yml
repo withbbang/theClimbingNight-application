@@ -1,3 +1,8 @@
+logging:
+  level:
+    # 유니크 위반 때 Hibernate가 SQLException 메시지(푸시 토큰 원문 포함)를 로그에 남긴다. 재시도로 복구되는 정상 경합이므로 끈다.
+    org.hibernate.orm.jdbc.error: "OFF"
+
 spring:
   application:
     name: theclimbingnight-api

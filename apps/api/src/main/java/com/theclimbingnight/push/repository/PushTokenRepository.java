@@ -1,11 +1,13 @@
 package com.theclimbingnight.push.repository;
 
 import com.theclimbingnight.push.entity.PushToken;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,7 +15,10 @@ import org.springframework.data.repository.query.Param;
 /** 삭제는 모두 벌크 쿼리이고 영속성 컨텍스트를 비우지 않는다. (탈퇴 이벤트 리스너 체인 안에서 불리므로) */
 public interface PushTokenRepository extends JpaRepository<PushToken, Long> {
 
-	Optional<PushToken> findByExpoPushToken(String expoPushToken);
+	/** 잠금 순서상 사용자 행을 먼저 잠근 뒤에만 부른다. 다른 트랜잭션의 삭제·이전과 겹치지 않게 행을 잠근다. */
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select t from PushToken t where t.expoPushToken = :token")
+	Optional<PushToken> findByExpoPushTokenForUpdate(@Param("token") String token);
 
 	@Query("select t.expoPushToken from PushToken t join User u on u.id = t.userId "
 			+ "where u.status = com.theclimbingnight.user.entity.UserStatus.ACTIVE and t.userId in :userIds "

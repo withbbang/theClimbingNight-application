@@ -33,7 +33,7 @@ public class PushTokenWriter {
 				.filter(User::isActive)
 				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 		Instant now = clock.instant();
-		pushTokenRepository.findByExpoPushToken(token).ifPresentOrElse(
+		pushTokenRepository.findByExpoPushTokenForUpdate(token).ifPresentOrElse(
 				existing -> existing.reassign(userId, platform, now),
 				() -> pushTokenRepository.saveAndFlush(PushToken.register(userId, token, platform, now)));
 	}

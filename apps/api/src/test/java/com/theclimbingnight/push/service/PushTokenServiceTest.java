@@ -1,5 +1,6 @@
 package com.theclimbingnight.push.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.times;
@@ -42,13 +43,15 @@ class PushTokenServiceTest {
 	}
 
 	@Test
-	void 두_번째도_위반이면_그대로_던진다() {
+	void 두_번째도_위반이면_원인과_토큰_없는_예외를_던진다() {
 		// given
 		willThrow(violation("uk_push_tokens_token")).given(writer).upsert(1L, TOKEN, PushPlatform.IOS);
 
 		// when, then
 		assertThatThrownBy(() -> service.register(1L, TOKEN, PushPlatform.IOS))
-				.isInstanceOf(DataIntegrityViolationException.class);
+				.isNotInstanceOf(DataIntegrityViolationException.class)
+				.hasNoCause()
+				.satisfies(e -> assertThat(e.getMessage()).doesNotContain("abc"));
 		verify(writer, times(2)).upsert(1L, TOKEN, PushPlatform.IOS);
 	}
 

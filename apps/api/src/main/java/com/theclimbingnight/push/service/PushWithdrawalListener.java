@@ -4,6 +4,8 @@ import com.theclimbingnight.push.repository.NotificationSettingRepository;
 import com.theclimbingnight.push.repository.PushTokenRepository;
 import com.theclimbingnight.user.service.UserWithdrawnEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,7 @@ public class PushWithdrawalListener {
 	}
 
 	@EventListener
+	@Order(Ordered.LOWEST_PRECEDENCE)
 	@Transactional
 	public void on(UserWithdrawnEvent event) {
 		pushTokenRepository.deleteAllByUserId(event.userId());

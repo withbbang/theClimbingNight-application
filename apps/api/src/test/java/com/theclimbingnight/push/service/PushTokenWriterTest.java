@@ -50,12 +50,15 @@ class PushTokenWriterTest {
 		// given
 		PushToken existing = PushToken.register(1L, TOKEN, PushPlatform.IOS, T0);
 		given(userRepository.findByIdForUpdate(2L)).willReturn(Optional.of(user(2L)));
-		given(pushTokenRepository.findByExpoPushToken(TOKEN)).willReturn(Optional.of(existing));
+		given(pushTokenRepository.findByExpoPushTokenForUpdate(TOKEN)).willReturn(Optional.of(existing));
 
 		// when
 		writer().upsert(2L, TOKEN, PushPlatform.ANDROID);
 
 		// then
+		InOrder order = Mockito.inOrder(userRepository, pushTokenRepository);
+		order.verify(userRepository).findByIdForUpdate(2L);
+		order.verify(pushTokenRepository).findByExpoPushTokenForUpdate(TOKEN);
 		assertThat(existing.getUserId()).isEqualTo(2L);
 		assertThat(existing.getPlatform()).isEqualTo(PushPlatform.ANDROID);
 		assertThat(existing.getLastSeenAt()).isEqualTo(T1);
@@ -66,7 +69,7 @@ class PushTokenWriterTest {
 	void 없는_토큰은_사용자_잠금_뒤_새로_저장한다() {
 		// given
 		given(userRepository.findByIdForUpdate(2L)).willReturn(Optional.of(user(2L)));
-		given(pushTokenRepository.findByExpoPushToken(TOKEN)).willReturn(Optional.empty());
+		given(pushTokenRepository.findByExpoPushTokenForUpdate(TOKEN)).willReturn(Optional.empty());
 
 		// when
 		writer().upsert(2L, TOKEN, PushPlatform.IOS);
@@ -74,6 +77,7 @@ class PushTokenWriterTest {
 		// then
 		InOrder order = Mockito.inOrder(userRepository, pushTokenRepository);
 		order.verify(userRepository).findByIdForUpdate(2L);
+		order.verify(pushTokenRepository).findByExpoPushTokenForUpdate(TOKEN);
 		order.verify(pushTokenRepository).saveAndFlush(any(PushToken.class));
 	}
 
