@@ -40,3 +40,7 @@ app:
     apple:
       audiences: ${APPLE_AUDIENCES:}
       jwks-url: https://appleid.apple.com/auth/keys
+  push:
+    enabled: false
+    base-url: https://exp.host
+    access-token: ${EXPO_ACCESS_TOKEN:}
