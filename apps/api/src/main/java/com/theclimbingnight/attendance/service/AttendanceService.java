@@ -38,12 +38,15 @@ public class AttendanceService {
 	}
 
 	/**
-	 * 잠금 순서는 벙 → 참석 → 블랙리스트다. 참석의 벙 ID만 먼저 읽어 벙과 참석을 차례로 잠근다
+	 * 잠금 순서는 사용자 → 벙 → 참석 → 블랙리스트다. 운영진 행을 먼저 잠그고(참석·블랙리스트의 FK 부모라 나중에 공유 잠금이 걸리면
+	 * 벙 → 사용자 순서가 된다), 참석의 벙 ID만 읽어 벙과 참석을 차례로 잠근다
 	 * (블랙리스트 INSERT가 FK 부모인 벙에 공유 잠금을 걸어 참석 → 벙 순서가 되는 것을 막는다).
 	 * 활성 노쇼 기록은 잠그고 읽어, 동시에 취소한 다른 운영진의 사유를 덮어쓰지 않는다. 보정 기한은 없다.
 	 */
 	@Transactional
 	public AttendanceResponse correct(long attendanceId, long adminId, AttendanceResult result) {
+		User admin = userRepository.findByIdForUpdate(adminId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 		long meetupId = attendanceRepository.findMeetupIdById(attendanceId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 		meetupRepository.findByIdForUpdate(meetupId)
@@ -54,7 +57,6 @@ public class AttendanceService {
 		if (previous == result) {
 			return AttendanceResponse.from(attendance);
 		}
-		User admin = userRepository.getReferenceById(adminId);
 		attendance.correct(result, admin);
 		long rosterId = attendance.getRosterMember().getId();
 		Instant now = clock.instant();

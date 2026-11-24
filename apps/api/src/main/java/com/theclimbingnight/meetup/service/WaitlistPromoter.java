@@ -18,11 +18,13 @@ import org.springframework.stereotype.Component;
 public class WaitlistPromoter {
 
 	private final MeetupApplicationRepository applicationRepository;
+	private final SeatCounter seatCounter;
 	private final ApplicationEventPublisher eventPublisher;
 
-	public WaitlistPromoter(MeetupApplicationRepository applicationRepository,
+	public WaitlistPromoter(MeetupApplicationRepository applicationRepository, SeatCounter seatCounter,
 			ApplicationEventPublisher eventPublisher) {
 		this.applicationRepository = applicationRepository;
+		this.seatCounter = seatCounter;
 		this.eventPublisher = eventPublisher;
 	}
 
@@ -31,8 +33,7 @@ public class WaitlistPromoter {
 		if (meetup.getCapacity() == null) {
 			return promoted;
 		}
-		long free = meetup.getCapacity()
-				- applicationRepository.countByMeetupIdAndStatus(meetup.getId(), MeetupApplicationStatus.CONFIRMED);
+		long free = seatCounter.freeSeats(meetup);
 		if (free <= 0) {
 			return promoted;
 		}

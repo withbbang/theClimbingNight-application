@@ -69,6 +69,7 @@ class PenaltyServiceTest {
 		admin = User.create("admin");
 		ReflectionTestUtils.setField(admin, "id", ADMIN_ID);
 		given(userRepository.getReferenceById(ADMIN_ID)).willReturn(admin);
+		given(userRepository.findByIdForUpdate(ADMIN_ID)).willReturn(Optional.of(admin));
 		Instant starts = Instant.parse("2026-05-20T10:00:00Z");
 		meetup = Meetup.create(new MeetupSpec("정기벙", null, "장소", starts, starts.plusSeconds(10800), 10, 24, true),
 				null);
@@ -305,5 +306,33 @@ class PenaltyServiceTest {
 		assertThatThrownBy(() -> service.ofRoster(5L))
 				.isInstanceOf(BusinessException.class)
 				.extracting(e -> ((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND);
+	}
+
+	@Test
+	void 운영진_행을_벙보다_먼저_잠근다() {
+		// given
+		canceledApplication(true);
+
+		// when
+		service.addLateCancel(APPLICATION_ID, ADMIN_ID);
+
+		// then
+		InOrder order = inOrder(userRepository, meetupRepository, applicationRepository);
+		order.verify(userRepository).findByIdForUpdate(ADMIN_ID);
+		order.verify(meetupRepository).findByIdForUpdate(10L);
+		order.verify(applicationRepository).findByIdForUpdate(APPLICATION_ID);
+	}
+
+	@Test
+	void 운영진이_없으면_인증_필요_오류다() {
+		// given
+		canceledApplication(true);
+		given(userRepository.findByIdForUpdate(ADMIN_ID)).willReturn(Optional.empty());
+
+		// when, then
+		assertThatThrownBy(() -> service.addLateCancel(APPLICATION_ID, ADMIN_ID))
+				.isInstanceOf(BusinessException.class)
+				.extracting(e -> ((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.AUTH_REQUIRED);
+		verify(meetupRepository, never()).findByIdForUpdate(10L);
 	}
 }

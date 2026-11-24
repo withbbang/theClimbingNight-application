@@ -66,7 +66,7 @@ class MeetupApplicationServiceTest {
 	void setUp() {
 		clock = new MutableClock(NOW);
 		service = new MeetupApplicationService(meetupRepository, applicationRepository, rosterMemberRepository,
-				userRepository, promoter, clock);
+				userRepository, promoter, new SeatCounter(applicationRepository), clock);
 		roster = roster(ROSTER_ID);
 		meetup = meetup(2);
 		given(userRepository.findByIdForUpdate(USER_ID)).willReturn(Optional.of(user(Role.MEMBER)));

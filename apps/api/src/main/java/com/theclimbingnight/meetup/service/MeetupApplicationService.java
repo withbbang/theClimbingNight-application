@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 동호회원의 벙 신청·취소와 운영진의 내보내기.
- * 신청 주체는 명부 항목이고, 모든 쓰기는 벙 행을 먼저 잠근 뒤 정원·신청 상태를 본다 (잠금 순서: 벙 → 신청).
+ * 신청 주체는 명부 항목이고, 쓰기는 사용자 행 → 벙 행을 먼저 잠근 뒤 정원·신청 상태를 본다 (잠금 순서: 사용자 → 벙 → 신청).
  */
 @Service
 @Transactional(readOnly = true)
@@ -33,16 +33,18 @@ public class MeetupApplicationService {
 	private final RosterMemberRepository rosterMemberRepository;
 	private final UserRepository userRepository;
 	private final WaitlistPromoter promoter;
+	private final SeatCounter seatCounter;
 	private final Clock clock;
 
 	public MeetupApplicationService(MeetupRepository meetupRepository,
 			MeetupApplicationRepository applicationRepository, RosterMemberRepository rosterMemberRepository,
-			UserRepository userRepository, WaitlistPromoter promoter, Clock clock) {
+			UserRepository userRepository, WaitlistPromoter promoter, SeatCounter seatCounter, Clock clock) {
 		this.meetupRepository = meetupRepository;
 		this.applicationRepository = applicationRepository;
 		this.rosterMemberRepository = rosterMemberRepository;
 		this.userRepository = userRepository;
 		this.promoter = promoter;
+		this.seatCounter = seatCounter;
 		this.clock = clock;
 	}
 
@@ -68,7 +70,7 @@ public class MeetupApplicationService {
 				throw new BusinessException(ErrorCode.MEETUP_APPLICATION_REMOVED);
 			}
 		}
-		boolean confirmed = hasFreeSeat(meetup);
+		boolean confirmed = seatCounter.freeSeats(meetup) > 0;
 		MeetupApplication application;
 		if (existing.isPresent()) {
 			application = existing.get();
@@ -124,15 +126,6 @@ public class MeetupApplicationService {
 	private static boolean isLate(Meetup meetup, MeetupApplication application, Instant now) {
 		Instant deadline = meetup.lateCancelDeadline();
 		return !now.isBefore(deadline) && application.getConfirmedAt().isBefore(deadline);
-	}
-
-	/** 정원이 없는 벙(가져온 기록)은 제한 없이 확정한다. */
-	private boolean hasFreeSeat(Meetup meetup) {
-		if (meetup.getCapacity() == null) {
-			return true;
-		}
-		return applicationRepository.countByMeetupIdAndStatus(meetup.getId(), MeetupApplicationStatus.CONFIRMED)
-				< meetup.getCapacity();
 	}
 
 	private void promoteIfOpen(Meetup meetup, Instant now) {

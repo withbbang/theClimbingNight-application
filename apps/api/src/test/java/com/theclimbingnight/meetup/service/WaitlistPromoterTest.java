@@ -41,7 +41,7 @@ class WaitlistPromoterTest {
 
 	@BeforeEach
 	void setUp() {
-		promoter = new WaitlistPromoter(applicationRepository, eventPublisher);
+		promoter = new WaitlistPromoter(applicationRepository, new SeatCounter(applicationRepository), eventPublisher);
 	}
 
 	@Test

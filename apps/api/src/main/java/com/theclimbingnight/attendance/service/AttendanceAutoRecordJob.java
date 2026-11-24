@@ -2,6 +2,9 @@ package com.theclimbingnight.attendance.service;
 
 import com.theclimbingnight.meetup.repository.MeetupRepository;
 import java.time.Clock;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -20,6 +23,8 @@ public class AttendanceAutoRecordJob {
 	private final MeetupRepository meetupRepository;
 	private final AttendanceRecorder recorder;
 	private final Clock clock;
+	/** 직전에 실패한 벙. 같은 벙이 1분마다 계속 실패해도 error 로그는 처음 한 번만 남긴다. 스케줄러 단일 스레드에서만 쓴다. */
+	private final Set<Long> failed = new HashSet<>();
 
 	public AttendanceAutoRecordJob(MeetupRepository meetupRepository, AttendanceRecorder recorder, Clock clock) {
 		this.meetupRepository = meetupRepository;
@@ -29,11 +34,18 @@ public class AttendanceAutoRecordJob {
 
 	@Scheduled(fixedDelay = 60_000)
 	public void run() {
-		for (Long meetupId : meetupRepository.findAttendanceDueIds(clock.instant())) {
+		List<Long> dueIds = meetupRepository.findAttendanceDueIds(clock.instant());
+		failed.retainAll(dueIds);
+		for (Long meetupId : dueIds) {
 			try {
 				recorder.record(meetupId);
+				failed.remove(meetupId);
 			} catch (RuntimeException e) {
-				log.error("참석 자동 기록 실패 meetupId={}", meetupId, e);
+				if (failed.add(meetupId)) {
+					log.error("참석 자동 기록 실패 meetupId={}", meetupId, e);
+				} else {
+					log.debug("참석 자동 기록 계속 실패 meetupId={}", meetupId, e);
+				}
 			}
 		}
 	}

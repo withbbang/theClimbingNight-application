@@ -65,7 +65,7 @@ class AttendanceServiceTest {
 		admin = User.create("admin");
 		ReflectionTestUtils.setField(admin, "id", ADMIN_ID);
 		ReflectionTestUtils.setField(admin, "role", Role.ADMIN);
-		given(userRepository.getReferenceById(ADMIN_ID)).willReturn(admin);
+		given(userRepository.findByIdForUpdate(ADMIN_ID)).willReturn(Optional.of(admin));
 		Instant starts = Instant.parse("2026-01-01T10:00:00Z");
 		meetup = Meetup.create(new MeetupSpec("제목", null, "장소", starts, starts.plusSeconds(10800), 10, 24, true),
 				null);
@@ -184,5 +184,32 @@ class AttendanceServiceTest {
 		order.verify(attendanceRepository).findByIdForUpdate(100L);
 		order.verify(penaltyRepository).findActiveForUpdate(10L, 5L, PenaltyType.NO_SHOW);
 		order.verify(penaltyRepository).save(any(Penalty.class));
+	}
+
+	@Test
+	void 운영진_행을_벙보다_먼저_잠근다() {
+		// given
+		given(penaltyRepository.findActiveForUpdate(10L, 5L, PenaltyType.NO_SHOW)).willReturn(Optional.empty());
+
+		// when
+		service.correct(100L, ADMIN_ID, AttendanceResult.NO_SHOW);
+
+		// then
+		InOrder order = inOrder(userRepository, meetupRepository, attendanceRepository);
+		order.verify(userRepository).findByIdForUpdate(ADMIN_ID);
+		order.verify(meetupRepository).findByIdForUpdate(10L);
+		order.verify(attendanceRepository).findByIdForUpdate(100L);
+	}
+
+	@Test
+	void 운영진이_없으면_인증_필요_오류다() {
+		// given
+		given(userRepository.findByIdForUpdate(ADMIN_ID)).willReturn(Optional.empty());
+
+		// when, then
+		assertThatThrownBy(() -> service.correct(100L, ADMIN_ID, AttendanceResult.NO_SHOW))
+				.isInstanceOf(BusinessException.class)
+				.extracting(e -> ((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.AUTH_REQUIRED);
+		verify(meetupRepository, never()).findByIdForUpdate(10L);
 	}
 }

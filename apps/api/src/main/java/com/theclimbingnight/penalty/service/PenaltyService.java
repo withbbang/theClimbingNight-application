@@ -16,6 +16,7 @@ import com.theclimbingnight.penalty.entity.PenaltyType;
 import com.theclimbingnight.penalty.repository.PenaltyRepository;
 import com.theclimbingnight.roster.entity.RosterMember;
 import com.theclimbingnight.roster.repository.RosterMemberRepository;
+import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -56,11 +57,14 @@ public class PenaltyService {
 	}
 
 	/**
-	 * 잠금 순서(벙 → 신청)를 지키려고 신청의 벙 ID만 먼저 읽고, 벙과 신청을 차례로 잠근 뒤 활성 늦은 취소 기록이 없을 때만 저장한다.
+	 * 잠금 순서(사용자 → 벙 → 신청)를 지키려고 운영진 행을 먼저 잠그고(블랙리스트 INSERT의 FK 공유 잠금이 벙 뒤에 걸리지 않게),
+	 * 신청의 벙 ID만 읽고, 벙과 신청을 차례로 잠근 뒤 활성 늦은 취소 기록이 없을 때만 저장한다.
 	 * 신청만 잠그고 INSERT하면 FK 부모(벙)에 공유 잠금이 걸려 신청 → 벙 순서가 되어 재신청(벙 → 신청)과 교착할 수 있다.
 	 */
 	@Transactional
 	public PenaltyResponse addLateCancel(long applicationId, long adminId) {
+		User admin = userRepository.findByIdForUpdate(adminId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 		long meetupId = applicationRepository.findMeetupIdById(applicationId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 		Meetup meetup = meetupRepository.findByIdForUpdate(meetupId)
@@ -78,7 +82,7 @@ public class PenaltyService {
 			throw new BusinessException(ErrorCode.PENALTY_ALREADY_EXISTS);
 		}
 		Penalty penalty = penaltyRepository.save(Penalty.create(application.getRosterMember(),
-				application.getMeetup(), PenaltyType.LATE_CANCEL, userRepository.getReferenceById(adminId)));
+				application.getMeetup(), PenaltyType.LATE_CANCEL, admin));
 		return PenaltyResponse.from(penalty);
 	}
 
