@@ -213,9 +213,45 @@ class MeetupApplicationServiceTest {
 		assertThat(response.applicationId()).isEqualTo(50L);
 		assertThat(mine.getStatus()).isEqualTo(MeetupApplicationStatus.CONFIRMED);
 		assertThat(mine.getAppliedAt()).isEqualTo(NOW);
-		assertThat(mine.isLateCancel()).isFalse();
+		assertThat(mine.isLateCancel()).isTrue();
 		assertThat(mine.getCancelReason()).isNull();
 		verify(applicationRepository, never()).save(any(MeetupApplication.class));
+	}
+
+	@Test
+	void 늦은_취소_표시는_재신청_뒤_정상_취소해도_남는다() {
+		// given
+		MeetupApplication mine = existing(MeetupApplicationStatus.CONFIRMED, NOW);
+		setNow(DEADLINE.plusSeconds(3600));
+		service.cancel(MEETUP_ID, USER_ID, null);
+		assertThat(mine.isLateCancel()).isTrue();
+		given(applicationRepository.countByMeetupIdAndStatus(MEETUP_ID, MeetupApplicationStatus.CONFIRMED))
+				.willReturn(0L);
+		service.apply(MEETUP_ID, USER_ID);
+		assertThat(mine.getConfirmedAt()).isEqualTo(DEADLINE.plusSeconds(3600));
+
+		// when
+		setNow(DEADLINE.plusSeconds(7200));
+		MyApplicationResponse response = service.cancel(MEETUP_ID, USER_ID, null);
+
+		// then
+		assertThat(response.lateCancel()).isTrue();
+		assertThat(mine.isLateCancel()).isTrue();
+	}
+
+	@Test
+	void 취소된_벙에서의_본인_취소는_기준_시각_뒤여도_늦은_취소가_아니다() {
+		// given
+		MeetupApplication mine = existing(MeetupApplicationStatus.CONFIRMED, NOW);
+		meetup.cancel(NOW);
+		setNow(DEADLINE.plusSeconds(1));
+
+		// when
+		MyApplicationResponse response = service.cancel(MEETUP_ID, USER_ID, null);
+
+		// then
+		assertThat(response.lateCancel()).isFalse();
+		assertThat(mine.isLateCancel()).isFalse();
 	}
 
 	@Test

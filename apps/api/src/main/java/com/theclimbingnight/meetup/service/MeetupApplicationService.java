@@ -93,7 +93,7 @@ public class MeetupApplicationService {
 				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 		requireActive(application);
 		boolean wasConfirmed = application.getStatus() == MeetupApplicationStatus.CONFIRMED;
-		application.cancel(wasConfirmed && isLate(meetup, application, now), normalize(reason), now);
+		application.cancel(wasConfirmed && meetup.isOpen() && isLate(meetup, application, now), normalize(reason), now);
 		if (wasConfirmed) {
 			promoteIfOpen(meetup, now);
 		}
@@ -120,7 +120,7 @@ public class MeetupApplicationService {
 		}
 	}
 
-	/** 확정자 본인 취소만 대상: 기준 시각 이후(정각 포함)이고, 기준 시각 전에 확정된 사람이어야 늦은 취소다. */
+	/** 확정자 본인 취소만 대상(운영진이 취소한 벙은 제외): 기준 시각 이후(정각 포함)이고, 기준 시각 전에 확정된 사람이어야 늦은 취소다. */
 	private static boolean isLate(Meetup meetup, MeetupApplication application, Instant now) {
 		Instant deadline = meetup.lateCancelDeadline();
 		return !now.isBefore(deadline) && application.getConfirmedAt().isBefore(deadline);

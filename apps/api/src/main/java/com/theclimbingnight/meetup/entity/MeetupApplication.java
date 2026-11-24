@@ -70,14 +70,16 @@ public class MeetupApplication extends BaseTimeEntity {
 		return application;
 	}
 
-	/** 취소한 신청을 다시 넣는다. 신청 시각은 새로 잡혀 대기 순번 맨 뒤로 간다. */
+	/**
+	 * 취소한 신청을 다시 넣는다. 신청 시각은 새로 잡혀 대기 순번 맨 뒤로 간다.
+	 * 늦은 취소 표시({@code lateCancel})는 이 신청 행에 한 번 붙으면 재신청해도 지우지 않는다.
+	 */
 	public void reapply(boolean confirmed, Instant now) {
 		if (this.status != MeetupApplicationStatus.CANCELED) {
 			throw new IllegalStateException("취소한 신청만 다시 신청할 수 있습니다: " + this.status);
 		}
 		start(confirmed, now);
 		this.canceledAt = null;
-		this.lateCancel = false;
 		this.cancelReason = null;
 	}
 
@@ -89,10 +91,11 @@ public class MeetupApplication extends BaseTimeEntity {
 		this.confirmedAt = now;
 	}
 
+	/** 늦은 취소 표시는 한 번 true가 되면 내려가지 않는다 (재신청 뒤 정상 취소로 지워지지 않게). */
 	public void cancel(boolean late, String reason, Instant now) {
 		requireActive();
 		this.status = MeetupApplicationStatus.CANCELED;
-		this.lateCancel = late;
+		this.lateCancel = this.lateCancel || late;
 		this.cancelReason = reason;
 		this.canceledAt = now;
 	}

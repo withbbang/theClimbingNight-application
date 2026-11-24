@@ -4,6 +4,7 @@ import com.theclimbingnight.common.BusinessException;
 import com.theclimbingnight.common.ErrorCode;
 import com.theclimbingnight.common.PageResponse;
 import com.theclimbingnight.common.TimeZones;
+import com.theclimbingnight.meetup.entity.Meetup;
 import com.theclimbingnight.meetup.entity.MeetupApplication;
 import com.theclimbingnight.meetup.repository.MeetupApplicationRepository;
 import com.theclimbingnight.meetup.repository.MeetupRepository;
@@ -62,8 +63,11 @@ public class PenaltyService {
 	public PenaltyResponse addLateCancel(long applicationId, long adminId) {
 		long meetupId = applicationRepository.findMeetupIdById(applicationId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
-		meetupRepository.findByIdForUpdate(meetupId)
+		Meetup meetup = meetupRepository.findByIdForUpdate(meetupId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
+		if (!meetup.isOpen()) {
+			throw new BusinessException(ErrorCode.PENALTY_NOT_LATE_CANCEL);
+		}
 		MeetupApplication application = applicationRepository.findByIdForUpdate(applicationId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 		if (!application.isLateCancel()) {

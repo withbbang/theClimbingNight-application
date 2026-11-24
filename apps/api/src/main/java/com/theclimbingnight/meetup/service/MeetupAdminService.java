@@ -70,7 +70,7 @@ public class MeetupAdminService {
 		if (!meetup.isOpen()) {
 			throw new BusinessException(ErrorCode.MEETUP_CANCELED);
 		}
-		if (meetup.hasEnded(now)) {
+		if (meetup.isOver(now)) {
 			throw new BusinessException(ErrorCode.MEETUP_ENDED);
 		}
 		List<Long> roster = applicationRepository.findAllByMeetupId(meetupId).stream()

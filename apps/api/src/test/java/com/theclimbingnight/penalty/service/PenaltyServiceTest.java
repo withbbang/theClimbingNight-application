@@ -111,6 +111,19 @@ class PenaltyServiceTest {
 	}
 
 	@Test
+	void 취소된_벙의_건에는_늦은_취소_표시가_있어도_블랙리스트를_매길_수_없다() {
+		// given
+		canceledApplication(true);
+		meetup.cancel(NOW);
+
+		// when, then
+		assertThatThrownBy(() -> service.addLateCancel(APPLICATION_ID, ADMIN_ID))
+				.isInstanceOf(BusinessException.class)
+				.extracting(e -> ((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.PENALTY_NOT_LATE_CANCEL);
+		verify(penaltyRepository, never()).save(any());
+	}
+
+	@Test
 	void 늦은_취소_건에_블랙리스트를_매기면_LATE_CANCEL로_저장된다() {
 		// given
 		canceledApplication(true);

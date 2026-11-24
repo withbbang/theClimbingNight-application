@@ -196,6 +196,34 @@ class MeetupAdminServiceTest {
 	}
 
 	@Test
+	void 종료_시각이_없는_지난_벙은_취소할_수_없다() {
+		// given
+		Meetup meetup = existing();
+		ReflectionTestUtils.setField(meetup, "startsAt", NOW.minus(Duration.ofDays(400)));
+		ReflectionTestUtils.setField(meetup, "endsAt", null);
+		given(meetupRepository.findByIdForUpdate(MEETUP_ID)).willReturn(Optional.of(meetup));
+
+		// when, then
+		assertThatThrownBy(() -> service.cancel(MEETUP_ID)).isInstanceOfSatisfying(BusinessException.class,
+				e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.MEETUP_ENDED));
+	}
+
+	@Test
+	void 종료_시각이_없어도_시작_전인_벙은_취소할_수_있다() {
+		// given
+		Meetup meetup = existing();
+		ReflectionTestUtils.setField(meetup, "endsAt", null);
+		given(meetupRepository.findByIdForUpdate(MEETUP_ID)).willReturn(Optional.of(meetup));
+		given(applicationRepository.findAllByMeetupId(MEETUP_ID)).willReturn(List.of());
+
+		// when
+		MeetupResponse response = service.cancel(MEETUP_ID);
+
+		// then
+		assertThat(response.canceledAt()).isEqualTo(NOW);
+	}
+
+	@Test
 	void 복제하면_날짜만_바뀌고_나머지는_같다() {
 		// given
 		Meetup source = existing();

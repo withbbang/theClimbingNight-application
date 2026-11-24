@@ -107,6 +107,11 @@ public class Meetup extends BaseTimeEntity {
 		return endsAt != null && !now.isBefore(endsAt);
 	}
 
+	/** 운영진 취소·수정 판정용: 종료 시각이 없으면 시작 시각을 종료로 본다. 자동 참석 기록은 {@link #hasEnded}를 쓴다. */
+	public boolean isOver(Instant now) {
+		return !now.isBefore(endsAt != null ? endsAt : startsAt);
+	}
+
 	public Instant lateCancelDeadline() {
 		return startsAt.minus(lateCancelHours, ChronoUnit.HOURS);
 	}
