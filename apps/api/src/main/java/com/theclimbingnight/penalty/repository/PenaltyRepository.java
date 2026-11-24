@@ -27,6 +27,13 @@ public interface PenaltyRepository extends JpaRepository<Penalty, Long> {
 	Optional<Penalty> findActive(@Param("meetupId") long meetupId, @Param("rosterMemberId") long rosterMemberId,
 			@Param("type") PenaltyType type);
 
+	/** 활성 기록을 잠그고 읽는다. 동시에 취소하는 쪽의 사유를 덮어쓰지 않게 한다. */
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select p from Penalty p where p.meetup.id = :meetupId and p.rosterMember.id = :rosterMemberId "
+			+ "and p.type = :type and p.revokedAt is null")
+	Optional<Penalty> findActiveForUpdate(@Param("meetupId") long meetupId,
+			@Param("rosterMemberId") long rosterMemberId, @Param("type") PenaltyType type);
+
 	List<Penalty> findAllByMeetupIdAndRevokedAtIsNull(long meetupId);
 
 	/** 벙 제목·시각을 응답에 쓰므로 벙을 함께 읽는다. */

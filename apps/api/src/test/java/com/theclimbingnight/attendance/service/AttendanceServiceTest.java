@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -17,6 +18,7 @@ import com.theclimbingnight.common.BusinessException;
 import com.theclimbingnight.common.ErrorCode;
 import com.theclimbingnight.meetup.entity.Meetup;
 import com.theclimbingnight.meetup.entity.MeetupSpec;
+import com.theclimbingnight.meetup.repository.MeetupRepository;
 import com.theclimbingnight.penalty.entity.Penalty;
 import com.theclimbingnight.penalty.entity.PenaltyType;
 import com.theclimbingnight.penalty.repository.PenaltyRepository;
@@ -31,6 +33,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -45,6 +48,7 @@ class AttendanceServiceTest {
 	private static final long ADMIN_ID = 1L;
 
 	@Mock AttendanceRepository attendanceRepository;
+	@Mock MeetupRepository meetupRepository;
 	@Mock PenaltyRepository penaltyRepository;
 	@Mock UserRepository userRepository;
 
@@ -56,7 +60,7 @@ class AttendanceServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new AttendanceService(attendanceRepository, penaltyRepository, userRepository,
+		service = new AttendanceService(attendanceRepository, meetupRepository, penaltyRepository, userRepository,
 				new MutableClock(NOW));
 		admin = User.create("admin");
 		ReflectionTestUtils.setField(admin, "id", ADMIN_ID);
@@ -70,13 +74,15 @@ class AttendanceServiceTest {
 		ReflectionTestUtils.setField(roster, "id", 5L);
 		attendance = Attendance.auto(meetup, roster);
 		ReflectionTestUtils.setField(attendance, "id", 100L);
+		given(attendanceRepository.findMeetupIdById(100L)).willReturn(Optional.of(10L));
+		given(meetupRepository.findByIdForUpdate(10L)).willReturn(Optional.of(meetup));
 		given(attendanceRepository.findByIdForUpdate(100L)).willReturn(Optional.of(attendance));
 	}
 
 	@Test
 	void 노쇼로_바꾸면_노쇼_블랙리스트가_생긴다() {
 		// given
-		given(penaltyRepository.findActive(10L, 5L, PenaltyType.NO_SHOW)).willReturn(Optional.empty());
+		given(penaltyRepository.findActiveForUpdate(10L, 5L, PenaltyType.NO_SHOW)).willReturn(Optional.empty());
 
 		// when
 		AttendanceResponse response = service.correct(100L, ADMIN_ID, AttendanceResult.NO_SHOW);
@@ -98,7 +104,7 @@ class AttendanceServiceTest {
 		// given
 		attendance.correct(AttendanceResult.NO_SHOW, admin);
 		Penalty penalty = Penalty.create(roster, meetup, PenaltyType.NO_SHOW, admin);
-		given(penaltyRepository.findActive(10L, 5L, PenaltyType.NO_SHOW)).willReturn(Optional.of(penalty));
+		given(penaltyRepository.findActiveForUpdate(10L, 5L, PenaltyType.NO_SHOW)).willReturn(Optional.of(penalty));
 
 		// when
 		service.correct(100L, ADMIN_ID, AttendanceResult.ATTENDED);
@@ -115,7 +121,7 @@ class AttendanceServiceTest {
 	void 노쇼_참석_노쇼로_바꿔도_활성_노쇼는_하나다() {
 		// given
 		Penalty[] holder = new Penalty[1];
-		given(penaltyRepository.findActive(10L, 5L, PenaltyType.NO_SHOW)).willAnswer(
+		given(penaltyRepository.findActiveForUpdate(10L, 5L, PenaltyType.NO_SHOW)).willAnswer(
 				inv -> Optional.ofNullable(holder[0] != null && holder[0].isActive() ? holder[0] : null));
 		given(penaltyRepository.save(any(Penalty.class))).willAnswer(inv -> {
 			holder[0] = inv.getArgument(0);
@@ -161,5 +167,22 @@ class AttendanceServiceTest {
 		assertThatThrownBy(() -> service.correct(999L, ADMIN_ID, AttendanceResult.NO_SHOW))
 				.isInstanceOfSatisfying(BusinessException.class,
 						e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+	}
+
+	@Test
+	void 벙을_먼저_잠그고_참석을_잠근_뒤_블랙리스트를_잠근다() {
+		// given
+		given(penaltyRepository.findActiveForUpdate(10L, 5L, PenaltyType.NO_SHOW)).willReturn(Optional.empty());
+
+		// when
+		service.correct(100L, ADMIN_ID, AttendanceResult.NO_SHOW);
+
+		// then
+		InOrder order = inOrder(attendanceRepository, meetupRepository, penaltyRepository);
+		order.verify(attendanceRepository).findMeetupIdById(100L);
+		order.verify(meetupRepository).findByIdForUpdate(10L);
+		order.verify(attendanceRepository).findByIdForUpdate(100L);
+		order.verify(penaltyRepository).findActiveForUpdate(10L, 5L, PenaltyType.NO_SHOW);
+		order.verify(penaltyRepository).save(any(Penalty.class));
 	}
 }
