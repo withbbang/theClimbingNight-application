@@ -136,6 +136,7 @@ k-drinker와 같은 패턴: `master` 푸시 → GitHub Actions가 이미지 빌�
 - iPhone에서 Apple로만 가입한 사람은 Android로 바꾸면 계정을 이어 쓸 수 없다. 가입 화면에서 카카오·네이버·구글을 위에 두고 Apple을 마지막에 둔다 (제안).
 - 앱이 각 SDK로 받은 토큰(카카오·네이버 access token, 구글·Apple ID token)을 API로 보내면 API가 제공자에게 검증한 뒤 자체 토큰을 발급한다.
 - 카카오·네이버 SDK는 네이티브 모듈이라 Expo Go로는 실행할 수 없다. 개발은 처음부터 EAS development build로 한다. 각 제공자 개발자 콘솔에 앱 등록(번들 ID, 키 해시, 리다이렉트)이 필요하다.
+- 네이버 SDK는 Client Secret을 앱에 넣어야 초기화된다. 앱 번들에서 꺼낼 수 있으므로 비밀로 취급하지 않고, 서버 인증에 쓰지 않는다.
 - 토큰 (제안): access token JWT 30분, refresh token 30일 회전 방식(사용할 때마다 새로 발급, 이전 것 폐기), DB에는 해시로 저장. 앱은 `expo-secure-store`에 보관.
 - 첫 로그인 시 닉네임을 입력받아 USER로 가입한다. 프로필 사진은 1단계에 없다 (닉네임 첫 글자 아바타). 업로드 경로가 2단계에 생기면 함께 넣는다 (제안). 같은 사람이 여러 소셜 계정으로 로그인하면 별개 계정으로 본다 (제안. 계정 연결은 3단계). 제공자가 이메일을 주더라도 이메일로 자동 병합하지 않는다 (다른 사람 계정에 붙는 사고 방지).
 - 앱 탈퇴: 계정을 비활성화하고 개인정보(닉네임, 프로필 사진, 제공자 ID)를 지운다. 명부의 참석 기록은 통계 보존을 위해 남기되 앱 계정과의 연결을 끊는다.
@@ -389,7 +390,7 @@ media_jobs       id, post_media_id, status, attempts, last_error   -- 워커 작
 
 | 결정 | 내용 |
 |---|---|
-| 앱 | Expo (React Native, TypeScript), Expo Router |
+| 앱 | Expo SDK 58 (React Native, TypeScript), Expo Router. 앱 식별자 `com.theclimbingnight.app` (iOS·Android 공통) |
 | 서버 | Spring Boot + nginx + Next.js, NAS Docker Compose |
 | 로그인 | 카카오·네이버·구글 + iOS Apple, Spring 자체 JWT (접근 방식 A) |
 | 소모임 병행 | 소모임은 계속 운영(모집 창구), 회원을 주기적으로 앱으로 일괄 이동 |
@@ -406,9 +407,9 @@ media_jobs       id, post_media_id, status, attempts, last_error   -- 워커 작
 
 ## 14. 만드는 사람에게 맡기는 것
 
-- 라이브러리 세부 선택: 상태관리, 목록 가상화(FlashList 등), 달력 컴포넌트, 2단계 이미지 편집기.
+- 라이브러리 세부 선택: 목록 가상화(FlashList 등), 달력 컴포넌트, 2단계 이미지 편집기. 서버 상태는 React Query, 아이콘은 phosphor-react-native로 정했다.
 - API 엔드포인트 세부 설계 (`api-conventions` 스킬 규약 안에서).
 - Flyway 마이그레이션 구성, 인덱스.
 - nginx 설정, Cloudflare Tunnel 구성 방식 (기존 프로젝트와 같은 터널을 쓸지 등).
-- 디자인 (색, 타이포, 아이콘). 동호회 로고·브랜드 자료는 사용자에게 받는다.
+- 디자인 (색, 타이포, 아이콘). 앱 토큰은 `apps/mobile/lib/theme.ts`에 있다. 동호회 로고·브랜드 자료는 사용자에게 받는다.
 - "(제안)" 표시 항목은 구현 중 더 나은 근거가 있으면 바꾸되, 바꾸면 이 문서를 고친다.
