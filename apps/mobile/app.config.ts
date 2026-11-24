@@ -66,6 +66,14 @@ export default function createConfig(): ExpoConfig {
           },
         },
       ],
+      [
+        'expo-font',
+        {
+          fonts: ['Regular', 'SemiBold', 'ExtraBold'].map(
+            (weight) => `./assets/fonts/Pretendard-${weight}.otf`,
+          ),
+        },
+      ],
       ['expo-splash-screen', { backgroundColor: '#EEF2F8', dark: { backgroundColor: '#101A2E' } }],
       ...socialPlugins(env),
     ],
