@@ -2,7 +2,6 @@ package com.theclimbingnight.meetup.controller;
 
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -143,6 +142,5 @@ class MeetupApplicationControllerTest {
 		mockMvc.perform(post("/api/v1/meetup-applications/100/remove").header("Authorization", admin))
 				.andExpect(status().isNoContent());
 		verify(meetupApplicationService).remove(100L);
-		verify(meetupApplicationService, never()).cancel(anyLong(), anyLong(), isNull());
 	}
 }

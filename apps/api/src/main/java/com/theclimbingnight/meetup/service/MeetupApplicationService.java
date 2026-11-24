@@ -83,7 +83,7 @@ public class MeetupApplicationService {
 			throw new BusinessException(ErrorCode.MEETUP_ALREADY_STARTED);
 		}
 		MeetupApplication application = applicationRepository
-				.findByMeetupIdAndRosterMemberId(meetupId, roster.getId())
+				.findByMeetupIdAndRosterMemberIdForUpdate(meetupId, roster.getId())
 				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 		requireActive(application);
 		boolean wasConfirmed = application.getStatus() == MeetupApplicationStatus.CONFIRMED;
@@ -96,9 +96,9 @@ public class MeetupApplicationService {
 
 	@Transactional
 	public void remove(long applicationId) {
-		long meetupId = applicationRepository.findById(applicationId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND))
-				.getMeetup().getId();
+		// 신청 엔티티를 먼저 읽으면 잠금 조회가 그 낡은 인스턴스를 돌려주므로, 벙 ID만 얻고 벙 → 신청 순서로 잠근다.
+		long meetupId = applicationRepository.findMeetupIdById(applicationId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 		Meetup meetup = lock(meetupId);
 		MeetupApplication application = applicationRepository.findByIdForUpdate(applicationId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));

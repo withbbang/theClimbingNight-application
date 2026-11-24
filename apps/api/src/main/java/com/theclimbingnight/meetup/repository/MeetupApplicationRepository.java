@@ -18,6 +18,10 @@ public interface MeetupApplicationRepository extends JpaRepository<MeetupApplica
 	@Query("select a from MeetupApplication a where a.id = :id")
 	Optional<MeetupApplication> findByIdForUpdate(@Param("id") long id);
 
+	/** 신청 엔티티를 영속성 컨텍스트에 올리지 않고 벙 ID만 얻는다. 벙을 먼저 잠근 뒤 신청을 잠금 조회하기 위해 쓴다. */
+	@Query("select a.meetup.id from MeetupApplication a where a.id = :id")
+	Optional<Long> findMeetupIdById(@Param("id") long applicationId);
+
 	Optional<MeetupApplication> findByMeetupIdAndRosterMemberId(long meetupId, long rosterMemberId);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -46,15 +50,8 @@ public interface MeetupApplicationRepository extends JpaRepository<MeetupApplica
 			+ "group by a.meetup.id, a.status")
 	List<MeetupStatusCount> countByMeetupIds(@Param("ids") Collection<Long> meetupIds);
 
-	@Query("select a from MeetupApplication a join fetch a.meetup m where a.rosterMember.id = :rosterMemberId "
-			+ "and a.status in (com.theclimbingnight.meetup.entity.MeetupApplicationStatus.CONFIRMED, "
-			+ "com.theclimbingnight.meetup.entity.MeetupApplicationStatus.WAITLISTED) "
-			+ "and m.status = com.theclimbingnight.meetup.entity.MeetupStatus.OPEN and m.startsAt > :now")
-	List<MeetupApplication> findActiveUpcoming(@Param("rosterMemberId") long rosterMemberId,
-			@Param("now") Instant now);
-
 	/**
-	 * findActiveUpcoming과 같은 조건의 벙 ID만 오름차순으로 준다. 엔티티를 영속성 컨텍스트에 올리지 않으므로,
+	 * 명부의 확정·대기 신청 중 OPEN이고 아직 시작하지 않은 벙의 ID만 오름차순으로 준다. 엔티티를 영속성 컨텍스트에 올리지 않으므로,
 	 * 뒤이어 잠금 조회한 벙·신청이 낡은 상태로 남지 않는다 (Hibernate는 이미 관리 중인 엔티티를 잠금 조회로 새로 고치지 않는다).
 	 */
 	@Query("select m.id from MeetupApplication a join a.meetup m where a.rosterMember.id = :rosterMemberId "

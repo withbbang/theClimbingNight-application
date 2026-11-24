@@ -145,10 +145,13 @@ class MeetupApplicationServiceTest {
 
 		// when, then
 		given(applicationRepository.findByMeetupIdAndRosterMemberId(MEETUP_ID, ROSTER_ID)).willReturn(Optional.empty());
+		given(applicationRepository.findByMeetupIdAndRosterMemberIdForUpdate(MEETUP_ID, ROSTER_ID))
+				.willReturn(Optional.empty());
 		assertThatThrownBy(() -> service.apply(MEETUP_ID, USER_ID))
 				.isInstanceOf(BusinessException.class)
 				.extracting("errorCode").isEqualTo(ErrorCode.MEETUP_ALREADY_STARTED);
-		given(applicationRepository.findByMeetupIdAndRosterMemberId(MEETUP_ID, ROSTER_ID)).willReturn(Optional.of(mine));
+		given(applicationRepository.findByMeetupIdAndRosterMemberIdForUpdate(MEETUP_ID, ROSTER_ID))
+				.willReturn(Optional.of(mine));
 		assertThatThrownBy(() -> service.cancel(MEETUP_ID, USER_ID, null))
 				.isInstanceOf(BusinessException.class)
 				.extracting("errorCode").isEqualTo(ErrorCode.MEETUP_ALREADY_STARTED);
@@ -313,7 +316,7 @@ class MeetupApplicationServiceTest {
 	void 내보내면_REMOVED이고_늦은_취소가_아니며_승격한다() {
 		// given
 		MeetupApplication target = existing(MeetupApplicationStatus.CONFIRMED, NOW);
-		given(applicationRepository.findById(50L)).willReturn(Optional.of(target));
+		given(applicationRepository.findMeetupIdById(50L)).willReturn(Optional.of(MEETUP_ID));
 		given(applicationRepository.findByIdForUpdate(50L)).willReturn(Optional.of(target));
 		setNow(DEADLINE.plusSeconds(1));
 
@@ -324,17 +327,48 @@ class MeetupApplicationServiceTest {
 		assertThat(target.getStatus()).isEqualTo(MeetupApplicationStatus.REMOVED);
 		assertThat(target.isLateCancel()).isFalse();
 		assertThat(target.getCanceledAt()).isEqualTo(DEADLINE.plusSeconds(1));
+		verify(promoter).promote(meetup, DEADLINE.plusSeconds(1));
+	}
+
+	@Test
+	void 내보내기는_신청을_읽기_전에_벙을_잠근다() {
+		// given
+		MeetupApplication target = existing(MeetupApplicationStatus.CONFIRMED, NOW);
+		given(applicationRepository.findMeetupIdById(50L)).willReturn(Optional.of(MEETUP_ID));
+		given(applicationRepository.findByIdForUpdate(50L)).willReturn(Optional.of(target));
+
+		// when
+		service.remove(50L);
+
+		// then
 		InOrder order = inOrder(meetupRepository, applicationRepository, promoter);
+		order.verify(applicationRepository).findMeetupIdById(50L);
 		order.verify(meetupRepository).findByIdForUpdate(MEETUP_ID);
 		order.verify(applicationRepository).findByIdForUpdate(50L);
-		order.verify(promoter).promote(meetup, DEADLINE.plusSeconds(1));
+		order.verify(promoter).promote(meetup, NOW);
+		verify(applicationRepository, never()).findById(anyLong());
+	}
+
+	@Test
+	void 취소는_벙을_잠근_뒤_내_신청을_잠금_조회한다() {
+		// given
+		existing(MeetupApplicationStatus.CONFIRMED, NOW);
+
+		// when
+		service.cancel(MEETUP_ID, USER_ID, null);
+
+		// then
+		InOrder order = inOrder(meetupRepository, applicationRepository);
+		order.verify(meetupRepository).findByIdForUpdate(MEETUP_ID);
+		order.verify(applicationRepository).findByMeetupIdAndRosterMemberIdForUpdate(MEETUP_ID, ROSTER_ID);
+		verify(applicationRepository, never()).findByMeetupIdAndRosterMemberId(anyLong(), anyLong());
 	}
 
 	@Test
 	void 비활성_신청이나_시작한_벙은_내보낼_수_없다() {
 		// given
 		MeetupApplication target = existing(MeetupApplicationStatus.CONFIRMED, NOW);
-		given(applicationRepository.findById(50L)).willReturn(Optional.of(target));
+		given(applicationRepository.findMeetupIdById(50L)).willReturn(Optional.of(MEETUP_ID));
 		given(applicationRepository.findByIdForUpdate(50L)).willReturn(Optional.of(target));
 		setNow(STARTS);
 
@@ -361,6 +395,8 @@ class MeetupApplicationServiceTest {
 				status == MeetupApplicationStatus.CONFIRMED, appliedAt);
 		ReflectionTestUtils.setField(application, "id", 50L);
 		given(applicationRepository.findByMeetupIdAndRosterMemberId(MEETUP_ID, ROSTER_ID))
+				.willReturn(Optional.of(application));
+		given(applicationRepository.findByMeetupIdAndRosterMemberIdForUpdate(MEETUP_ID, ROSTER_ID))
 				.willReturn(Optional.of(application));
 		return application;
 	}

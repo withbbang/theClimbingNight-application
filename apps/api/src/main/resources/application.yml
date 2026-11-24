@@ -3,6 +3,10 @@ spring:
     name: theclimbingnight-api
   profiles:
     default: local
+  datasource:
+    hikari:
+      # 쓰기는 행 잠금으로 직렬화한다. 잠금 뒤의 일반 조회가 커밋된 행을 보게 MySQL 기본 REPEATABLE READ 스냅숏 대신 READ COMMITTED.
+      transaction-isolation: TRANSACTION_READ_COMMITTED
   servlet:
     multipart:
       max-file-size: 1MB

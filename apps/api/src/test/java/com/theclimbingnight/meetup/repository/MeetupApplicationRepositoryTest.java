@@ -92,35 +92,6 @@ class MeetupApplicationRepositoryTest {
 	}
 
 	@Test
-	void 다가오는_활성_신청만_찾는다() {
-		// given
-		RosterMember me = roster("me");
-		Meetup upcoming = meetup("upcoming", NOW.plus(1, ChronoUnit.DAYS));
-		Meetup waiting = meetup("waiting", NOW.plus(2, ChronoUnit.DAYS));
-		Meetup past = meetup("past", NOW.minus(1, ChronoUnit.DAYS));
-		Meetup startedNow = meetup("startedNow", NOW);
-		Meetup canceledMeetup = meetup("canceledMeetup", NOW.plus(3, ChronoUnit.DAYS));
-		canceledMeetup.cancel(NOW);
-		Meetup canceledApplication = meetup("canceledApplication", NOW.plus(4, ChronoUnit.DAYS));
-		meetupApplicationRepository.save(MeetupApplication.create(upcoming, me, true, NOW));
-		meetupApplicationRepository.save(MeetupApplication.create(waiting, me, false, NOW));
-		meetupApplicationRepository.save(MeetupApplication.create(past, me, true, NOW));
-		meetupApplicationRepository.save(MeetupApplication.create(startedNow, me, true, NOW));
-		meetupApplicationRepository.save(MeetupApplication.create(canceledMeetup, me, true, NOW));
-		MeetupApplication canceled = MeetupApplication.create(canceledApplication, me, true, NOW);
-		canceled.cancel(false, null, NOW);
-		meetupApplicationRepository.save(canceled);
-		meetupApplicationRepository.save(MeetupApplication.create(upcoming, roster("other"), true, NOW));
-		meetupApplicationRepository.flush();
-
-		// when
-		List<MeetupApplication> found = meetupApplicationRepository.findActiveUpcoming(me.getId(), NOW);
-
-		// then
-		assertThat(found).extracting(a -> a.getMeetup().getTitle()).containsExactlyInAnyOrder("upcoming", "waiting");
-	}
-
-	@Test
 	void 다가오는_활성_신청의_벙_ID를_오름차순으로_찾는다() {
 		// given
 		RosterMember me = roster("me");
@@ -167,7 +138,7 @@ class MeetupApplicationRepositoryTest {
 				.isEmpty();
 	}
 
-	/** 탈퇴 리스너가 엔티티 대신 벙 ID만 먼저 조회하는 이유: 이미 올라온 엔티티는 잠금 조회로도 새로 읽히지 않는다. */
+	/** 탈퇴 리스너·내보내기가 엔티티 대신 벙 ID만 먼저 조회하는 이유: 이미 올라온 엔티티는 잠금 조회로도 새로 읽히지 않는다. */
 	@Test
 	void 이미_읽어_둔_신청은_잠금_조회로도_새로_고쳐지지_않는다() {
 		// given
@@ -176,7 +147,7 @@ class MeetupApplicationRepositoryTest {
 		MeetupApplication mine = meetupApplicationRepository.save(MeetupApplication.create(meetup, me, true, NOW));
 		meetupApplicationRepository.flush();
 		entityManager.clear();
-		meetupApplicationRepository.findActiveUpcoming(me.getId(), NOW);
+		meetupApplicationRepository.findById(mine.getId());
 		// 다른 트랜잭션이 내보낸 것처럼 영속성 컨텍스트를 거치지 않고 바꾼다.
 		entityManager.createNativeQuery("update meetup_applications set status = 'REMOVED' where id = :id")
 				.setParameter("id", mine.getId()).executeUpdate();
@@ -190,5 +161,21 @@ class MeetupApplicationRepositoryTest {
 		entityManager.clear();
 		assertThat(meetupApplicationRepository.findByMeetupIdAndRosterMemberIdForUpdate(meetup.getId(), me.getId())
 				.orElseThrow().getStatus()).isEqualTo(MeetupApplicationStatus.REMOVED);
+	}
+
+	@Test
+	void 신청_ID로_벙_ID만_찾는다() {
+		// given
+		Meetup meetup = meetup("m", NOW.plus(1, ChronoUnit.DAYS));
+		MeetupApplication mine = meetupApplicationRepository.save(
+				MeetupApplication.create(meetup, roster("me"), true, NOW));
+		meetupApplicationRepository.flush();
+		entityManager.clear();
+
+		// when, then
+		assertThat(meetupApplicationRepository.findMeetupIdById(mine.getId())).contains(meetup.getId());
+		// 엔티티를 하나도 올리지 않는다.
+		assertThat(entityManager.unwrap(org.hibernate.Session.class).getStatistics().getEntityCount()).isZero();
+		assertThat(meetupApplicationRepository.findMeetupIdById(-1L)).isEmpty();
 	}
 }
