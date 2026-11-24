@@ -1,0 +1,145 @@
+import * as SplashScreen from 'expo-splash-screen';
+
+import { act, renderRouter, screen, fireEvent } from 'expo-router/testing-library';
+
+import { setSessionExpiredHandler } from '@/lib/api';
+import { networkError } from '@/lib/api-error';
+import { authApi } from '@/lib/auth-api';
+import { queryClient } from '@/lib/query-client';
+import { createSessionStore, sessionStore, type SessionStore } from '@/lib/session-store';
+import { tokens } from '@/test-utils/tokens';
+
+const mockSession: { current: SessionStore | null } = { current: null };
+jest.mock('@/lib/session-store', () => {
+  const actual = jest.requireActual('@/lib/session-store');
+  return {
+    createSessionStore: actual.createSessionStore,
+    // 테스트마다 앱을 새로 켠 상태로 시작한다.
+    get sessionStore() {
+      return mockSession.current ?? actual.sessionStore;
+    },
+  };
+});
+
+const mockStored = new Map<string, string>();
+jest.mock('expo-secure-store', () => ({
+  getItemAsync: jest.fn(async (key: string) => mockStored.get(key) ?? null),
+  setItemAsync: jest.fn(async (key: string, value: string) => {
+    mockStored.set(key, value);
+  }),
+  deleteItemAsync: jest.fn(async (key: string) => {
+    mockStored.delete(key);
+  }),
+}));
+jest.mock('expo-splash-screen', () => ({
+  preventAutoHideAsync: jest.fn(async () => true),
+  hideAsync: jest.fn(async () => {}),
+}));
+jest.mock('expo-haptics', () => ({
+  selectionAsync: jest.fn(async () => {}),
+  impactAsync: jest.fn(async () => {}),
+  ImpactFeedbackStyle: { Light: 'light' },
+}));
+jest.mock('@/lib/auth-api', () => ({
+  authApi: { getMe: jest.fn(), logout: jest.fn(async () => {}) },
+}));
+jest.mock('@/lib/social', () => ({
+  availableAdapters: () => [],
+  signOutSocial: jest.fn(async () => {}),
+}));
+jest.mock('@/lib/api', () => ({ apiFetch: jest.fn(), setSessionExpiredHandler: jest.fn() }));
+
+const getMe = jest.mocked(authApi.getMe);
+
+async function start(session?: ReturnType<typeof tokens>, initialUrl = '/') {
+  if (session) mockStored.set('session', JSON.stringify(session));
+  const result = await renderRouter('./app', { initialUrl });
+  await act(async () => {});
+  return result;
+}
+
+beforeEach(() => {
+  mockStored.clear();
+  queryClient.clear();
+  queryClient.setDefaultOptions({ queries: { retry: false } });
+  jest.clearAllMocks();
+  mockSession.current = createSessionStore();
+  getMe.mockRejectedValue(networkError());
+});
+
+it('keeps the splash until the session is loaded', async () => {
+  let finish = () => {};
+  const load = jest.spyOn(sessionStore, 'load').mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  await renderRouter('./app', { initialUrl: '/' });
+  expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
+  load.mockRestore();
+  await act(async () => {
+    await sessionStore.load();
+    finish();
+  });
+  expect(SplashScreen.hideAsync).toHaveBeenCalledTimes(1);
+});
+
+it('shows the four tabs to a guest', async () => {
+  await start();
+  expect(screen.getAllByRole('tab').map((t) => t.props.accessibilityLabel)).toEqual([
+    '홈',
+    '벙',
+    '굿즈',
+    '마이',
+  ]);
+});
+
+it('asks a guest to log in on the meetups tab', async () => {
+  const app = await start(undefined, '/meetups');
+  await fireEvent.press(screen.getByRole('button', { name: '로그인하기' }));
+  expect(app.getPathname()).toBe('/login');
+});
+
+it('asks a USER for membership verification on the meetups tab', async () => {
+  await start(tokens('1', 'USER'), '/meetups');
+  expect(screen.getByText('동호회원 인증이 필요해요')).toBeOnTheScreen();
+});
+
+it.each(['MEMBER', 'ADMIN'] as const)('shows the meetups placeholder to %s', async (role) => {
+  await start(tokens('1', role), '/meetups');
+  expect(screen.getByText('벙 일정을 준비하고 있어요')).toBeOnTheScreen();
+});
+
+it('shows the nickname and logs out on the my tab', async () => {
+  await start(tokens('1', 'USER', '별이'), '/my');
+  expect(screen.getByText('별이')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '로그아웃' }));
+  await act(async () => {});
+  expect(screen.queryByText('별이')).toBeNull();
+  expect(authApi.logout).toHaveBeenCalledWith('R1', undefined);
+});
+
+it('refreshes the cached user after start', async () => {
+  getMe.mockResolvedValue({ id: 1, nickname: '별이', role: 'MEMBER' });
+  await start(tokens('1', 'USER'), '/meetups');
+  expect(await screen.findByText('벙 일정을 준비하고 있어요')).toBeOnTheScreen();
+});
+
+it('stays usable when getMe fails on the network', async () => {
+  await start(tokens('1', 'USER', '별이'), '/my');
+  expect(getMe).toHaveBeenCalled();
+  expect(screen.getByText('별이')).toBeOnTheScreen();
+});
+
+it('opens login and clears cached queries when the session expires', async () => {
+  const app = await start(tokens('1'), '/my');
+  queryClient.setQueryData(['inquiries'], [1]);
+  const handler = jest.mocked(setSessionExpiredHandler).mock.calls.at(-1)![0];
+  await act(async () => {
+    await sessionStore.signOut();
+    handler();
+  });
+  expect(app.getPathname()).toBe('/login');
+  expect(queryClient.getQueryData(['inquiries'])).toBeUndefined();
+});

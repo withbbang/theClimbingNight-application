@@ -106,4 +106,6 @@ export function createSessionStore() {
   };
 }
 
+export type SessionStore = ReturnType<typeof createSessionStore>;
+
 export const sessionStore = createSessionStore();
