@@ -208,8 +208,9 @@ k-drinker와 같은 패턴: `master` 푸시 → GitHub Actions가 이미지 빌�
 ### 참석률
 
 - 기간: 일 / 주 / 월 / 분기 / 연 (주는 월요일 시작, 한국 시간 기준).
-- **참석률 = 기간 내 내가 "참석"으로 기록된 벙 수 ÷ 기간 내 열린 벙 수(취소 제외)** (제안). 참석 횟수도 함께 보여준다.
-- 지난 기록을 이관하면 이관된 벙도 분모·분자에 포함된다.
+- **참석률 = 기간 내 내가 "참석"으로 기록된 벙 수 ÷ 기간 내 참석 기록이 끝난 벙 수(취소 제외)**. 참석 횟수도 함께 보여준다.
+- 아직 열리지 않았거나 참석 기록 전인 벙은 분모에 넣지 않는다 (진행 중인 달의 비율이 낮아지지 않게).
+- 지난 기록을 이관하면 이관된 벙도 참석 기록이 끝난 벙으로 보아 분모·분자에 포함된다.
 - 집계는 요청 때 SQL로 계산한다. 회원 수·벙 수가 작아 별도 집계 테이블이 필요 없다.
 
 ### 동시성
@@ -278,7 +279,9 @@ meetups                              -- 벙 (이관 데이터를 위해 ends_at�
   id, title, description, place_name, starts_at, ends_at, capacity,
   late_cancel_hours DEFAULT 24, participants_visible BOOLEAN DEFAULT TRUE,
   host_user_id → users (nullable: 이관 데이터),
-  status ENUM(OPEN, CANCELED), canceled_at, source ENUM(APP, IMPORT)
+  status ENUM(OPEN, CANCELED), canceled_at, source ENUM(APP, IMPORT),
+  attendance_recorded_at (참석 자동 기록을 끝낸 시각),
+  reminder_sent_at (일정 알림을 보낸 시각, 시작 시각이 바뀌면 NULL로 되돌려 다시 보낸다)
 
 meetup_applications                  -- 신청 (앱에서 생긴 것만)
   id, meetup_id → meetups, roster_member_id → roster_members,
@@ -306,9 +309,16 @@ inquiries
 
 push_tokens
   id, user_id → users, expo_push_token UNIQUE, platform ENUM(IOS, ANDROID), last_seen_at
+  -- 같은 토큰을 다른 사용자가 등록하면 소유자를 옮긴다. 탈퇴하면 지운다.
+
+notification_settings                -- 행이 없으면 모두 켜진 것으로 본다
+  user_id PK → users, new_meetup BOOLEAN, new_notice BOOLEAN
+
+push_tickets                         -- Expo 발송 티켓. 15분 뒤 수신 확인으로 무효 토큰을 지우고 티켓도 지운다
+  id, ticket_id, expo_push_token, sent_at
 
 app_settings                         -- 앱 업데이트 없이 바꾸는 값
-  key PRIMARY KEY, value
+  setting_key PRIMARY KEY, setting_value
   -- somoim_join_url, smartstore_url 등
 ```
 
@@ -337,11 +347,16 @@ media_jobs       id, post_media_id, status, attempts, last_error   -- 워커 작
 |---|---|
 | 동호회원 인증 승인·거절 | 신청자 |
 | 대기 → 확정 승격 | 해당 회원 |
-| 벙 취소 | 신청자 전원 |
-| 새 벙 개설 | MEMBER 전원 (알림 설정에서 끌 수 있음) |
-| 새 공지 | 전원 (끌 수 있음) |
-| 문의 답변 | 문의자 |
-| 벙 전날 리마인드 | 확정자 (제안) |
+| 벙 취소 | 확정·대기자 |
+| 새 벙 개설 | MEMBER·ADMIN, 개설한 운영진 제외 (알림 설정에서 끌 수 있음) |
+| 새 공지 | 활성 사용자, 작성한 운영진 제외 (끌 수 있음) |
+| 문의 답변 | 문의자 (답변을 고쳐도 다시 보내지 않음) |
+| 벙 일정 리마인드 | 확정자 |
+
+- **리마인드 시각**: 전날 20시(KST)부터 다음 날 벙까지 한 번 보낸다. 서버가 꺼져 있어 놓쳤으면 당일 09시부터 시작 전까지 보낸다. 09시 전에는 보내지 않는다. 벙 시작 시각을 바꾸면 새 날짜로 다시 보낸다 (`meetups.reminder_sent_at`).
+- 발송은 트랜잭션이 커밋된 뒤 별도 스레드(큐 1000개)에서 한다. 롤백되면 보내지 않는다.
+- 알림은 유실될 수 있다 (서버 재시작, 큐 초과). 실패는 본래 요청을 실패시키지 않는다.
+- 푸시 토큰 원문은 로그에 남기지 않는다.
 
 ### 미디어 처리 (2단계)
 
