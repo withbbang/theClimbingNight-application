@@ -63,9 +63,11 @@ export function monthGrid(key: DateKey): DateKey[][] {
   return weeks;
 }
 
-export function formatDay(key: DateKey): string {
-  const [, month, day] = key.split('-').map(Number);
-  return `${month}월 ${day}일(${WEEKDAYS[dayOfWeek(key)]})`;
+/** 지난해까지의 날에는 연도를 붙인다. */
+export function formatDay(key: DateKey, today: DateKey = todayKst()): string {
+  const [year, month, day] = key.split('-').map(Number);
+  const prefix = year < Number(today.slice(0, 4)) ? `${year}년 ` : '';
+  return `${prefix}${month}월 ${day}일(${WEEKDAYS[dayOfWeek(key)]})`;
 }
 
 export function formatTime(iso: string): string {

@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 
 import { useFocusEffect, useRouter } from 'expo-router';
 
+import { useLeaveAuth } from '@/hooks/use-leave-auth';
 import { authApi } from '@/lib/auth-api';
 import { errorMessage } from '@/lib/error-message';
 import { notifyError, notifySuccess } from '@/lib/haptics';
@@ -36,6 +37,7 @@ function watchReturn(onSilent: () => void) {
 
 export function useLogin() {
   const router = useRouter();
+  const leaveAuth = useLeaveAuth();
   const busy = useRef(false);
   // 새로 시도하거나 화면을 떠나면 올라간다. 예전 시도의 늦은 결과를 버린다.
   const attempt = useRef(0);
@@ -112,7 +114,7 @@ export function useLogin() {
       void clearSessionCache();
       await sessionStore.signIn(result.tokens);
       if (isCurrent()) {
-        router.dismissTo('/');
+        leaveAuth();
       }
     } catch (e) {
       if (!isCurrent()) {

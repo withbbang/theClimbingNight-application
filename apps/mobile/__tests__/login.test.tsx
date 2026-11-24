@@ -110,6 +110,32 @@ it('signs in and returns to the tabs', async () => {
   expect(app.getPathname()).toBe('/');
 });
 
+it('returns to the screen that asked for login', async () => {
+  mockServer({
+    '/auth/login': ok({ status: 'LOGGED_IN', tokens: tokens('1', 'USER') }),
+    '/users/me': ok(tokens('1', 'USER').user),
+  });
+  const app = await renderApp('/inquiries');
+  await press('로그인하기');
+  expect(app.getPathname()).toBe('/login');
+  await press('카카오 로그인');
+  expect(app.getPathname()).toBe('/inquiries');
+});
+
+it('returns to the screen that asked for login after signing up', async () => {
+  mockServer({
+    '/auth/login': ok({ status: 'SIGNUP_REQUIRED', signupToken: 'st' }),
+    '/auth/signup': ok(tokens('1', 'USER')),
+    '/users/me': ok(tokens('1', 'USER').user),
+  });
+  const app = await renderApp('/inquiries');
+  await press('로그인하기');
+  await press('카카오 로그인');
+  await fireEvent.changeText(screen.getByLabelText('닉네임'), '가나');
+  await press('가입하기');
+  expect(app.getPathname()).toBe('/inquiries');
+});
+
 it('drops data cached for an earlier account', async () => {
   mockServer({ '/auth/login': ok({ status: 'LOGGED_IN', tokens: tokens('1') }) });
   await renderApp('/login');

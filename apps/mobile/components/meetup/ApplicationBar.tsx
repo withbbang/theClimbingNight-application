@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
-import Animated, { FadeInDown, LinearTransition, useReducedMotion } from 'react-native-reanimated';
+import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
 
 import { AppText } from '@/components/ui/AppText';
 import { Button } from '@/components/ui/Button';
@@ -60,8 +60,7 @@ export function ApplicationBar({ detail, phase, started }: ApplicationBarProps) 
   const text = statusText(detail, phase, started);
 
   return (
-    <Animated.View
-      layout={reduced ? undefined : LinearTransition.springify().damping(18)}
+    <View
       style={{
         gap: space(3),
         padding: space(4),
@@ -95,6 +94,6 @@ export function ApplicationBar({ detail, phase, started }: ApplicationBarProps) 
           onPress={() => router.push(`/meetups/${meetup.id}/cancel`)}
         />
       ) : null}
-    </Animated.View>
+    </View>
   );
 }

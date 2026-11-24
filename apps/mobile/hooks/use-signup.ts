@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useRouter } from 'expo-router';
 
+import { useLeaveAuth } from '@/hooks/use-leave-auth';
 import { ApiError } from '@/lib/api-error';
 import { authApi } from '@/lib/auth-api';
 import { errorMessage } from '@/lib/error-message';
@@ -16,6 +17,7 @@ const RESTART_CODES = ['AUTH_SIGNUP_EXPIRED', 'AUTH_ALREADY_REGISTERED'];
 
 export function useSignup(signupToken: string | null) {
   const router = useRouter();
+  const leaveAuth = useLeaveAuth();
   const busy = useRef(false);
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export function useSignup(signupToken: string | null) {
       void clearSessionCache();
       await sessionStore.signIn(tokens);
       if (!left.current) {
-        router.dismissTo('/');
+        leaveAuth();
       }
     } catch (e) {
       if (left.current) {
