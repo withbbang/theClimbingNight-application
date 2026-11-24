@@ -54,6 +54,10 @@ description: apps/api 와 apps/mobile · apps/web 이 공유하는 REST 규약 �
 | `MEETUP_ALREADY_STARTED` | 409 | 이미 시작한 벙입니다. |
 | `MEETUP_ENDED` | 409 | 이미 끝난 벙입니다. |
 | `MEETUP_CANCELED` | 409 | 취소된 벙입니다. |
+| `MEETUP_ROSTER_REQUIRED` | 403 | 동호회원 명부와 연결된 계정만 신청할 수 있습니다. |
+| `MEETUP_ALREADY_APPLIED` | 409 | 이미 신청한 벙입니다. |
+| `MEETUP_APPLICATION_REMOVED` | 409 | 운영진이 내보낸 벙에는 다시 신청할 수 없습니다. |
+| `MEETUP_APPLICATION_NOT_ACTIVE` | 409 | 이미 취소되었거나 내보낸 신청입니다. |
 
 - 401은 두 종류다. `AUTH_REQUIRED`는 세션이 없거나 만료된 것이라 로그인 화면으로 보내고, `AUTH_INVALID_SOCIAL_TOKEN`은 소셜 토큰 검증 실패라 세션 만료가 아니다.
 - 리프레시 토큰은 회전하며 한 번만 쓸 수 있다. 클라이언트는 리프레시 요청을 single-flight(동시에 하나만)로 보내야 한다. 같은 토큰의 중복 요청은 `AUTH_REQUIRED`(401)를 받는다.

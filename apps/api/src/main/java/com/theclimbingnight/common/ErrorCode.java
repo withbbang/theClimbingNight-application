@@ -32,7 +32,11 @@ public enum ErrorCode {
 	MEETUP_START_IN_PAST(HttpStatus.BAD_REQUEST, "시작 시각은 지금 이후여야 합니다."),
 	MEETUP_ALREADY_STARTED(HttpStatus.CONFLICT, "이미 시작한 벙입니다."),
 	MEETUP_ENDED(HttpStatus.CONFLICT, "이미 끝난 벙입니다."),
-	MEETUP_CANCELED(HttpStatus.CONFLICT, "취소된 벙입니다.");
+	MEETUP_CANCELED(HttpStatus.CONFLICT, "취소된 벙입니다."),
+	MEETUP_ROSTER_REQUIRED(HttpStatus.FORBIDDEN, "동호회원 명부와 연결된 계정만 신청할 수 있습니다."),
+	MEETUP_ALREADY_APPLIED(HttpStatus.CONFLICT, "이미 신청한 벙입니다."),
+	MEETUP_APPLICATION_REMOVED(HttpStatus.CONFLICT, "운영진이 내보낸 벙에는 다시 신청할 수 없습니다."),
+	MEETUP_APPLICATION_NOT_ACTIVE(HttpStatus.CONFLICT, "이미 취소되었거나 내보낸 신청입니다.");
 
 	private final HttpStatus status;
 	private final String message;
