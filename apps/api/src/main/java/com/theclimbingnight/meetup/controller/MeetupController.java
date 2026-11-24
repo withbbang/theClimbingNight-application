@@ -6,11 +6,19 @@ import com.theclimbingnight.auth.web.RequireRole;
 import com.theclimbingnight.common.ApiResponse;
 import com.theclimbingnight.meetup.dto.MeetupCopyRequest;
 import com.theclimbingnight.meetup.dto.MeetupCreateRequest;
+import com.theclimbingnight.meetup.dto.MeetupDetailResponse;
 import com.theclimbingnight.meetup.dto.MeetupResponse;
+import com.theclimbingnight.meetup.dto.MeetupSummaryResponse;
 import com.theclimbingnight.meetup.dto.MeetupUpdateRequest;
 import com.theclimbingnight.meetup.service.MeetupAdminService;
+import com.theclimbingnight.meetup.service.MeetupQueryService;
 import com.theclimbingnight.user.entity.Role;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
+import java.util.List;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,8 +34,25 @@ public class MeetupController {
 
 	private final MeetupAdminService meetupAdminService;
 
-	public MeetupController(MeetupAdminService meetupAdminService) {
+	private final MeetupQueryService meetupQueryService;
+
+	public MeetupController(MeetupAdminService meetupAdminService, MeetupQueryService meetupQueryService) {
 		this.meetupAdminService = meetupAdminService;
+		this.meetupQueryService = meetupQueryService;
+	}
+
+	@RequireRole(Role.MEMBER)
+	@GetMapping
+	public ApiResponse<List<MeetupSummaryResponse>> list(@CurrentUser AuthenticatedUser user,
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+		return ApiResponse.success(meetupQueryService.list(user.id(), from, to));
+	}
+
+	@RequireRole(Role.MEMBER)
+	@GetMapping("/{id}")
+	public ApiResponse<MeetupDetailResponse> get(@CurrentUser AuthenticatedUser user, @PathVariable long id) {
+		return ApiResponse.success(meetupQueryService.get(id, user.id(), user.role()));
 	}
 
 	@RequireRole(Role.ADMIN)

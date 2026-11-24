@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -20,6 +21,7 @@ import com.theclimbingnight.meetup.dto.MeetupResponse;
 import com.theclimbingnight.meetup.entity.MeetupSpec;
 import com.theclimbingnight.meetup.entity.MeetupStatus;
 import com.theclimbingnight.meetup.service.MeetupAdminService;
+import com.theclimbingnight.meetup.service.MeetupQueryService;
 import com.theclimbingnight.user.entity.Role;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
@@ -52,6 +54,9 @@ class MeetupControllerTest {
 
 	@MockitoBean
 	MeetupAdminService meetupAdminService;
+
+	@MockitoBean
+	MeetupQueryService meetupQueryService;
 
 	private String bearer(long id, Role role) {
 		User user = User.create("climber");
@@ -183,5 +188,66 @@ class MeetupControllerTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("{\"startsAt\":\"2026-12-08T22:00:00+09:00\",\"endsAt\":\"2026-12-08T19:00:00+09:00\"}"))
 				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void USER가_벙_목록을_보면_403이다() throws Exception {
+		// given
+		String bearer = bearer(7L, Role.USER);
+
+		// when, then
+		mockMvc.perform(get("/api/v1/meetups").param("from", "2026-12-01").param("to", "2026-12-31")
+				.header("Authorization", bearer))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error.code").value("AUTH_FORBIDDEN"));
+	}
+
+	@Test
+	void 날짜_형식이_틀리면_400이다() throws Exception {
+		// given
+		String bearer = bearer(7L, Role.MEMBER);
+
+		// when, then
+		mockMvc.perform(get("/api/v1/meetups").param("from", "2026/12/01").param("to", "2026-12-31")
+				.header("Authorization", bearer))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("COMMON_VALIDATION_FAILED"));
+	}
+
+	@Test
+	void 날짜가_없으면_400이다() throws Exception {
+		// given
+		String bearer = bearer(7L, Role.MEMBER);
+
+		// when, then
+		mockMvc.perform(get("/api/v1/meetups").param("from", "2026-12-01").header("Authorization", bearer))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void MEMBER가_목록을_보면_200이다() throws Exception {
+		// given
+		String bearer = bearer(7L, Role.MEMBER);
+		given(meetupQueryService.list(7L, java.time.LocalDate.of(2026, 12, 1), java.time.LocalDate.of(2026, 12, 31)))
+				.willReturn(java.util.List.of());
+
+		// when, then
+		mockMvc.perform(get("/api/v1/meetups").param("from", "2026-12-01").param("to", "2026-12-31")
+				.header("Authorization", bearer))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data").isArray());
+	}
+
+	@Test
+	void 상세는_호출자의_역할을_넘긴다() throws Exception {
+		// given
+		String bearer = bearer(1L, Role.ADMIN);
+		given(meetupQueryService.get(5L, 1L, Role.ADMIN)).willReturn(
+				new com.theclimbingnight.meetup.dto.MeetupDetailResponse(response(), 0, 0, null, null));
+
+		// when, then
+		mockMvc.perform(get("/api/v1/meetups/5").header("Authorization", bearer))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.meetup.id").value(5));
 	}
 }

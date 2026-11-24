@@ -141,8 +141,7 @@ public class MeetupApplicationService {
 		}
 		List<MeetupApplication> waiting = applicationRepository.findAllByMeetupIdAndStatusOrderByAppliedAtAscIdAsc(
 				application.getMeetup().getId(), MeetupApplicationStatus.WAITLISTED);
-		int index = waiting.indexOf(application);
-		return MyApplicationResponse.of(application, index < 0 ? null : index + 1);
+		return MyApplicationResponse.of(application, WaitlistPositions.of(application, waiting));
 	}
 
 	private RosterMember requireRoster(long userId) {

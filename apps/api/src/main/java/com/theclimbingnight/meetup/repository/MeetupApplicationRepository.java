@@ -39,6 +39,18 @@ public interface MeetupApplicationRepository extends JpaRepository<MeetupApplica
 	List<MeetupApplication> findAllByMeetupIdAndStatusOrderByAppliedAtAscIdAsc(
 			long meetupId, MeetupApplicationStatus status);
 
+	/** 명단 표시용: 명부(닉네임)를 함께 읽어 N+1을 피한다. 확정 순서. */
+	@Query("select a from MeetupApplication a join fetch a.rosterMember "
+			+ "where a.meetup.id = :meetupId and a.status = :status order by a.confirmedAt asc, a.id asc")
+	List<MeetupApplication> findAllWithRosterByMeetupIdAndStatusOrderByConfirmedAtAscIdAsc(
+			@Param("meetupId") long meetupId, @Param("status") MeetupApplicationStatus status);
+
+	/** 명단 표시용: 명부(닉네임)를 함께 읽어 N+1을 피한다. 대기 순서. */
+	@Query("select a from MeetupApplication a join fetch a.rosterMember "
+			+ "where a.meetup.id = :meetupId and a.status = :status order by a.appliedAt asc, a.id asc")
+	List<MeetupApplication> findAllWithRosterByMeetupIdAndStatusOrderByAppliedAtAscIdAsc(
+			@Param("meetupId") long meetupId, @Param("status") MeetupApplicationStatus status);
+
 	List<MeetupApplication> findAllByMeetupId(long meetupId);
 
 	List<MeetupApplication> findAllByMeetupIdInAndRosterMemberId(Collection<Long> meetupIds, long rosterMemberId);
