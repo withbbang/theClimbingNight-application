@@ -72,4 +72,27 @@ class MeetupRepositoryTest {
 		// then
 		assertThat(ids).containsExactly(due.getId(), exactlyNow.getId());
 	}
+
+	@Test
+	void 알리지_않은_열린_앱_벙만_시작_시각_경계_안에서_일정_알림_대상이다() {
+		// given
+		Instant until = NOW.plus(1, ChronoUnit.DAYS);
+		meetupRepository.save(meetup("atNow", NOW, null));
+		Meetup first = meetupRepository.save(meetup("first", NOW.plusSeconds(1), null));
+		Meetup last = meetupRepository.save(meetup("last", until.minusSeconds(1), null));
+		meetupRepository.save(meetup("atUntil", until, null));
+		Meetup canceled = meetup("canceled", NOW.plusSeconds(60), null);
+		canceled.cancel(NOW);
+		meetupRepository.save(canceled);
+		Meetup imported = meetup("imported", NOW.plusSeconds(60), null);
+		ReflectionTestUtils.setField(imported, "source", com.theclimbingnight.meetup.entity.MeetupSource.IMPORT);
+		meetupRepository.save(imported);
+		Meetup sent = meetup("sent", NOW.plusSeconds(60), null);
+		sent.markReminderSent(NOW);
+		meetupRepository.save(sent);
+		meetupRepository.flush();
+
+		// when, then
+		assertThat(meetupRepository.findReminderDueIds(NOW, until)).containsExactly(first.getId(), last.getId());
+	}
 }
