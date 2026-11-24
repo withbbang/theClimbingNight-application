@@ -24,6 +24,8 @@ import org.springframework.web.client.ResourceAccessException;
 public class ExpoPushClient implements PushGateway {
 
 	private static final String UNKNOWN = "UNKNOWN";
+	/** 외부 값이 로그에 그대로 섞이지 않게 코드 모양만 받는다. */
+	private static final java.util.regex.Pattern ERROR_CODE = java.util.regex.Pattern.compile("[A-Za-z_]{1,64}");
 	private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE = new ParameterizedTypeReference<>() {
 	};
 
@@ -93,7 +95,7 @@ public class ExpoPushClient implements PushGateway {
 
 	private static String errorOf(Map<?, ?> item) {
 		if (item.get("details") instanceof Map<?, ?> details && details.get("error") instanceof String error
-				&& !error.isBlank()) {
+				&& ERROR_CODE.matcher(error).matches()) {
 			return error;
 		}
 		return UNKNOWN;
@@ -121,8 +123,13 @@ public class ExpoPushClient implements PushGateway {
 			throw (status == 429 || status >= 500) ? new PushTransientException(code) : new PushRequestException(code);
 		} catch (ResourceAccessException e) {
 			throw new PushTransientException("CONNECTION");
+		} catch (PushTransientException | PushRequestException e) {
+			throw e;
 		} catch (RestClientException e) {
 			throw new PushRequestException("INVALID_RESPONSE");
+		} catch (RuntimeException e) {
+			// 예: 액세스 토큰에 줄바꿈이 있으면 JDK HttpRequest가 헤더 값을 담은 IllegalArgumentException을 던진다. 원본은 버린다.
+			throw new PushRequestException("CLIENT_ERROR");
 		}
 		if (response == null) {
 			throw new PushRequestException("INVALID_RESPONSE");

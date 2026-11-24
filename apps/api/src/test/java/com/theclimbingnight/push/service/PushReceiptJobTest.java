@@ -54,7 +54,11 @@ class PushReceiptJobTest {
 	}
 
 	private static PushTicket ticket(long id, Instant sentAt) {
-		PushTicket ticket = PushTicket.of("t" + id, "ExponentPushToken[" + id + "]", sentAt);
+		return ticket(id, "ExponentPushToken[" + id + "]", sentAt);
+	}
+
+	private static PushTicket ticket(long id, String token, Instant sentAt) {
+		PushTicket ticket = PushTicket.of("t" + id, token, sentAt);
 		try {
 			Field field = PushTicket.class.getDeclaredField("id");
 			field.setAccessible(true);
@@ -166,5 +170,43 @@ class PushReceiptJobTest {
 
 		// then
 		verify(writer, times(2)).deleteTickets(any());
+	}
+
+	@Test
+	void 같은_토큰에_무효_티켓이_여럿이면_가장_늦은_발송_시각으로_지운다() {
+		// given
+		Instant first = NOW.minus(Duration.ofMinutes(50));
+		Instant second = NOW.minus(Duration.ofMinutes(40));
+		PushTicket a = ticket(1, "ExponentPushToken[same]", first);
+		PushTicket b = ticket(2, "ExponentPushToken[same]", second);
+		given(repository.findDue(any(), anyLong(), any(Pageable.class))).willReturn(List.of(a, b));
+		given(gateway.receipts(anyList())).willReturn(Map.of(
+				"t1", new PushReceipt("DeviceNotRegistered"), "t2", new PushReceipt("DeviceNotRegistered")));
+
+		// when
+		job.run();
+
+		// then
+		verify(writer).deleteTokens(Map.of("ExponentPushToken[same]", second));
+	}
+
+	@Test
+	void 토큰_삭제에_실패한_티켓은_남기고_나머지는_지운다() {
+		// given
+		Instant sentAt = NOW.minus(Duration.ofMinutes(20));
+		given(repository.findDue(any(), anyLong(), any(Pageable.class)))
+				.willReturn(List.of(ticket(1, sentAt), ticket(2, sentAt), ticket(3, sentAt)));
+		given(gateway.receipts(anyList())).willReturn(Map.of(
+				"t1", new PushReceipt("DeviceNotRegistered"),
+				"t2", new PushReceipt("DeviceNotRegistered"),
+				"t3", new PushReceipt(null)));
+		given(writer.deleteTokens(any())).willReturn(java.util.Set.of("ExponentPushToken[1]"));
+
+		// when
+		job.run();
+
+		// then
+		verify(writer).deleteTickets(deletedIds.capture());
+		assertThat(deletedIds.getValue()).containsExactlyInAnyOrder(2L, 3L);
 	}
 }

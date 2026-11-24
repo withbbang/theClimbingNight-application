@@ -181,4 +181,74 @@ class ExpoPushClientTest {
 				Map.entry("t2", new PushReceipt("DeviceNotRegistered")),
 				Map.entry("t3", new PushReceipt("UNKNOWN")));
 	}
+
+	private static ExpoPushClient failingClient(String accessToken, RuntimeException failure) {
+		RestClient restClient = RestClient.builder().requestFactory((uri, method) -> {
+			throw failure;
+		}).build();
+		return new ExpoPushClient(restClient, new PushProperties(true, "https://exp.host", accessToken));
+	}
+
+	@Test
+	void 잘못된_액세스_토큰으로_생긴_예외는_값을_담지_않는_요청_오류가_된다() {
+		// given
+		String secret = "bad\nsecret-value";
+		IllegalArgumentException failure = new IllegalArgumentException("invalid header value: Bearer " + secret);
+		ExpoPushClient client = failingClient(secret, failure);
+
+		// when
+		Throwable onSend = catchThrowable(() -> client.send(List.of(message("ExponentPushToken[a]"))));
+		Throwable onReceipts = catchThrowable(() -> client.receipts(List.of("t1")));
+
+		// then
+		for (Throwable thrown : List.of(onSend, onReceipts)) {
+			assertThat(thrown).isInstanceOf(PushRequestException.class).hasNoCause();
+			assertThat(thrown.getMessage()).doesNotContain("secret-value").doesNotContain("Bearer");
+		}
+	}
+
+	@Test
+	void 연결_실패는_여전히_일시_오류다() {
+		// given
+		ExpoPushClient client = failingClient("", new org.springframework.web.client.ResourceAccessException("I/O error"));
+
+		// when
+		Throwable thrown = catchThrowable(() -> client.send(List.of(message("ExponentPushToken[a]"))));
+
+		// then
+		assertThat(thrown).isInstanceOf(PushTransientException.class).hasNoCause();
+	}
+
+	@Test
+	void 형식이_다른_오류_값은_UNKNOWN으로_바꾼다() {
+		// given
+		ExpoPushClient client = client("");
+		server.expect(requestTo(SEND)).andRespond(withSuccess(
+				"{\"data\":[{\"status\":\"error\",\"details\":{\"error\":\"bad ExponentPushToken[leak]\"}}]}",
+				MediaType.APPLICATION_JSON));
+
+		// when
+		List<PushTicketResult> results = client.send(List.of(message("ExponentPushToken[a]")));
+
+		// then
+		assertThat(results).containsExactly(new PushTicketResult(null, "UNKNOWN"));
+	}
+
+	@Test
+	void 수신_확인의_형식이_다른_오류_값도_UNKNOWN이다() {
+		// given
+		ExpoPushClient client = client("");
+		server.expect(requestTo(RECEIPTS)).andRespond(withSuccess(
+				"{\"data\":{\"t1\":{\"status\":\"error\",\"details\":{\"error\":\"ExponentPushToken[leak]\"}},"
+						+ "\"t2\":{\"status\":\"error\",\"details\":{\"error\":\"MessageRateExceeded\"}}}}",
+				MediaType.APPLICATION_JSON));
+
+		// when
+		Map<String, PushReceipt> receipts = client.receipts(List.of("t1", "t2"));
+
+		// then
+		assertThat(receipts).containsOnly(
+				Map.entry("t1", new PushReceipt("UNKNOWN")),
+				Map.entry("t2", new PushReceipt("MessageRateExceeded")));
+	}
 }

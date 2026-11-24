@@ -8,9 +8,11 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
@@ -81,7 +83,7 @@ public class PushReceiptJob {
 		}
 		List<Long> done = new ArrayList<>();
 		Map<String, Instant> invalid = new LinkedHashMap<>();
-		List<Long> invalidTicketIds = new ArrayList<>();
+		Map<String, List<Long>> invalidTicketIdsByToken = new HashMap<>();
 		for (PushTicket ticket : page) {
 			PushReceipt receipt = receipts.get(ticket.getTicketId());
 			if (receipt == null) {
@@ -95,20 +97,27 @@ public class PushReceiptJob {
 				continue;
 			}
 			if (DEVICE_NOT_REGISTERED.equals(receipt.error())) {
-				// 같은 토큰에 여러 티켓이면 가장 이른 발송 시각을 쓴다. 그 뒤 다시 등록된 토큰을 지우지 않기 위해서다.
-				invalidTicketIds.add(ticket.getId());
-				invalid.merge(ticket.getExpoPushToken(), ticket.getSentAt(), (a, b) -> a.isBefore(b) ? a : b);
+				// 같은 토큰에 여러 티켓이면 가장 늦은 발송 시각을 쓴다. 티켓마다 지우는 것과 같은 결과다.
+				invalidTicketIdsByToken.computeIfAbsent(ticket.getExpoPushToken(), k -> new ArrayList<>()).add(ticket.getId());
+				invalid.merge(ticket.getExpoPushToken(), ticket.getSentAt(), (a, b) -> a.isAfter(b) ? a : b);
 			} else {
 				log.error("푸시 수신 오류 code={}", receipt.error());
 			}
 		}
 		if (!invalid.isEmpty()) {
+			Set<String> failedTokens;
 			try {
-				writer.deleteTokens(invalid);
+				failedTokens = writer.deleteTokens(invalid);
 			} catch (RuntimeException e) {
 				log.error("무효 푸시 토큰 삭제 실패 type={}", e.getClass().getSimpleName());
-				// 토큰이 남았으니 티켓도 남겨 다음 실행에서 다시 시도한다.
-				done.removeAll(invalidTicketIds);
+				failedTokens = invalid.keySet();
+			}
+			Set<String> failed = failedTokens;
+			if (!failed.isEmpty()) {
+				// 토큰이 남았으니 그 토큰의 티켓도 남겨 다음 실행에서 다시 시도한다.
+				done.removeAll(invalidTicketIdsByToken.entrySet().stream()
+						.filter(entry -> failed.contains(entry.getKey()))
+						.flatMap(entry -> entry.getValue().stream()).toList());
 			}
 		}
 		if (!done.isEmpty()) {
