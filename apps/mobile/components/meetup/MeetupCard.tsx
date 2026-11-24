@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
@@ -14,6 +14,8 @@ import { capacityText, meetupPhase } from '@/lib/meetup-status';
 import type { MeetupSummaryResponse } from '@/types/api/meetup';
 
 const MAX_STAGGER = 6;
+/** 이보다 큰 글꼴에서는 가로로 놓으면 제목 자리가 남지 않는다. */
+const STACK_FONT_SCALE = 1.5;
 
 interface MeetupCardProps {
   meetup: MeetupSummaryResponse;
@@ -26,6 +28,7 @@ export function MeetupCard({ meetup, index, showDate = false }: MeetupCardProps)
   const router = useRouter();
   const { colors, radius, space } = useTheme();
   const press = usePressScale();
+  const stacked = useWindowDimensions().fontScale > STACK_FONT_SCALE;
   const phase = meetupPhase(meetup, new Date());
   const phaseLabel = {
     CANCELED: '취소된 벙',
@@ -44,8 +47,8 @@ export function MeetupCard({ meetup, index, showDate = false }: MeetupCardProps)
           onPress={() => router.push(`/meetups/${meetup.id}`)}
           {...press.handlers}
           style={{
-            flexDirection: 'row',
-            gap: space(4),
+            flexDirection: stacked ? 'column' : 'row',
+            gap: space(stacked ? 2 : 4),
             padding: space(5),
             borderRadius: radius.card,
             backgroundColor: colors.surface,
@@ -61,7 +64,7 @@ export function MeetupCard({ meetup, index, showDate = false }: MeetupCardProps)
               {formatTime(meetup.startsAt)}
             </AppText>
           </View>
-          <View style={[styles.body, { gap: space(1) }]}>
+          <View style={[stacked ? null : styles.body, { gap: space(1) }]}>
             <AppText
               variant="label"
               tone={faded ? 'muted' : 'default'}

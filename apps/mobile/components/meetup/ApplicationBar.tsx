@@ -4,10 +4,10 @@ import { useRouter } from 'expo-router';
 
 import Animated, { FadeInDown, LinearTransition, useReducedMotion } from 'react-native-reanimated';
 
-import { StatusBadge } from '@/components/meetup/StatusBadge';
 import { AppText } from '@/components/ui/AppText';
 import { Button } from '@/components/ui/Button';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { Hold } from '@/components/ui/Hold';
 import { useApply } from '@/hooks/use-meetup-application';
 import { useTheme } from '@/hooks/use-theme';
 import { errorMessage } from '@/lib/error-message';
@@ -67,7 +67,7 @@ export function ApplicationBar({ detail, phase, started }: ApplicationBarProps) 
           accessibilityLiveRegion="polite"
           style={{ flexDirection: 'row', alignItems: 'center', gap: space(3) }}
         >
-          {phase === 'CANCELED' ? null : <StatusBadge status={status} />}
+          {active && phase !== 'CANCELED' ? <Hold on={status === 'CONFIRMED'} size={20} /> : null}
           <View style={{ flex: 1 }}>
             <AppText variant="label" tone={phase === 'CANCELED' ? 'danger' : 'default'}>
               {text}

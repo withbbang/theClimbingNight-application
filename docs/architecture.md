@@ -407,7 +407,7 @@ media_jobs       id, post_media_id, status, attempts, last_error   -- 워커 작
 
 ## 14. 만드는 사람에게 맡기는 것
 
-- 라이브러리 세부 선택: 목록 가상화(FlashList 등), 달력 컴포넌트, 2단계 이미지 편집기. 서버 상태는 React Query, 아이콘은 phosphor-react-native로 정했다.
+- 라이브러리 세부 선택: 2단계 이미지 편집기. 서버 상태는 React Query, 아이콘은 phosphor-react-native, 목록 가상화는 FlashList, 달력은 직접 만든 컴포넌트(일요일 시작)로 정했다.
 - API 엔드포인트 세부 설계 (`api-conventions` 스킬 규약 안에서).
 - Flyway 마이그레이션 구성, 인덱스.
 - nginx 설정, Cloudflare Tunnel 구성 방식 (기존 프로젝트와 같은 터널을 쓸지 등).

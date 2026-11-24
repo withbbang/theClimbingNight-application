@@ -12,11 +12,13 @@ paths:
 - API 주소는 `EXPO_PUBLIC_API_URL`. `EXPO_PUBLIC_*`는 앱 번들에 그대로 들어가니 비밀값을 넣지 않는다.
 - 인증 토큰은 `expo-secure-store`에만 저장한다. AsyncStorage에 토큰 저장 금지.
 - 세션은 `lib/session-store.ts`로만 읽고 쓴다. 로그아웃은 `lib/sign-out.ts`의 `signOut`을 부른다.
+- 날짜·시각 계산과 표시는 `lib/kst.ts`로만 한다 (서울 기준, 기기 시간대와 `Intl`을 쓰지 않음).
+- 역할별 화면 감추기는 `RoleGate`, 첫 로딩·실패 표시는 `QueryState`, 쓰기 요청은 `useSubmit`(중복 전송 방지)으로 한다.
 - 소셜 로그인 SDK는 `lib/social/`에서만 import한다.
 - 색은 `useTheme`로만 쓴다 (제공자 로그인 버튼의 브랜드 색은 예외). 아이콘은 `phosphor-react-native/src/icons/<이름>`에서 하나씩 import한다 (전체 import는 아이콘을 모두 번들에 넣음).
 - 애니메이션은 Reanimated로 `transform`·`opacity`만 움직이고, `useReducedMotion`이면 끝 상태로 둔다.
 - 미디어 업로드: API에서 presigned URL을 받아 R2로 직접 PUT. 업로드 전에 앱에서 리사이즈·압축한다. API 서버로 파일 본문을 보내지 않는다.
-- 이미지 표시는 `expo-image` (캐시·placeholder). 피드 같은 긴 목록은 `FlatList`가 아닌 가상화 리스트(FlashList 등, 아키텍처 문서에서 확정)를 쓴다.
+- 이미지 표시는 `expo-image` (캐시·placeholder). 피드 같은 긴 목록은 `FlatList`가 아닌 FlashList를 쓴다.
 - 웹뷰 화면은 `react-native-webview`로 `apps/web` 페이지를 연다. 웹뷰와 앱 사이 통신은 `postMessage` 메시지 타입을 `types/bridge.ts` 한 곳에 정의한다.
 - 디렉토리: `app/`(라우트) · `components/ui/`(범용) · `components/<feature>/`(도메인) · `hooks/` · `lib/` · `types/api/`.
 - 파일명: 컴포넌트 `PascalCase.tsx`, 훅 `use-xxx.ts`, 그 외 `kebab-case.ts`. 라우트 파일은 Expo Router 규칙을 따른다.

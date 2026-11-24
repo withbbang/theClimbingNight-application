@@ -17,7 +17,8 @@ export function Screen({ children, scroll = false, bottomInset = true }: ScreenP
   const insets = useSafeAreaInsets();
   const padding = {
     paddingTop: insets.top + space(4),
-    paddingBottom: (bottomInset ? insets.bottom : 0) + space(5),
+    // 직접 스크롤하는 탭 화면은 내용이 탭 막대 바로 위에서 잘리게 아래를 비우지 않는다.
+    paddingBottom: bottomInset ? insets.bottom + space(5) : scroll ? space(5) : 0,
     paddingHorizontal: space(6),
   };
 
