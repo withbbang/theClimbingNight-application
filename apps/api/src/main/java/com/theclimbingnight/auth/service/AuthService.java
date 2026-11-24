@@ -11,6 +11,7 @@ import com.theclimbingnight.auth.social.SocialTokenVerifiers;
 import com.theclimbingnight.common.BusinessException;
 import com.theclimbingnight.common.ConstraintViolations;
 import com.theclimbingnight.common.ErrorCode;
+import com.theclimbingnight.push.service.PushTokenService;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
 import com.theclimbingnight.user.service.NicknamePolicy;
@@ -43,11 +44,13 @@ public class AuthService {
 	private final AuthProperties properties;
 	private final Clock clock;
 	private final TransactionTemplate transactionTemplate;
+	private final PushTokenService pushTokenService;
 
 	public AuthService(UserRepository userRepository, AuthIdentityRepository authIdentityRepository,
 			RefreshTokenRepository refreshTokenRepository, SocialTokenVerifiers socialTokenVerifiers,
 			JwtTokenService jwtTokenService, RefreshTokens refreshTokens, NicknamePolicy nicknamePolicy,
-			AuthProperties properties, Clock clock, TransactionTemplate transactionTemplate) {
+			AuthProperties properties, Clock clock, TransactionTemplate transactionTemplate,
+			PushTokenService pushTokenService) {
 		this.userRepository = userRepository;
 		this.authIdentityRepository = authIdentityRepository;
 		this.refreshTokenRepository = refreshTokenRepository;
@@ -58,6 +61,7 @@ public class AuthService {
 		this.properties = properties;
 		this.clock = clock;
 		this.transactionTemplate = transactionTemplate;
+		this.pushTokenService = pushTokenService;
 	}
 
 	/**
@@ -134,9 +138,14 @@ public class AuthService {
 	}
 
 	@Transactional
-	public void logout(String refreshToken) {
-		refreshTokenRepository.findByTokenHash(RefreshTokens.hash(refreshToken))
-				.ifPresent(token -> token.revoke(clock.instant()));
+	public void logout(String refreshToken, String expoPushToken) {
+		refreshTokenRepository.findByTokenHash(RefreshTokens.hash(refreshToken)).ifPresent(token -> {
+			token.revoke(clock.instant());
+			// 한 기기에서 A가 로그아웃하고 B가 로그인할 수 있으므로, 리프레시 토큰 소유자의 토큰만 지운다.
+			if (expoPushToken != null && !expoPushToken.isBlank()) {
+				pushTokenService.deleteOwned(token.getUserId(), expoPushToken);
+			}
+		});
 	}
 
 	@Transactional

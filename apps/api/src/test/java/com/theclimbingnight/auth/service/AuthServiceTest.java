@@ -52,6 +52,7 @@ class AuthServiceTest {
 	@Mock RefreshTokenRepository refreshTokenRepository;
 	@Mock SocialTokenVerifiers verifiers;
 	@Mock SocialTokenVerifier verifier;
+	@Mock com.theclimbingnight.push.service.PushTokenService pushTokenService;
 
 	private MutableClock clock;
 	private JwtTokenService jwtTokenService;
@@ -65,7 +66,7 @@ class AuthServiceTest {
 		jwtTokenService = new JwtTokenService(props, clock);
 		service = new AuthService(userRepository, authIdentityRepository, refreshTokenRepository, verifiers,
 				jwtTokenService, new RefreshTokens(new SecureRandom()), new NicknamePolicy(), props, clock,
-				new TransactionTemplate(org.mockito.Mockito.mock(PlatformTransactionManager.class)));
+				new TransactionTemplate(org.mockito.Mockito.mock(PlatformTransactionManager.class)), pushTokenService);
 		given(verifiers.get(SocialProvider.KAKAO)).willReturn(verifier);
 		given(verifier.verify("social-token")).willReturn(KAKAO_42);
 		given(userRepository.saveAndFlush(any(User.class))).willAnswer(inv -> {
@@ -419,7 +420,7 @@ class AuthServiceTest {
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
 
 		// when
-		service.logout("old-token");
+		service.logout("old-token", null);
 
 		// then
 		assertThat(old.getRevokedAt()).isEqualTo(START);
@@ -431,7 +432,36 @@ class AuthServiceTest {
 		given(refreshTokenRepository.findByTokenHash(any())).willReturn(Optional.empty());
 
 		// when, then
-		service.logout("nothing");
+		service.logout("nothing", "ExponentPushToken[abc]");
+		verify(pushTokenService, never()).deleteOwned(org.mockito.ArgumentMatchers.anyLong(), any());
+	}
+
+	@Test
+	void 로그아웃하면_내_토큰만_지운다() {
+		// given
+		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+
+		// when
+		service.logout("old-token", "ExponentPushToken[abc]");
+
+		// then
+		verify(pushTokenService).deleteOwned(7L, "ExponentPushToken[abc]");
+		assertThat(old.getRevokedAt()).isEqualTo(START);
+	}
+
+	@Test
+	void 푸시_토큰_없이도_로그아웃된다() {
+		// given
+		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+
+		// when
+		service.logout("old-token", null);
+
+		// then
+		assertThat(old.getRevokedAt()).isEqualTo(START);
+		verify(pushTokenService, never()).deleteOwned(org.mockito.ArgumentMatchers.anyLong(), any());
 	}
 
 	@Test

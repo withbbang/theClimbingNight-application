@@ -185,7 +185,16 @@ class AuthControllerTest {
 		mockMvc.perform(post("/api/v1/auth/logout").contentType(MediaType.APPLICATION_JSON)
 						.content("{\"refreshToken\":\"old\"}"))
 				.andExpect(status().isNoContent());
-		verify(authService).logout("old");
+		verify(authService).logout("old", null);
+	}
+
+	@Test
+	void 로그아웃에_푸시_토큰을_함께_넘긴다() throws Exception {
+		// given, when, then
+		mockMvc.perform(post("/api/v1/auth/logout").contentType(MediaType.APPLICATION_JSON)
+						.content("{\"refreshToken\":\"old\",\"expoPushToken\":\"ExponentPushToken[abc]\"}"))
+				.andExpect(status().isNoContent());
+		verify(authService).logout("old", "ExponentPushToken[abc]");
 	}
 
 }
