@@ -69,6 +69,7 @@ export function TextField({ label, error, helper, onFocus, onBlur, ...props }: T
           }}
           style={[
             styles.input,
+            props.multiline ? styles.multiline : null,
             {
               color: colors.text,
               backgroundColor: colors.surface,
@@ -114,5 +115,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     paddingVertical: 12,
   },
+  multiline: { minHeight: 128, textAlignVertical: 'top' },
   ring: { borderWidth: 2 },
 });
