@@ -11,6 +11,7 @@ import { queryClient } from '@/lib/query-client';
 function syncMembership(data: unknown) {
   if (isMembershipPush(data)) {
     void queryClient.invalidateQueries({ queryKey: ['users', 'me'] });
+    void queryClient.invalidateQueries({ queryKey: ['membership-requests'] });
   }
 }
 

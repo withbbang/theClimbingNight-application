@@ -105,6 +105,7 @@ it('refreshes the user when a membership push arrives', async () => {
   expect(invalidate).not.toHaveBeenCalled();
   receive(notification('MEMBERSHIP_APPROVED'));
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['users', 'me'] });
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['membership-requests'] });
 });
 
 it('refreshes the user when a membership push is tapped', async () => {
