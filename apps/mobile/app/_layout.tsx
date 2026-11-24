@@ -63,7 +63,9 @@ function Navigation() {
           animation: reduced ? 'fade' : 'default',
           contentStyle: { backgroundColor: theme.colors.background },
         }}
-      />
+      >
+        <Stack.Screen name="meetups/[id]/cancel" options={{ presentation: 'modal' }} />
+      </Stack>
     </ThemeProvider>
   );
 }
