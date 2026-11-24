@@ -146,16 +146,39 @@ it('opens login and clears cached queries when the session expires', async () =>
   expect(queryClient.getQueryData(['inquiries'])).toBeUndefined();
 });
 
+const pushed = jest.mocked(Notifications.useLastNotificationResponse);
+
+function tapPush(type: string) {
+  pushed.mockReturnValue({
+    notification: { request: { content: { data: { type } } } },
+  } as unknown as Notifications.NotificationResponse);
+}
+
+afterEach(() => pushed.mockReturnValue(null));
+
+it('opens the routed tab on a cold start', async () => {
+  tapPush('MEETUP_CREATED');
+  const app = await start(tokens('1', 'MEMBER'));
+  expect(app.getPathname()).toBe('/meetups');
+});
+
+it('opens the routed tab when a push is tapped on another tab', async () => {
+  const app = await start(tokens('1', 'MEMBER'), '/goods');
+  tapPush('INQUIRY_ANSWERED');
+  await act(async () => {
+    await sessionStore.updateUser({ id: 1, nickname: '다시', role: 'MEMBER' });
+  });
+  expect(app.getPathname()).toBe('/my');
+  expect(router.canDismiss()).toBe(false);
+});
+
 it('returns from login to the routed tab when a push is tapped', async () => {
   const app = await start(tokens('1', 'MEMBER'), '/my');
   await act(async () => router.push('/login'));
-  jest.mocked(Notifications.useLastNotificationResponse).mockReturnValue({
-    notification: { request: { content: { data: { type: 'MEETUP_CREATED' } } } },
-  } as unknown as Notifications.NotificationResponse);
+  tapPush('MEETUP_CREATED');
   await act(async () => {
     await sessionStore.updateUser({ id: 1, nickname: '다시', role: 'MEMBER' });
   });
   expect(app.getPathname()).toBe('/meetups');
   expect(router.canDismiss()).toBe(false);
-  jest.mocked(Notifications.useLastNotificationResponse).mockReturnValue(null);
 });

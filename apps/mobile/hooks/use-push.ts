@@ -43,8 +43,12 @@ export function usePush() {
     syncMembership(data);
     const route = routeForPush(data);
     if (route) {
-      // 로그인 화면 위에 탭을 또 쌓지 않게 이미 있는 탭으로 돌아간다.
-      router.dismissTo(route);
+      // 로그인 화면이 떠 있으면 걷어내고 간다. 탭 안에서는 dismissTo가 아무 일도 하지 않는다.
+      if (router.canDismiss()) {
+        router.dismissTo(route);
+      } else {
+        router.navigate(route);
+      }
     }
   }, [ready, response, router]);
 }

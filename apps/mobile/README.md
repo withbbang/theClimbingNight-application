@@ -6,14 +6,14 @@ Expo SDK 58, React Native, TypeScript. 카카오·네이버·구글 SDK가 네�
 
 값은 `.env.example`을 복사한 파일에 넣는다. 비어 있는 제공자는 로그인 버튼이 숨고, 나머지는 그대로 동작한다.
 
-| 무엇 | 어디서 | 환경변수 |
-|---|---|---|
-| 카카오 네이티브 앱 키 | Kakao Developers. 플랫폼에 iOS 번들 ID와 Android 패키지·키 해시 등록 | `EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY` |
-| 네이버 Client ID·Secret | 네이버 개발자센터. iOS URL 스킴은 `theclimbingnightnaver` | `EXPO_PUBLIC_NAVER_CLIENT_ID`, `EXPO_PUBLIC_NAVER_CLIENT_SECRET` |
-| 구글 OAuth 클라이언트 | Google Cloud. 웹·iOS·Android(SHA-1) 세 개를 만들고 앱에는 웹과 iOS ID를 넣는다 | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` |
-| Apple 로그인 | Apple Developer에서 App ID에 Sign in with Apple 켜기 | 없음 |
-| EAS 프로젝트 ID | `pnpm dlx eas-cli init` | `EAS_PROJECT_ID` |
-| FCM 설정 | Firebase의 `google-services.json` 경로 | `GOOGLE_SERVICES_JSON` |
+| 무엇                    | 어디서                                                                         | 환경변수                                                               |
+| ----------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| 카카오 네이티브 앱 키   | Kakao Developers. 플랫폼에 iOS 번들 ID와 Android 패키지·키 해시 등록           | `EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY`                                     |
+| 네이버 Client ID·Secret | 네이버 개발자센터. iOS URL 스킴은 `theclimbingnightnaver`                      | `EXPO_PUBLIC_NAVER_CLIENT_ID`, `EXPO_PUBLIC_NAVER_CLIENT_SECRET`       |
+| 구글 OAuth 클라이언트   | Google Cloud. 웹·iOS·Android(SHA-1) 세 개를 만들고 앱에는 웹과 iOS ID를 넣는다 | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` |
+| Apple 로그인            | Apple Developer에서 App ID에 Sign in with Apple 켜기                           | 없음                                                                   |
+| EAS 프로젝트 ID         | `pnpm dlx eas-cli init`                                                        | `EAS_PROJECT_ID`                                                       |
+| FCM 설정                | Firebase의 `google-services.json` 경로                                         | `GOOGLE_SERVICES_JSON`                                                 |
 
 번들 ID와 패키지는 둘 다 `com.theclimbingnight.app`이다. `EXPO_PUBLIC_*`는 앱 번들에 그대로 들어간다.
 
@@ -32,11 +32,11 @@ pnpm start               # 빌드가 이미 있으면 개발 서버만
 
 `EXPO_PUBLIC_API_URL`을 넣는다.
 
-| 기기 | 주소 |
-|---|---|
-| iOS 시뮬레이터 | `http://localhost:8080` |
-| Android 에뮬레이터 | `http://10.0.2.2:8080` |
-| 실기기 | 같은 와이파이의 컴퓨터 IP |
+| 기기               | 주소                      |
+| ------------------ | ------------------------- |
+| iOS 시뮬레이터     | `http://localhost:8080`   |
+| Android 에뮬레이터 | `http://10.0.2.2:8080`    |
+| 실기기             | 같은 와이파이의 컴퓨터 IP |
 
 ## Android 키 해시와 SHA-1
 

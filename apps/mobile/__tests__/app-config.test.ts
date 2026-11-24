@@ -75,3 +75,14 @@ it('lists naver before kakao so that both URL handlers are generated', () => {
     names.indexOf('@react-native-kakao/core'),
   );
 });
+
+it('creates the open url method itself when naver is used without kakao', () => {
+  const naver = { EXPO_PUBLIC_NAVER_CLIENT_ID: 'n', EXPO_PUBLIC_NAVER_CLIENT_SECRET: 's' };
+  const names = pluginNames(load(naver));
+  expect(names.indexOf('./plugins/with-open-url')).toBeGreaterThan(
+    names.indexOf('@react-native-seoul/naver-login'),
+  );
+  expect(pluginNames(load({ ...naver, EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY: 'k' }))).not.toContain(
+    './plugins/with-open-url',
+  );
+});

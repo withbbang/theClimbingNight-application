@@ -1,7 +1,7 @@
-import { Platform } from 'react-native';
+import { AppState, Platform, type AppStateStatus } from 'react-native';
 
 import { signInAsync } from 'expo-apple-authentication';
-import { fireEvent, screen } from 'expo-router/testing-library';
+import { act, fireEvent, screen } from 'expo-router/testing-library';
 
 import { queryClient } from '@/lib/query-client';
 import { sessionStore } from '@/lib/session-store';
@@ -173,4 +173,86 @@ it('goes back to the tabs with 둘러보기', async () => {
   const app = await renderApp('/login');
   await press('둘러보기');
   expect(app.getPathname()).toBe('/');
+});
+
+describe('when the social app never answers', () => {
+  let changeState: (state: AppStateStatus) => void;
+  let answer: (value: { type: 'success'; token: string } | { type: 'cancelled' }) => void;
+
+  beforeEach(() => {
+    const listeners = new Set<(state: AppStateStatus) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      listeners.add(listener);
+      return { remove: () => listeners.delete(listener) } as ReturnType<
+        typeof AppState.addEventListener
+      >;
+    });
+    changeState = (state) => [...listeners].forEach((listener) => listener(state));
+    kakaoSignIn.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+  });
+
+  async function comeBack() {
+    await act(async () => {
+      changeState('background');
+      changeState('active');
+      await jest.advanceTimersByTimeAsync(5000);
+    });
+  }
+
+  it('unlocks the buttons after the user comes back', async () => {
+    await renderApp('/login');
+    await press('카카오 로그인');
+    expect(button('네이버 로그인')).toBeDisabled();
+    await comeBack();
+    expect(button('네이버 로그인')).not.toBeDisabled();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('stays locked when only a system dialog covered the app', async () => {
+    await renderApp('/login');
+    await press('카카오 로그인');
+    await act(async () => {
+      changeState('inactive');
+      changeState('active');
+      await jest.advanceTimersByTimeAsync(5000);
+    });
+    expect(button('네이버 로그인')).toBeDisabled();
+  });
+
+  it('still accepts a late answer when nothing else was tried', async () => {
+    mockServer({ '/auth/login': ok({ status: 'LOGGED_IN', tokens: tokens('1') }) });
+    await renderApp('/login');
+    await press('카카오 로그인');
+    await comeBack();
+    answer({ type: 'success', token: 'late' });
+    await flush();
+    expect(sessionStore.getState().status).toBe('authenticated');
+  });
+
+  it('ignores a late answer after another provider was tried', async () => {
+    const server = mockServer({});
+    jest.mocked(naverAdapter.signIn).mockReturnValue(new Promise(() => {}));
+    await renderApp('/login');
+    await press('카카오 로그인');
+    await comeBack();
+    await press('네이버 로그인');
+    answer({ type: 'success', token: 'late' });
+    await flush();
+    expect(server.count('/auth/login')).toBe(0);
+    expect(button('네이버 로그인')).toBeBusy();
+  });
+
+  it('ignores a late answer after leaving the login screen', async () => {
+    const server = mockServer({});
+    await renderApp('/login');
+    await press('카카오 로그인');
+    await press('둘러보기');
+    answer({ type: 'success', token: 'late' });
+    await flush();
+    expect(server.count('/auth/login')).toBe(0);
+  });
 });

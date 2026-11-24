@@ -12,6 +12,10 @@ function socialPlugins(env: NodeJS.ProcessEnv): Plugins {
   // 네이버를 카카오보다 앞에 둔다. 나중에 등록한 plugin이 먼저 실행되고, 네이버는 카카오가 넣은 코드를 고친다.
   if (env.EXPO_PUBLIC_NAVER_CLIENT_ID && env.EXPO_PUBLIC_NAVER_CLIENT_SECRET) {
     plugins.push(['@react-native-seoul/naver-login', { urlScheme: NAVER_URL_SCHEME }]);
+    if (!env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY) {
+      // 카카오가 없으면 네이버가 고칠 URL 처리 메서드가 없으므로 직접 넣는다.
+      plugins.push('./plugins/with-open-url');
+    }
   }
   const kakaoKey = env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY;
   if (kakaoKey) {

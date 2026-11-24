@@ -9,8 +9,8 @@ import { createSessionStore, sessionStore, type SessionStore } from '@/lib/sessi
 import { tokens } from '@/test-utils/tokens';
 
 const mockSession: { current: SessionStore | null } = { current: null };
-const mockDismissTo = jest.fn();
-const mockRouter = { dismissTo: mockDismissTo };
+const mockNavigate = jest.fn();
+const mockRouter = { canDismiss: () => false, navigate: mockNavigate };
 
 jest.mock('@/lib/session-store', () => {
   const actual = jest.requireActual('@/lib/session-store');
@@ -69,7 +69,7 @@ it('opens the routed screen when a notification is tapped', async () => {
   await sessionStore.load();
   lastResponse.mockReturnValue(tap('MEETUP_CREATED'));
   await renderHook(() => usePush());
-  expect(mockDismissTo).toHaveBeenCalledWith('/meetups');
+  expect(mockNavigate).toHaveBeenCalledWith('/meetups');
 });
 
 it('handles a notification response only once', async () => {
@@ -77,7 +77,7 @@ it('handles a notification response only once', async () => {
   lastResponse.mockReturnValue(tap('MEETUP_CREATED'));
   const { rerender } = await renderHook(() => usePush());
   await rerender(undefined);
-  expect(mockDismissTo).toHaveBeenCalledTimes(1);
+  expect(mockNavigate).toHaveBeenCalledTimes(1);
   expect(Notifications.clearLastNotificationResponse).toHaveBeenCalledTimes(1);
 });
 
@@ -85,16 +85,16 @@ it('clears an unknown notification without moving', async () => {
   await sessionStore.load();
   lastResponse.mockReturnValue(tap('UNKNOWN'));
   await renderHook(() => usePush());
-  expect(mockDismissTo).not.toHaveBeenCalled();
+  expect(mockNavigate).not.toHaveBeenCalled();
   expect(Notifications.clearLastNotificationResponse).toHaveBeenCalledTimes(1);
 });
 
 it('waits for the session to load before routing a cold start tap', async () => {
   lastResponse.mockReturnValue(tap('NOTICE_PUBLISHED'));
   await renderHook(() => usePush());
-  expect(mockDismissTo).not.toHaveBeenCalled();
+  expect(mockNavigate).not.toHaveBeenCalled();
   await act(async () => sessionStore.load());
-  expect(mockDismissTo).toHaveBeenCalledWith('/');
+  expect(mockNavigate).toHaveBeenCalledWith('/');
 });
 
 it('refreshes the user when a membership push arrives', async () => {
