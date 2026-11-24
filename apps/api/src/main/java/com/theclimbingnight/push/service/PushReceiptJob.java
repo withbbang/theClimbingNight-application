@@ -1,5 +1,6 @@
 package com.theclimbingnight.push.service;
 
+import com.theclimbingnight.common.FailureSummary;
 import com.theclimbingnight.push.entity.PushTicket;
 import com.theclimbingnight.push.expo.PushGateway;
 import com.theclimbingnight.push.expo.PushReceipt;
@@ -55,7 +56,7 @@ public class PushReceiptJob {
 			try {
 				page = repository.findDue(cutoff, lastId, PageRequest.of(0, PAGE_SIZE));
 			} catch (RuntimeException e) {
-				log.error("푸시 수신 확인 대상 조회 실패 type={}", e.getClass().getSimpleName());
+				log.error("푸시 수신 확인 대상 조회 실패 type={}", FailureSummary.of(e));
 				return;
 			}
 			if (page.isEmpty()) {
@@ -65,7 +66,7 @@ public class PushReceiptJob {
 			try {
 				process(page, expiry);
 			} catch (RuntimeException e) {
-				log.error("푸시 수신 확인 처리 실패 type={}", e.getClass().getSimpleName());
+				log.error("푸시 수신 확인 처리 실패 type={}", FailureSummary.of(e));
 			}
 			if (page.size() < PAGE_SIZE) {
 				return;
@@ -79,7 +80,7 @@ public class PushReceiptJob {
 			receipts = gateway.receipts(page.stream().map(PushTicket::getTicketId).toList());
 		} catch (RuntimeException e) {
 			// 토큰이 담길 수 있어 예외 객체는 로그에 넘기지 않는다. 이 쪽의 오래된 티켓 정리는 아래에서 계속한다.
-			log.error("푸시 수신 확인 조회 실패 type={}", e.getClass().getSimpleName());
+			log.error("푸시 수신 확인 조회 실패 type={}", FailureSummary.of(e));
 		}
 		List<Long> done = new ArrayList<>();
 		Map<String, Instant> invalid = new LinkedHashMap<>();
@@ -109,7 +110,7 @@ public class PushReceiptJob {
 			try {
 				failedTokens = writer.deleteTokens(invalid);
 			} catch (RuntimeException e) {
-				log.error("무효 푸시 토큰 삭제 실패 type={}", e.getClass().getSimpleName());
+				log.error("무효 푸시 토큰 삭제 실패 type={}", FailureSummary.of(e));
 				failedTokens = invalid.keySet();
 			}
 			Set<String> failed = failedTokens;
@@ -124,7 +125,7 @@ public class PushReceiptJob {
 			try {
 				writer.deleteTickets(done);
 			} catch (RuntimeException e) {
-				log.error("푸시 티켓 삭제 실패 type={}", e.getClass().getSimpleName());
+				log.error("푸시 티켓 삭제 실패 type={}", FailureSummary.of(e));
 			}
 		}
 	}

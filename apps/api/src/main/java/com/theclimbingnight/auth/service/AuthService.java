@@ -129,7 +129,8 @@ public class AuthService {
 		if (!stored.isUsable(now)) {
 			throw new BusinessException(ErrorCode.AUTH_REQUIRED);
 		}
-		User user = userRepository.findById(stored.getUserId())
+		// 탈퇴(사용자 → 리프레시 토큰)와 같은 잠금 순서. 새 토큰 INSERT의 FK 공유 잠금이 폐기 뒤에 걸리면 교착할 수 있다.
+		User user = userRepository.findByIdForUpdate(stored.getUserId())
 				.filter(User::isActive)
 				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 		// 조회 뒤 다른 요청이 먼저 폐기했을 수 있으므로 조건부 UPDATE로 한 요청만 통과시킨다.

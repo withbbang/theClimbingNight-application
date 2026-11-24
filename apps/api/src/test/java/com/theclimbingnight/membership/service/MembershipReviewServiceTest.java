@@ -77,7 +77,7 @@ class MembershipReviewServiceTest {
 		given(membershipRequestRepository.findUserIdById(REQUEST_ID)).willReturn(Optional.of(APPLICANT_ID));
 		given(userRepository.findByIdForUpdate(APPLICANT_ID)).willReturn(Optional.of(applicant));
 		given(membershipRequestRepository.findByIdForUpdate(REQUEST_ID)).willReturn(Optional.of(request));
-		given(userRepository.getReferenceById(REVIEWER_ID)).willReturn(reviewer);
+		given(userRepository.findByIdForUpdate(REVIEWER_ID)).willReturn(Optional.of(reviewer));
 		given(rosterMemberRepository.findByUserId(APPLICANT_ID)).willReturn(Optional.empty());
 		given(rosterMemberRepository.save(any(RosterMember.class))).willAnswer(inv -> {
 			RosterMember saved = inv.getArgument(0);
@@ -324,5 +324,42 @@ class MembershipReviewServiceTest {
 			member.linkTo(linkedTo);
 		}
 		return member;
+	}
+
+	@Test
+	void 운영진과_신청자를_ID_순서로_먼저_잠근다() {
+		// when
+		service.approve(REQUEST_ID, REVIEWER_ID, new MembershipApproveRequest(null, true));
+
+		// then
+		InOrder order = inOrder(userRepository, membershipRequestRepository);
+		order.verify(userRepository).findByIdForUpdate(REVIEWER_ID);
+		order.verify(userRepository).findByIdForUpdate(APPLICANT_ID);
+		order.verify(membershipRequestRepository).findByIdForUpdate(REQUEST_ID);
+	}
+
+	@Test
+	void 운영진_ID가_더_크면_신청자를_먼저_잠근다() {
+		// given
+		given(userRepository.findByIdForUpdate(50L)).willReturn(Optional.of(user(50L, Role.ADMIN)));
+
+		// when
+		service.reject(REQUEST_ID, 50L, "사유");
+
+		// then
+		InOrder order = inOrder(userRepository, membershipRequestRepository);
+		order.verify(userRepository).findByIdForUpdate(APPLICANT_ID);
+		order.verify(userRepository).findByIdForUpdate(50L);
+		order.verify(membershipRequestRepository).findByIdForUpdate(REQUEST_ID);
+	}
+
+	@Test
+	void 자기_신청을_심사하면_사용자를_한_번만_잠근다() {
+		// when
+		service.approve(REQUEST_ID, APPLICANT_ID, new MembershipApproveRequest(null, true));
+
+		// then
+		verify(userRepository).findByIdForUpdate(APPLICANT_ID);
+		assertThat(request.getReviewedBy()).isSameAs(applicant);
 	}
 }

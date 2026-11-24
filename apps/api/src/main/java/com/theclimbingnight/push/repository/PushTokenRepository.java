@@ -45,9 +45,15 @@ public interface PushTokenRepository extends JpaRepository<PushToken, Long> {
 	@Query("delete from PushToken t where t.expoPushToken = :token and t.lastSeenAt <= :sentAt")
 	int deleteIfNotSeenSince(@Param("token") String token, @Param("sentAt") Instant sentAt);
 
-	@Modifying
-	@Query("delete from PushToken t where t.userId = :userId")
-	int deleteAllByUserId(@Param("userId") long userId);
+	/** 잠그지 않고 읽는다. 잠글 때는 이 값으로 {@link #findByExpoPushTokenForUpdate}를 부른다. */
+	@Query("select t.expoPushToken from PushToken t where t.userId = :userId order by t.expoPushToken")
+	List<String> findTokensOwnedBy(@Param("userId") long userId);
+
+	/** 정리 대상: 소유자에게 살아 있는 세션이 없거나, staleBefore 전에 마지막으로 등록된 토큰. */
+	@Query("select t.expoPushToken from PushToken t where t.lastSeenAt < :staleBefore "
+			+ "or not exists (select r.id from RefreshToken r where r.userId = t.userId "
+			+ "and r.revokedAt is null and r.expiresAt > :now) order by t.id")
+	List<String> findStaleTokens(@Param("now") Instant now, @Param("staleBefore") Instant staleBefore);
 
 	@Modifying
 	@Query("delete from PushToken t where t.userId = :userId and t.expoPushToken = :token")

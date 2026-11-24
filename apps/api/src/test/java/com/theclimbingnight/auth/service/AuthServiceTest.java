@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -283,14 +285,16 @@ class AuthServiceTest {
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
 		ReflectionTestUtils.setField(old, "id", 99L);
-		given(userRepository.findById(7L)).willReturn(Optional.of(user));
+		given(userRepository.findByIdForUpdate(7L)).willReturn(Optional.of(user));
 		given(refreshTokenRepository.revokeIfActive(any(Long.class), any(Instant.class))).willReturn(1);
 
 		// when
 		TokenPair tokens = service.refresh("old-token");
 
 		// then
-		verify(refreshTokenRepository).revokeIfActive(99L, START);
+		InOrder order = inOrder(userRepository, refreshTokenRepository);
+		order.verify(userRepository).findByIdForUpdate(7L);
+		order.verify(refreshTokenRepository).revokeIfActive(99L, START);
 		assertThat(tokens.refreshToken()).isNotEqualTo("old-token");
 		assertThat(savedRefresh().getTokenHash()).isEqualTo(RefreshTokens.hash(tokens.refreshToken()));
 	}
@@ -301,7 +305,7 @@ class AuthServiceTest {
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
 		ReflectionTestUtils.setField(old, "id", 99L);
-		given(userRepository.findById(7L)).willReturn(Optional.of(user(7L)));
+		given(userRepository.findByIdForUpdate(7L)).willReturn(Optional.of(user(7L)));
 		given(refreshTokenRepository.revokeIfActive(any(Long.class), any(Instant.class))).willReturn(0);
 
 		// when, then
@@ -315,7 +319,7 @@ class AuthServiceTest {
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
 		old.revoke(START);
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
-		given(userRepository.findById(7L)).willReturn(Optional.of(user(7L)));
+		given(userRepository.findByIdForUpdate(7L)).willReturn(Optional.of(user(7L)));
 
 		// when, then
 		assertCode(() -> service.refresh("old-token"), ErrorCode.AUTH_REQUIRED);
@@ -326,7 +330,7 @@ class AuthServiceTest {
 		ReflectionTestUtils.setField(old, "id", 99L);
 		old.revoke(revokedAt);
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
-		given(userRepository.findById(7L)).willReturn(Optional.of(user(7L)));
+		given(userRepository.findByIdForUpdate(7L)).willReturn(Optional.of(user(7L)));
 		return old;
 	}
 
@@ -359,7 +363,7 @@ class AuthServiceTest {
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
 		ReflectionTestUtils.setField(old, "id", 99L);
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
-		given(userRepository.findById(7L)).willReturn(Optional.of(user(7L)));
+		given(userRepository.findByIdForUpdate(7L)).willReturn(Optional.of(user(7L)));
 		given(refreshTokenRepository.revokeIfActive(any(Long.class), any(Instant.class))).willReturn(0);
 
 		// when, then
@@ -392,7 +396,7 @@ class AuthServiceTest {
 		// given
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
-		given(userRepository.findById(7L)).willReturn(Optional.of(user(7L)));
+		given(userRepository.findByIdForUpdate(7L)).willReturn(Optional.of(user(7L)));
 		clock.advance(Duration.ofDays(30).plusSeconds(1));
 
 		// when, then
@@ -406,7 +410,7 @@ class AuthServiceTest {
 		user.withdraw(START);
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
-		given(userRepository.findById(7L)).willReturn(Optional.of(user));
+		given(userRepository.findByIdForUpdate(7L)).willReturn(Optional.of(user));
 
 		// when, then
 		assertCode(() -> service.refresh("old-token"), ErrorCode.AUTH_REQUIRED);

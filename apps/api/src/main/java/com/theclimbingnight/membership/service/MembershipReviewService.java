@@ -31,6 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 운영진의 신청 심사. 잠금 순서는 어디서나 사용자 → 신청 → 명부다(탈퇴와의 데드락 방지).
  * 신청은 잠그지 않고 신청자 ID만 읽은 뒤 사용자를 잠그고, 그다음 신청을 잠가 상태를 다시 확인한다.
+ * 운영진 행도 먼저 잠근다(reviewed_by FK 공유 잠금이 명부 뒤에 걸리면 늦은 취소 기록과 교착한다).
+ * 두 사용자는 ID 순서로 잠가 서로를 심사하는 경우에도 순서가 엇갈리지 않게 한다.
  */
 @Service
 @Transactional(readOnly = true)
@@ -72,7 +74,8 @@ public class MembershipReviewService {
 
 	@Transactional
 	public MembershipRequestResponse approve(long requestId, long reviewerId, MembershipApproveRequest body) {
-		MembershipRequest request = lockPending(requestId);
+		Locked locked = lockPending(requestId, reviewerId);
+		MembershipRequest request = locked.request();
 		User applicant = request.getUser();
 		Optional<RosterMember> existing = rosterMemberRepository.findByUserId(applicant.getId());
 
@@ -100,7 +103,7 @@ public class MembershipReviewService {
 			}
 		}
 
-		request.approve(target, userRepository.getReferenceById(reviewerId), clock.instant());
+		request.approve(target, locked.reviewer(), clock.instant());
 		if (applicant.getRole() == Role.USER) {
 			applicant.changeRole(Role.MEMBER);
 		}
@@ -110,24 +113,44 @@ public class MembershipReviewService {
 
 	@Transactional
 	public MembershipRequestResponse reject(long requestId, long reviewerId, String reason) {
-		MembershipRequest request = lockPending(requestId);
-		request.reject(reason.strip(), userRepository.getReferenceById(reviewerId), clock.instant());
+		Locked locked = lockPending(requestId, reviewerId);
+		MembershipRequest request = locked.request();
+		request.reject(reason.strip(), locked.reviewer(), clock.instant());
 		eventPublisher.publishEvent(
 				new MembershipReviewedEvent(request.getUser().getId(), MembershipRequestStatus.REJECTED));
 		return MembershipRequestResponse.from(request);
 	}
 
-	/** 사용자 → 신청 순서로 잠그고, 잠근 뒤 대기 상태인지 다시 확인한다. */
-	private MembershipRequest lockPending(long requestId) {
+	private record Locked(MembershipRequest request, User reviewer) {
+	}
+
+	/** 사용자(신청자·운영진) → 신청 순서로 잠그고, 잠근 뒤 대기 상태인지 다시 확인한다. */
+	private Locked lockPending(long requestId, long reviewerId) {
 		long userId = membershipRequestRepository.findUserIdById(requestId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
-		userRepository.findByIdForUpdate(userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
+		User reviewer;
+		if (reviewerId < userId) {
+			reviewer = lockReviewer(reviewerId);
+			lockApplicant(userId);
+		} else {
+			User applicant = lockApplicant(userId);
+			reviewer = reviewerId == userId ? applicant : lockReviewer(reviewerId);
+		}
 		MembershipRequest request = membershipRequestRepository.findByIdForUpdate(requestId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 		if (!request.isPending()) {
 			throw new BusinessException(ErrorCode.MEMBERSHIP_REQUEST_ALREADY_REVIEWED);
 		}
-		return request;
+		return new Locked(request, reviewer);
+	}
+
+	private User lockApplicant(long userId) {
+		return userRepository.findByIdForUpdate(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
+	}
+
+	private User lockReviewer(long reviewerId) {
+		return userRepository.findByIdForUpdate(reviewerId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 	}
 }

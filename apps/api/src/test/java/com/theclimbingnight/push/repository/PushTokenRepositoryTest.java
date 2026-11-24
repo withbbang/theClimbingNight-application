@@ -3,6 +3,8 @@ package com.theclimbingnight.push.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.theclimbingnight.auth.entity.RefreshToken;
+import com.theclimbingnight.auth.repository.RefreshTokenRepository;
 import com.theclimbingnight.common.ConstraintViolations;
 import com.theclimbingnight.push.entity.NotificationSetting;
 import com.theclimbingnight.push.entity.PushPlatform;
@@ -33,6 +35,7 @@ class PushTokenRepositoryTest {
 
 	@Autowired PushTokenRepository pushTokenRepository;
 	@Autowired NotificationSettingRepository notificationSettingRepository;
+	@Autowired RefreshTokenRepository refreshTokenRepository;
 	@Autowired UserRepository userRepository;
 	@Autowired EntityManager entityManager;
 
@@ -186,22 +189,61 @@ class PushTokenRepositoryTest {
 	}
 
 	@Test
-	void 사용자의_토큰을_모두_지운다() {
+	void 사용자가_가진_토큰을_값_순서로_찾는다() {
 		// given
 		User a = user("a", Role.USER);
 		User b = user("b", Role.USER);
-		token(a, "ExponentPushToken[a1]");
 		token(a, "ExponentPushToken[a2]");
+		token(a, "ExponentPushToken[a1]");
 		token(b, "ExponentPushToken[b1]");
 
-		// when
-		int deleted = pushTokenRepository.deleteAllByUserId(a.getId());
-		entityManager.clear();
+		// when, then
+		assertThat(pushTokenRepository.findTokensOwnedBy(a.getId()))
+				.containsExactly("ExponentPushToken[a1]", "ExponentPushToken[a2]");
+	}
 
-		// then
-		assertThat(deleted).isEqualTo(2);
-		assertThat(pushTokenRepository.findAll()).extracting(PushToken::getExpoPushToken)
-				.containsExactly("ExponentPushToken[b1]");
+	private void session(User user, String hashSeed, Instant expiresAt, Instant revokedAt) {
+		RefreshToken refresh = RefreshToken.issue(user.getId(), hashSeed.repeat(64), expiresAt);
+		if (revokedAt != null) {
+			refresh.revoke(revokedAt);
+		}
+		refreshTokenRepository.saveAndFlush(refresh);
+	}
+
+	@Test
+	void 살아_있는_세션이_없는_사용자의_토큰은_정리_대상이다() {
+		// given: 만료 정각은 만료로 본다
+		User alive = user("alive", Role.USER);
+		User expired = user("expired", Role.USER);
+		User revoked = user("revoked", Role.USER);
+		User none = user("none", Role.USER);
+		session(alive, "a", NOW.plusSeconds(1), null);
+		session(alive, "b", NOW.minusSeconds(1), null);
+		session(expired, "c", NOW, null);
+		session(revoked, "d", NOW.plusSeconds(100), NOW.minusSeconds(1));
+		token(alive, "ExponentPushToken[alive]");
+		token(expired, "ExponentPushToken[expired]");
+		token(revoked, "ExponentPushToken[revoked]");
+		token(none, "ExponentPushToken[none]");
+
+		// when, then
+		assertThat(pushTokenRepository.findStaleTokens(NOW, NOW.minusSeconds(60))).containsExactly(
+				"ExponentPushToken[expired]", "ExponentPushToken[revoked]", "ExponentPushToken[none]");
+	}
+
+	@Test
+	void 세션이_살아_있어도_오래_등록되지_않은_토큰은_정리_대상이다() {
+		// given
+		User alive = user("alive", Role.USER);
+		session(alive, "a", NOW.plusSeconds(1), null);
+		Instant staleBefore = NOW.minusSeconds(60);
+		pushTokenRepository.saveAndFlush(PushToken.register(alive.getId(), "ExponentPushToken[old]",
+				PushPlatform.IOS, staleBefore.minusSeconds(1)));
+		pushTokenRepository.saveAndFlush(PushToken.register(alive.getId(), "ExponentPushToken[edge]",
+				PushPlatform.IOS, staleBefore));
+
+		// when, then
+		assertThat(pushTokenRepository.findStaleTokens(NOW, staleBefore)).containsExactly("ExponentPushToken[old]");
 	}
 
 	@Test

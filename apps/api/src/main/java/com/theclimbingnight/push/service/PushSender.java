@@ -1,5 +1,6 @@
 package com.theclimbingnight.push.service;
 
+import com.theclimbingnight.common.FailureSummary;
 import com.theclimbingnight.push.entity.PushTicket;
 import com.theclimbingnight.push.expo.PushGateway;
 import com.theclimbingnight.push.expo.PushMessage;
@@ -22,7 +23,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 푸시를 100개씩 나눠 보낸다. 트랜잭션이 없다. 저장·삭제는 {@link PushTicketWriter}가 새 트랜잭션으로 한다.
- * 푸시 토큰은 로그에 남기지 않는다. Hibernate의 SQL 오류 로그도 꺼 두었으므로 DB 실패는 여기서 클래스 이름만 남긴다.
+ * 푸시 토큰은 로그에 남기지 않는다. Hibernate의 SQL 오류 로그도 꺼 두었으므로 DB 실패는 여기서 클래스 이름과 DB 오류 코드만 남긴다.
  */
 @Component
 public class PushSender {
@@ -58,7 +59,7 @@ public class PushSender {
 				sendBatch(batch, title, body, data);
 			} catch (RuntimeException e) {
 				// 한 묶음의 어떤 실패도 다음 묶음을 막지 않는다. 예외 객체는 넘기지 않는다 (메시지에 토큰이 있을 수 있음).
-				log.error("푸시 묶음 처리 실패 type={}", e.getClass().getSimpleName());
+				log.error("푸시 묶음 처리 실패 type={}", FailureSummary.of(e));
 			}
 		}
 	}
@@ -95,14 +96,14 @@ public class PushSender {
 			try {
 				writer.saveAll(tickets);
 			} catch (RuntimeException e) {
-				log.error("푸시 티켓 저장 실패 type={}", e.getClass().getSimpleName());
+				log.error("푸시 티켓 저장 실패 type={}", FailureSummary.of(e));
 			}
 		}
 		if (!invalid.isEmpty()) {
 			try {
 				writer.deleteTokens(invalid);
 			} catch (RuntimeException e) {
-				log.error("무효 푸시 토큰 삭제 실패 type={}", e.getClass().getSimpleName());
+				log.error("무효 푸시 토큰 삭제 실패 type={}", FailureSummary.of(e));
 			}
 		}
 	}

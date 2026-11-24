@@ -1,5 +1,6 @@
 package com.theclimbingnight.push.service;
 
+import com.theclimbingnight.common.FailureSummary;
 import com.theclimbingnight.inquiry.service.InquiryAnsweredEvent;
 import com.theclimbingnight.meetup.service.MeetupApplicationPromotedEvent;
 import com.theclimbingnight.meetup.service.MeetupCanceledEvent;
@@ -18,7 +19,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * 커밋이 끝난 이벤트만 받아 푸시 실행기로 넘긴다. 롤백된 이벤트는 오지 않는다. 푸시 실패는 본래 요청을 실패시키지 않는다.
- * <p>Hibernate의 SQL 오류 로그가 꺼져 있고 예외 메시지에 푸시 토큰이 들어갈 수 있어, 실패는 여기서 클래스 이름만 남긴다
+ * <p>Hibernate의 SQL 오류 로그가 꺼져 있고 예외 메시지에 푸시 토큰이 들어갈 수 있어, 실패는 여기서 클래스 이름과 DB 오류 코드만 남긴다
  * (예외 객체를 로그에 넘기지 않는다). 큐가 차면 Spring의 {@code TaskRejectedException}이 오는데
  * {@code RejectedExecutionException}의 하위 타입이라 함께 잡힌다.
  */
@@ -76,13 +77,13 @@ public class PushEventListener {
 				try {
 					task.run();
 				} catch (RuntimeException e) {
-					log.error("푸시 알림 처리 실패 event={} type={}", eventName, e.getClass().getSimpleName());
+					log.error("푸시 알림 처리 실패 event={} type={}", eventName, FailureSummary.of(e));
 				}
 			});
 		} catch (RejectedExecutionException e) {
 			log.warn("푸시 큐가 가득 차 알림을 건너뜀 event={}", eventName);
 		} catch (RuntimeException e) {
-			log.error("푸시 알림 접수 실패 event={} type={}", eventName, e.getClass().getSimpleName());
+			log.error("푸시 알림 접수 실패 event={} type={}", eventName, FailureSummary.of(e));
 		}
 	}
 }

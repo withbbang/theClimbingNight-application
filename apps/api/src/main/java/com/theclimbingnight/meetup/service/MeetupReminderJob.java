@@ -1,5 +1,6 @@
 package com.theclimbingnight.meetup.service;
 
+import com.theclimbingnight.common.FailureSummary;
 import com.theclimbingnight.common.TimeZones;
 import com.theclimbingnight.meetup.repository.MeetupRepository;
 import java.time.Clock;
@@ -49,7 +50,7 @@ public class MeetupReminderJob {
 			try {
 				service.remind(meetupId, until);
 			} catch (RuntimeException e) {
-				log.error("벙 일정 알림 실패 meetupId={} type={}", meetupId, e.getClass().getSimpleName());
+				log.error("벙 일정 알림 실패 meetupId={} type={}", meetupId, FailureSummary.of(e));
 			}
 		}
 	}

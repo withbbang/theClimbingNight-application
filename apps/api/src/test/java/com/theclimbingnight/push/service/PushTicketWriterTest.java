@@ -58,7 +58,7 @@ class PushTicketWriterTest {
 	@AfterEach
 	void tearDown() {
 		tx.executeWithoutResult(s -> {
-			tokenRepository.deleteAllByUserId(userId);
+			tokenRepository.deleteAllInBatch();
 			ticketRepository.deleteAll(ticketRepository.findAll().stream()
 					.filter(t -> t.getExpoPushToken().contains(tokenA.substring(19)) || t.getTicketId().startsWith("wt-"))
 					.toList());

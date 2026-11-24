@@ -1,5 +1,6 @@
 package com.theclimbingnight.push.service;
 
+import com.theclimbingnight.common.FailureSummary;
 import com.theclimbingnight.push.entity.PushTicket;
 import com.theclimbingnight.push.repository.PushTicketRepository;
 import java.time.Instant;
@@ -50,9 +51,9 @@ public class PushTicketWriter {
 			try {
 				tokenDeleter.deleteIfNotSeenSince(token, sentAt);
 			} catch (RuntimeException e) {
-				// 예외 메시지에 토큰이 있을 수 있어 로그에 넘기지 않고 호출한 쪽이 클래스 이름만 남긴다.
+				// 예외 메시지에 토큰이 있을 수 있어 로그에 넘기지 않고 호출한 쪽이 클래스 이름과 DB 오류 코드만 남긴다.
 				failed.add(token);
-				log.error("무효 푸시 토큰 삭제 실패 type={}", e.getClass().getSimpleName());
+				log.error("무효 푸시 토큰 삭제 실패 type={}", FailureSummary.of(e));
 			}
 		});
 		return failed;
