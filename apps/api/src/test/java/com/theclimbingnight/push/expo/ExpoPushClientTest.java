@@ -208,15 +208,74 @@ class ExpoPushClientTest {
 	}
 
 	@Test
-	void 연결_실패는_여전히_일시_오류다() {
-		// given
-		ExpoPushClient client = failingClient("", new org.springframework.web.client.ResourceAccessException("I/O error"));
+	void 읽기_시간_초과는_다시_보내지_않는_요청_오류다() throws Exception {
+		// given: 연결은 받고 응답은 하지 않는 서버
+		try (java.net.ServerSocket silent = new java.net.ServerSocket(0, 10, java.net.InetAddress.getLoopbackAddress())) {
+			ExpoPushClient client = realClient(silent.getLocalPort());
+
+			// when
+			Throwable onSend = catchThrowable(() -> client.send(List.of(message("ExponentPushToken[a]"))));
+			Throwable onReceipts = catchThrowable(() -> client.receipts(List.of("t1")));
+
+			// then
+			assertThat(onSend).isInstanceOf(PushRequestException.class).hasNoCause();
+			assertThat(((PushRequestException) onSend).getCode()).isEqualTo("READ_TIMEOUT");
+			assertThat(onReceipts).isNotInstanceOf(PushTransientException.class).isInstanceOf(PushRequestException.class);
+		}
+	}
+
+	@Test
+	void 연결_거부는_일시_오류다() throws Exception {
+		// given: 닫힌 포트
+		int closedPort;
+		try (java.net.ServerSocket probe = new java.net.ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress())) {
+			closedPort = probe.getLocalPort();
+		}
+		ExpoPushClient client = realClient(closedPort);
 
 		// when
 		Throwable thrown = catchThrowable(() -> client.send(List.of(message("ExponentPushToken[a]"))));
 
 		// then
 		assertThat(thrown).isInstanceOf(PushTransientException.class).hasNoCause();
+		assertThat(((PushTransientException) thrown).getCode()).isEqualTo("CONNECTION");
+	}
+
+	@Test
+	void 연결_뒤의_그_밖의_입출력_실패는_다시_보내지_않는_요청_오류다() {
+		// given
+		ExpoPushClient client = failingClient("",
+				new org.springframework.web.client.ResourceAccessException("I/O error", new java.io.IOException("Connection reset")));
+
+		// when
+		Throwable thrown = catchThrowable(() -> client.send(List.of(message("ExponentPushToken[a]"))));
+
+		// then
+		assertThat(thrown).isInstanceOf(PushRequestException.class).hasNoCause();
+		assertThat(((PushRequestException) thrown).getCode()).isEqualTo("IO_ERROR");
+	}
+
+	@Test
+	void 알_수_없는_호스트는_일시_오류다() {
+		// given
+		ExpoPushClient client = failingClient("", new org.springframework.web.client.ResourceAccessException("I/O error",
+				new java.net.UnknownHostException("exp.invalid")));
+
+		// when
+		Throwable thrown = catchThrowable(() -> client.send(List.of(message("ExponentPushToken[a]"))));
+
+		// then
+		assertThat(thrown).isInstanceOf(PushTransientException.class).hasNoCause();
+	}
+
+	/** PushConfig와 같은 방식(detect)으로 만든 실제 HTTP 클라이언트, 짧은 시간 제한, 로컬 포트만. */
+	private static ExpoPushClient realClient(int port) {
+		org.springframework.boot.http.client.HttpClientSettings settings = org.springframework.boot.http.client.HttpClientSettings
+				.defaults().withTimeouts(java.time.Duration.ofMillis(300), java.time.Duration.ofMillis(300));
+		RestClient restClient = RestClient.builder()
+				.requestFactory(org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder.detect().build(settings))
+				.build();
+		return new ExpoPushClient(restClient, new PushProperties(true, "http://127.0.0.1:" + port, ""));
 	}
 
 	@Test

@@ -48,4 +48,10 @@ public class PushTokenService {
 	public void deleteOwned(long userId, String token) {
 		pushTokenRepository.deleteByUserIdAndToken(userId, token);
 	}
+
+	/** 이미 폐기된 리프레시 토큰의 로그아웃 재시도용. 폐기 시각 이후에 다시 등록된 토큰은 남긴다. */
+	@Transactional
+	public void deleteOwnedIfNotSeenSince(long userId, String token, java.time.Instant revokedAt) {
+		pushTokenRepository.deleteByUserIdAndTokenIfNotSeenSince(userId, token, revokedAt);
+	}
 }

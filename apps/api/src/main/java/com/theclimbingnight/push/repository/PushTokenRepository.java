@@ -52,4 +52,10 @@ public interface PushTokenRepository extends JpaRepository<PushToken, Long> {
 	@Modifying
 	@Query("delete from PushToken t where t.userId = :userId and t.expoPushToken = :token")
 	int deleteByUserIdAndToken(@Param("userId") long userId, @Param("token") String token);
+
+	/** 늦게 도착한 로그아웃 재시도가 그 사이 다시 등록된 토큰을 지우지 않게, 기준 시각 이후에 본 토큰은 남긴다. 사용자 조건과 함께 한 문장으로 지운다. */
+	@Modifying
+	@Query("delete from PushToken t where t.userId = :userId and t.expoPushToken = :token and t.lastSeenAt <= :at")
+	int deleteByUserIdAndTokenIfNotSeenSince(@Param("userId") long userId, @Param("token") String token,
+			@Param("at") Instant at);
 }

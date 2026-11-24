@@ -221,6 +221,32 @@ class PushTokenRepositoryTest {
 	}
 
 	@Test
+	void 폐기_시각_이전에_본_내_토큰만_지운다() {
+		// given: 토큰 3개의 lastSeenAt이 폐기 시각보다 이전, 같음, 이후
+		User a = user("a", Role.USER);
+		User b = user("b", Role.USER);
+		Instant revokedAt = NOW.plusSeconds(100);
+		pushTokenRepository.saveAndFlush(PushToken.register(a.getId(), "ExponentPushToken[old]", PushPlatform.IOS, revokedAt.minusSeconds(1)));
+		pushTokenRepository.saveAndFlush(PushToken.register(a.getId(), "ExponentPushToken[equal]", PushPlatform.IOS, revokedAt));
+		pushTokenRepository.saveAndFlush(PushToken.register(a.getId(), "ExponentPushToken[new]", PushPlatform.IOS, revokedAt.plusSeconds(1)));
+		pushTokenRepository.saveAndFlush(PushToken.register(b.getId(), "ExponentPushToken[other]", PushPlatform.IOS, revokedAt.minusSeconds(1)));
+
+		// when
+		int old = pushTokenRepository.deleteByUserIdAndTokenIfNotSeenSince(a.getId(), "ExponentPushToken[old]", revokedAt);
+		int equal = pushTokenRepository.deleteByUserIdAndTokenIfNotSeenSince(a.getId(), "ExponentPushToken[equal]", revokedAt);
+		int reRegistered = pushTokenRepository.deleteByUserIdAndTokenIfNotSeenSince(a.getId(), "ExponentPushToken[new]", revokedAt);
+		int othersToken = pushTokenRepository.deleteByUserIdAndTokenIfNotSeenSince(a.getId(), "ExponentPushToken[other]", revokedAt);
+
+		// then
+		assertThat(old).isEqualTo(1);
+		assertThat(equal).isEqualTo(1);
+		assertThat(reRegistered).isEqualTo(0);
+		assertThat(othersToken).isEqualTo(0);
+		assertThat(pushTokenRepository.findAll()).extracting(PushToken::getExpoPushToken)
+				.containsExactlyInAnyOrder("ExponentPushToken[new]", "ExponentPushToken[other]");
+	}
+
+	@Test
 	void 잠금_조회는_있는_토큰을_찾고_없으면_비어_있다() {
 		// given
 		User user = user("a", Role.USER);

@@ -143,9 +143,16 @@ public class AuthService {
 	@Transactional
 	public void logout(String refreshToken, String expoPushToken) {
 		refreshTokenRepository.findByTokenHash(RefreshTokens.hash(refreshToken)).ifPresent(token -> {
-			token.revoke(clock.instant());
+			boolean alreadyRevoked = token.getRevokedAt() != null;
+			Instant revokedAt = alreadyRevoked ? token.getRevokedAt() : clock.instant();
+			token.revoke(revokedAt);
 			// 한 기기에서 A가 로그아웃하고 B가 로그인할 수 있으므로, 리프레시 토큰 소유자의 토큰만 지운다.
 			if (expoPushToken != null && EXPO_PUSH_TOKEN.matcher(expoPushToken).matches()) {
+				if (alreadyRevoked) {
+					// 응답이 유실돼 늦게 온 재시도다. 그 사이 같은 토큰을 다시 등록했다면 지우지 않는다.
+					pushTokenService.deleteOwnedIfNotSeenSince(token.getUserId(), expoPushToken, revokedAt);
+					return;
+				}
 				// 탈퇴(refresh_tokens → push_tokens)와 같은 잠금 순서가 되도록 폐기 UPDATE를 먼저 DB에 반영한다.
 				refreshTokenRepository.flush();
 				pushTokenService.deleteOwned(token.getUserId(), expoPushToken);

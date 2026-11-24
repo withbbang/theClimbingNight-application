@@ -74,4 +74,16 @@ class PushTokenServiceTest {
 		// then
 		verify(pushTokenRepository).deleteByUserIdAndToken(1L, TOKEN);
 	}
+
+	@Test
+	void 폐기_시각_이전에_본_내_토큰만_지운다() {
+		// given
+		java.time.Instant revokedAt = java.time.Instant.parse("2026-06-01T00:00:00Z");
+
+		// when
+		service.deleteOwnedIfNotSeenSince(1L, TOKEN, revokedAt);
+
+		// then
+		verify(pushTokenRepository).deleteByUserIdAndTokenIfNotSeenSince(1L, TOKEN, revokedAt);
+	}
 }

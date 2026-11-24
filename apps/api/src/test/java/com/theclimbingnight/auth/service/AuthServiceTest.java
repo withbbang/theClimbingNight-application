@@ -466,6 +466,38 @@ class AuthServiceTest {
 	}
 
 	@Test
+	void 이미_폐기된_리프레시_토큰의_로그아웃은_폐기_시각_이전의_푸시_토큰만_지운다() {
+		// given
+		Instant revokedAt = START.minusSeconds(60);
+		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
+		old.revoke(revokedAt);
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+
+		// when
+		service.logout("old-token", "ExponentPushToken[abc]");
+
+		// then
+		verify(pushTokenService).deleteOwnedIfNotSeenSince(7L, "ExponentPushToken[abc]", revokedAt);
+		verify(pushTokenService, never()).deleteOwned(org.mockito.ArgumentMatchers.anyLong(), any());
+		assertThat(old.getRevokedAt()).isEqualTo(revokedAt);
+	}
+
+	@Test
+	void 폐기되지_않은_리프레시_토큰의_로그아웃은_조건_없이_내_토큰을_지운다() {
+		// given: 만료됐지만 폐기되지 않은 토큰
+		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.minusSeconds(1));
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+
+		// when
+		service.logout("old-token", "ExponentPushToken[abc]");
+
+		// then
+		verify(pushTokenService).deleteOwned(7L, "ExponentPushToken[abc]");
+		verify(pushTokenService, never()).deleteOwnedIfNotSeenSince(org.mockito.ArgumentMatchers.anyLong(), any(), any());
+		assertThat(old.getRevokedAt()).isEqualTo(START);
+	}
+
+	@Test
 	void 형식이_다른_푸시_토큰은_지우지_않고_로그아웃한다() {
 		// given
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));

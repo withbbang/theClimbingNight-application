@@ -122,7 +122,11 @@ public class ExpoPushClient implements PushGateway {
 			String code = "HTTP_" + status;
 			throw (status == 429 || status >= 500) ? new PushTransientException(code) : new PushRequestException(code);
 		} catch (ResourceAccessException e) {
-			throw new PushTransientException("CONNECTION");
+			// 요청이 처리됐을 수 있는 실패는 다시 보내면 같은 푸시가 중복되므로, 연결 단계 실패만 일시 오류로 본다.
+			if (isConnectFailure(e)) {
+				throw new PushTransientException("CONNECTION");
+			}
+			throw new PushRequestException(isTimeout(e) ? "READ_TIMEOUT" : "IO_ERROR");
 		} catch (PushTransientException | PushRequestException e) {
 			throw e;
 		} catch (RestClientException e) {
@@ -138,6 +142,28 @@ public class ExpoPushClient implements PushGateway {
 			throw new PushRequestException(errorsCode(errors.get(0)));
 		}
 		return response;
+	}
+
+	/** 연결을 맺기 전의 실패(거부, 연결 시간 초과, 호스트 없음)만 true. 요청이 서버에 닿지 않았다고 볼 수 있다. */
+	private static boolean isConnectFailure(Throwable e) {
+		for (Throwable t = e; t != null; t = t.getCause()) {
+			// HttpConnectTimeoutException은 HttpTimeoutException의 하위 클래스라 읽기 시간 초과보다 먼저 가른다.
+			if (t instanceof java.net.http.HttpConnectTimeoutException || t instanceof java.net.ConnectException
+					|| t instanceof java.net.UnknownHostException || t instanceof java.net.NoRouteToHostException
+					|| t instanceof java.nio.channels.UnresolvedAddressException) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static boolean isTimeout(Throwable e) {
+		for (Throwable t = e; t != null; t = t.getCause()) {
+			if (t instanceof java.net.http.HttpTimeoutException || t instanceof java.net.SocketTimeoutException) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** Expo가 준 코드가 대문자·밑줄로만 이뤄졌을 때만 쓴다. 그 밖의 값은 로그에 섞여 들어오지 않게 버린다. */
