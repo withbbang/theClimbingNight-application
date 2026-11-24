@@ -28,7 +28,11 @@ public enum ErrorCode {
 	MEMBERSHIP_REQUEST_PENDING(HttpStatus.CONFLICT, "이미 심사 중인 신청이 있습니다."),
 	MEMBERSHIP_REQUEST_ALREADY_REVIEWED(HttpStatus.CONFLICT, "이미 처리된 신청입니다."),
 	ROSTER_ALREADY_LINKED(HttpStatus.CONFLICT, "다른 회원과 연결된 명부 항목입니다."),
-	MEMBERSHIP_LINKED_ELSEWHERE(HttpStatus.CONFLICT, "이 회원은 이미 다른 명부 항목에 연결되어 있습니다.");
+	MEMBERSHIP_LINKED_ELSEWHERE(HttpStatus.CONFLICT, "이 회원은 이미 다른 명부 항목에 연결되어 있습니다."),
+	MEETUP_START_IN_PAST(HttpStatus.BAD_REQUEST, "시작 시각은 지금 이후여야 합니다."),
+	MEETUP_ALREADY_STARTED(HttpStatus.CONFLICT, "이미 시작한 벙입니다."),
+	MEETUP_ENDED(HttpStatus.CONFLICT, "이미 끝난 벙입니다."),
+	MEETUP_CANCELED(HttpStatus.CONFLICT, "취소된 벙입니다.");
 
 	private final HttpStatus status;
 	private final String message;
