@@ -1,3 +1,5 @@
+import { AppState, type AppStateStatus } from 'react-native';
+
 import * as Notifications from 'expo-notifications';
 
 import { act, renderHook } from '@testing-library/react-native';
@@ -114,4 +116,44 @@ it('refreshes the user when a membership push is tapped', async () => {
   lastResponse.mockReturnValue(tap('MEMBERSHIP_APPROVED'));
   await renderHook(() => usePush());
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['users', 'me'] });
+});
+
+describe('returning to the app', () => {
+  const listen = jest.mocked(AppState.addEventListener);
+
+  function changeState(state: AppStateStatus) {
+    for (const [type, listener] of listen.mock.calls) {
+      if (type === 'change') {
+        listener(state);
+      }
+    }
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-11-24T03:00:00Z'));
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('registers again only after a day since the last attempt', async () => {
+    await sessionStore.signIn(tokens('1'));
+    await renderHook(() => usePush());
+    jest.setSystemTime(new Date('2026-11-25T02:59:59.999Z'));
+    changeState('active');
+    expect(registerPushToken).toHaveBeenCalledTimes(1);
+    jest.setSystemTime(new Date('2026-11-25T03:00:00Z'));
+    changeState('background');
+    expect(registerPushToken).toHaveBeenCalledTimes(1);
+    changeState('active');
+    changeState('active');
+    expect(registerPushToken).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not register while logged out', async () => {
+    await sessionStore.load();
+    await renderHook(() => usePush());
+    changeState('active');
+    expect(registerPushToken).not.toHaveBeenCalled();
+  });
 });

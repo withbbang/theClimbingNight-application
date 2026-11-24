@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 
+import { AppState } from 'react-native';
+
 import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 
@@ -7,6 +9,8 @@ import { useSession } from '@/hooks/use-session';
 import { registerPushToken } from '@/lib/push';
 import { queryKeysForPush, routeForPush } from '@/lib/push-route';
 import { queryClient } from '@/lib/query-client';
+
+const REGISTER_INTERVAL = 24 * 60 * 60 * 1000;
 
 function refetchFor(data: unknown) {
   for (const queryKey of queryKeysForPush(data)) {
@@ -22,9 +26,19 @@ export function usePush() {
   const response = Notifications.useLastNotificationResponse();
 
   useEffect(() => {
-    if (userId !== null) {
-      void registerPushToken();
+    if (userId === null) {
+      return;
     }
+    let registeredAt = Date.now();
+    void registerPushToken();
+    // 서버는 오래 등록되지 않은 토큰을 지운다. 앱을 끄지 않고 쓰는 기기도 하루 한 번 다시 등록한다.
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && Date.now() - registeredAt >= REGISTER_INTERVAL) {
+        registeredAt = Date.now();
+        void registerPushToken();
+      }
+    });
+    return () => subscription.remove();
   }, [userId]);
 
   useEffect(() => {

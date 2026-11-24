@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.theclimbingnight.auth.AuthProperties;
 import com.theclimbingnight.push.repository.PushTokenRepository;
+import com.theclimbingnight.push.repository.StalePushToken;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -28,6 +29,8 @@ class PushTokenCleanupJobTest {
 
 	private static final Instant NOW = Instant.parse("2026-11-24T19:00:00Z");
 
+	private static final Instant SEEN = NOW.minus(Duration.ofDays(61));
+
 	@Mock PushTokenRepository repository;
 	@Mock PushTokenDeleter deleter;
 	PushTokenCleanupJob job;
@@ -39,29 +42,29 @@ class PushTokenCleanupJobTest {
 	}
 
 	@Test
-	void 정리_대상을_조회_시각_기준으로_지운다() {
+	void 정리_대상을_조회한_등록_시각_기준으로_지운다() {
 		// given
-		given(repository.findStaleTokens(NOW, NOW.minus(Duration.ofDays(60)))).willReturn(List.of("A", "B"));
+		given(repository.findStaleTokens(NOW, NOW.minus(Duration.ofDays(60)))).willReturn(List.of(new StalePushToken("A", SEEN), new StalePushToken("B", SEEN.plusSeconds(1))));
 
 		// when
 		job.run();
 
-		// then: 조회 뒤 다시 등록된 토큰은 지우지 않게 조회 시각을 넘긴다
-		verify(deleter).deleteIfNotSeenSince("A", NOW);
-		verify(deleter).deleteIfNotSeenSince("B", NOW);
+		// then: 조회와 겹쳐 다시 등록된 토큰은 지우지 않게 조회한 등록 시각을 넘긴다
+		verify(deleter).deleteIfNotSeenSince("A", SEEN);
+		verify(deleter).deleteIfNotSeenSince("B", SEEN.plusSeconds(1));
 	}
 
 	@Test
 	void 하나가_실패해도_나머지를_지우고_토큰은_로그에_남기지_않는다(CapturedOutput output) {
 		// given
-		given(repository.findStaleTokens(any(), any())).willReturn(List.of("secretA", "B"));
-		willThrow(new IllegalStateException("secretA")).given(deleter).deleteIfNotSeenSince("secretA", NOW);
+		given(repository.findStaleTokens(any(), any())).willReturn(List.of(new StalePushToken("secretA", SEEN), new StalePushToken("B", SEEN)));
+		willThrow(new IllegalStateException("secretA")).given(deleter).deleteIfNotSeenSince("secretA", SEEN);
 
 		// when
 		job.run();
 
 		// then
-		verify(deleter).deleteIfNotSeenSince("B", NOW);
+		verify(deleter).deleteIfNotSeenSince("B", SEEN);
 		assertThat(output.getAll()).doesNotContain("secretA");
 	}
 

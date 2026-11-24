@@ -227,7 +227,8 @@ class PushTokenRepositoryTest {
 		token(none, "ExponentPushToken[none]");
 
 		// when, then
-		assertThat(pushTokenRepository.findStaleTokens(NOW, NOW.minusSeconds(60))).containsExactly(
+		assertThat(pushTokenRepository.findStaleTokens(NOW, NOW.minusSeconds(60)))
+				.extracting(StalePushToken::token).containsExactly(
 				"ExponentPushToken[expired]", "ExponentPushToken[revoked]", "ExponentPushToken[none]");
 	}
 
@@ -243,7 +244,8 @@ class PushTokenRepositoryTest {
 				PushPlatform.IOS, staleBefore));
 
 		// when, then
-		assertThat(pushTokenRepository.findStaleTokens(NOW, staleBefore)).containsExactly("ExponentPushToken[old]");
+		assertThat(pushTokenRepository.findStaleTokens(NOW, staleBefore))
+				.containsExactly(new StalePushToken("ExponentPushToken[old]", staleBefore.minusSeconds(1)));
 	}
 
 	@Test

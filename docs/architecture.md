@@ -311,7 +311,7 @@ inquiries
 push_tokens
   id, user_id → users, expo_push_token UNIQUE, platform ENUM(IOS, ANDROID), last_seen_at
   -- 같은 토큰을 다른 사용자가 등록하면 소유자를 옮긴다. 탈퇴하면 지운다.
-  -- 매일 04시(KST)에 살아 있는 세션이 없는 사용자의 토큰과 60일(리프레시 유효 기간의 2배) 동안 다시 등록되지 않은 토큰을 지운다.
+  -- 매일 04시(KST)에 살아 있는 세션이 없는 사용자의 토큰과 60일(리프레시 유효 기간의 2배) 동안 다시 등록되지 않은 토큰을 지운다. 앱은 켜거나 로그인할 때, 화면으로 돌아올 때 하루 한 번 다시 등록한다.
 
 notification_settings                -- 행이 없으면 모두 켜진 것으로 본다
   user_id PK → users, new_meetup BOOLEAN, new_notice BOOLEAN
