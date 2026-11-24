@@ -1,9 +1,10 @@
 import { View } from 'react-native';
 
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 
 import { UserIcon } from 'phosphor-react-native/src/icons/User';
 
+import { MenuRow } from '@/components/my/MenuRow';
 import { AppText } from '@/components/ui/AppText';
 import { Button } from '@/components/ui/Button';
 import { FadeInItem } from '@/components/ui/FadeInItem';
@@ -20,6 +21,23 @@ const ROLE_LABELS: Record<Role, string> = {
   MEMBER: '동호회원',
   ADMIN: '운영진',
 };
+
+interface Menu {
+  label: string;
+  href: Href;
+}
+
+const MEMBER_MENUS: Menu[] = [
+  { label: '내 참석률', href: '/attendance' },
+  { label: '내 블랙리스트 기록', href: '/penalties' },
+];
+const USER_MENUS: Menu[] = [{ label: '동호회원 인증', href: '/membership' }];
+const COMMON_MENUS: Menu[] = [
+  { label: '문의', href: '/inquiries' },
+  { label: '알림 설정', href: '/settings/notifications' },
+  { label: '닉네임 변경', href: '/settings/nickname' },
+  { label: '탈퇴', href: '/settings/withdraw' },
+];
 
 export default function MyScreen() {
   const router = useRouter();
@@ -40,6 +58,7 @@ export default function MyScreen() {
     );
   }
   const { nickname, role } = session.tokens.user;
+  const menus = [...(role === 'USER' ? USER_MENUS : MEMBER_MENUS), ...COMMON_MENUS];
   return (
     <Screen scroll bottomInset={false}>
       <View style={{ gap: space(2) }}>
@@ -54,10 +73,15 @@ export default function MyScreen() {
         <FadeInItem index={2}>
           <AppText tone="muted">{ROLE_LABELS[role]}</AppText>
         </FadeInItem>
-        <FadeInItem index={3} style={{ marginTop: space(6) }}>
-          <Button label="로그아웃" variant="secondary" onPress={() => void signOut()} />
-        </FadeInItem>
       </View>
+      <View style={{ marginTop: space(6) }}>
+        {menus.map(({ label, href }, i) => (
+          <MenuRow key={label} label={label} index={i + 3} onPress={() => router.push(href)} />
+        ))}
+      </View>
+      <FadeInItem index={menus.length + 3} style={{ marginTop: space(6) }}>
+        <Button label="로그아웃" variant="secondary" onPress={() => void signOut()} />
+      </FadeInItem>
     </Screen>
   );
 }
