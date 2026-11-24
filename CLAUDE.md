@@ -15,7 +15,7 @@ Expo(앱) + Next.js(웹뷰·관리자) + Spring Boot(API) 모노레포, 1인 개
 | `docs/` | 아키텍처 등 설계 문서 | — | — |
 | `.claude/` | Claude Code 설정 (rules · skills · agents · hooks) | — | — |
 
-아직 앱 디렉터리는 없다. 만들기 전에 `docs/architecture.md`를 먼저 확정한다.
+앱 디렉터리는 apps/api만 있다.
 
 ## 명령
 
@@ -60,7 +60,7 @@ pnpm build
 
 ## 더 읽을 곳 (필요할 때만 로드됨)
 
-- 설계 → `docs/architecture.md` (작성 예정)
+- 설계 → `docs/architecture.md`
 - 경로별 컨벤션 → `.claude/rules/` : `mobile.md`, `web.md`, `api.md`, `testing.md`
 - 절차 → `/new-feature` (API→앱·웹 기능 구현), `/project-review` (diff 점검, 기본 `/review`와 다름), `/release` (배포 전 체크)
 - 참조 → `api-conventions` 스킬 (URL · 응답 래퍼 · 에러 코드 · 페이징)
