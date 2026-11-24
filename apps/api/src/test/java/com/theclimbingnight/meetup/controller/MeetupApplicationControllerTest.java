@@ -19,9 +19,13 @@ import com.theclimbingnight.common.config.WebConfig;
 import com.theclimbingnight.meetup.dto.MyApplicationResponse;
 import com.theclimbingnight.meetup.entity.MeetupApplicationStatus;
 import com.theclimbingnight.meetup.service.MeetupApplicationService;
+import com.theclimbingnight.penalty.dto.PenaltyResponse;
+import com.theclimbingnight.penalty.entity.PenaltyType;
+import com.theclimbingnight.penalty.service.PenaltyService;
 import com.theclimbingnight.user.entity.Role;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +54,9 @@ class MeetupApplicationControllerTest {
 
 	@MockitoBean
 	MeetupApplicationService meetupApplicationService;
+
+	@MockitoBean
+	PenaltyService penaltyService;
 
 	private String bearer(long id, Role role) {
 		User user = User.create("climber");
@@ -142,5 +149,23 @@ class MeetupApplicationControllerTest {
 		mockMvc.perform(post("/api/v1/meetup-applications/100/remove").header("Authorization", admin))
 				.andExpect(status().isNoContent());
 		verify(meetupApplicationService).remove(100L);
+	}
+
+	@Test
+	void 늦은_취소_블랙리스트는_ADMIN만_매기고_201이다() throws Exception {
+		// given
+		String admin = bearer(1L, Role.ADMIN);
+		String member = bearer(7L, Role.MEMBER);
+		given(penaltyService.addLateCancel(100L, 1L)).willReturn(new PenaltyResponse(3L, 5L, "정기벙",
+				Instant.parse("2026-12-01T10:00:00Z"), PenaltyType.LATE_CANCEL, true, null));
+
+		// when, then
+		mockMvc.perform(post("/api/v1/meetup-applications/100/penalties").header("Authorization", member))
+				.andExpect(status().isForbidden());
+		verify(penaltyService, never()).addLateCancel(anyLong(), anyLong());
+		mockMvc.perform(post("/api/v1/meetup-applications/100/penalties").header("Authorization", admin))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.data.id").value(3))
+				.andExpect(jsonPath("$.data.type").value("LATE_CANCEL"));
 	}
 }

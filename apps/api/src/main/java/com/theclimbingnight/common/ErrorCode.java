@@ -36,7 +36,10 @@ public enum ErrorCode {
 	MEETUP_ROSTER_REQUIRED(HttpStatus.FORBIDDEN, "동호회원 명부와 연결된 계정만 신청할 수 있습니다."),
 	MEETUP_ALREADY_APPLIED(HttpStatus.CONFLICT, "이미 신청한 벙입니다."),
 	MEETUP_APPLICATION_REMOVED(HttpStatus.CONFLICT, "운영진이 내보낸 벙에는 다시 신청할 수 없습니다."),
-	MEETUP_APPLICATION_NOT_ACTIVE(HttpStatus.CONFLICT, "이미 취소되었거나 내보낸 신청입니다.");
+	MEETUP_APPLICATION_NOT_ACTIVE(HttpStatus.CONFLICT, "이미 취소되었거나 내보낸 신청입니다."),
+	PENALTY_NOT_LATE_CANCEL(HttpStatus.CONFLICT, "늦은 취소로 표시된 신청이 아닙니다."),
+	PENALTY_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 블랙리스트에 기록된 건입니다."),
+	PENALTY_ALREADY_REVOKED(HttpStatus.CONFLICT, "이미 취소된 블랙리스트 기록입니다.");
 
 	private final HttpStatus status;
 	private final String message;

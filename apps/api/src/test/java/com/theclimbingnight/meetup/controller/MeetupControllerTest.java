@@ -3,6 +3,7 @@ package com.theclimbingnight.meetup.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -26,6 +27,7 @@ import com.theclimbingnight.user.entity.Role;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -229,7 +231,7 @@ class MeetupControllerTest {
 		// given
 		String bearer = bearer(7L, Role.MEMBER);
 		given(meetupQueryService.list(7L, java.time.LocalDate.of(2026, 12, 1), java.time.LocalDate.of(2026, 12, 31)))
-				.willReturn(java.util.List.of());
+				.willReturn(List.of());
 
 		// when, then
 		mockMvc.perform(get("/api/v1/meetups").param("from", "2026-12-01").param("to", "2026-12-31")
@@ -249,5 +251,29 @@ class MeetupControllerTest {
 		mockMvc.perform(get("/api/v1/meetups/5").header("Authorization", bearer))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.meetup.id").value(5));
+	}
+
+	@Test
+	void MEMBER가_신청자_목록을_보면_403이다() throws Exception {
+		// given
+		String bearer = bearer(7L, Role.MEMBER);
+
+		// when, then
+		mockMvc.perform(get("/api/v1/meetups/5/applications").header("Authorization", bearer))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error.code").value("AUTH_FORBIDDEN"));
+		verify(meetupQueryService, never()).applications(anyLong());
+	}
+
+	@Test
+	void ADMIN은_신청자_목록을_본다() throws Exception {
+		// given
+		String bearer = bearer(1L, Role.ADMIN);
+		given(meetupQueryService.applications(5L)).willReturn(List.of());
+
+		// when, then
+		mockMvc.perform(get("/api/v1/meetups/5/applications").header("Authorization", bearer))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data").isArray());
 	}
 }

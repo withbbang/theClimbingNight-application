@@ -53,6 +53,10 @@ public interface MeetupApplicationRepository extends JpaRepository<MeetupApplica
 
 	List<MeetupApplication> findAllByMeetupId(long meetupId);
 
+	/** 운영진 신청자 목록용: 상태와 관계없이 명부를 함께 읽는다. 정렬은 서비스에서 한다. */
+	@Query("select a from MeetupApplication a join fetch a.rosterMember where a.meetup.id = :meetupId")
+	List<MeetupApplication> findAllWithRosterByMeetupId(@Param("meetupId") long meetupId);
+
 	List<MeetupApplication> findAllByMeetupIdInAndRosterMemberId(Collection<Long> meetupIds, long rosterMemberId);
 
 	@Query("select new com.theclimbingnight.meetup.repository.MeetupStatusCount(a.meetup.id, a.status, count(a)) "

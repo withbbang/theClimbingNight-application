@@ -1,5 +1,6 @@
 package com.theclimbingnight.penalty.repository;
 
+import com.theclimbingnight.penalty.dto.PenaltySummaryResponse;
 import com.theclimbingnight.penalty.entity.Penalty;
 import com.theclimbingnight.penalty.entity.PenaltyType;
 import jakarta.persistence.LockModeType;
@@ -7,6 +8,9 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -25,6 +29,8 @@ public interface PenaltyRepository extends JpaRepository<Penalty, Long> {
 
 	List<Penalty> findAllByMeetupIdAndRevokedAtIsNull(long meetupId);
 
+	/** 벙 제목·시각을 응답에 쓰므로 벙을 함께 읽는다. */
+	@EntityGraph(attributePaths = "meetup")
 	List<Penalty> findAllByRosterMemberIdOrderByIdDesc(long rosterMemberId);
 
 	@Query("select new com.theclimbingnight.penalty.repository.PenaltyCount(p.rosterMember.id, count(p), "
@@ -33,4 +39,13 @@ public interface PenaltyRepository extends JpaRepository<Penalty, Long> {
 			+ "group by p.rosterMember.id")
 	List<PenaltyCount> countActiveByRosterIds(@Param("ids") Collection<Long> rosterIds,
 			@Param("recentFrom") Instant recentFrom);
+
+	/** 활성 기록이 있는 명부만, 최근 3개월 수·누적 수 내림차순, 명부 ID 오름차순. */
+	@Query(value = "select new com.theclimbingnight.penalty.dto.PenaltySummaryResponse(r.id, r.somoimNickname, "
+			+ "count(p), sum(case when m.startsAt >= :recentFrom then 1 else 0 end)) "
+			+ "from Penalty p join p.rosterMember r join p.meetup m where p.revokedAt is null "
+			+ "group by r.id, r.somoimNickname "
+			+ "order by sum(case when m.startsAt >= :recentFrom then 1 else 0 end) desc, count(p) desc, r.id asc",
+			countQuery = "select count(distinct p.rosterMember.id) from Penalty p where p.revokedAt is null")
+	Page<PenaltySummaryResponse> summarize(@Param("recentFrom") Instant recentFrom, Pageable pageable);
 }

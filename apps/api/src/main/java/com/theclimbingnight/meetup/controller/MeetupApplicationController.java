@@ -7,6 +7,8 @@ import com.theclimbingnight.common.ApiResponse;
 import com.theclimbingnight.meetup.dto.MeetupCancelApplicationRequest;
 import com.theclimbingnight.meetup.dto.MyApplicationResponse;
 import com.theclimbingnight.meetup.service.MeetupApplicationService;
+import com.theclimbingnight.penalty.dto.PenaltyResponse;
+import com.theclimbingnight.penalty.service.PenaltyService;
 import com.theclimbingnight.user.entity.Role;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -21,8 +23,12 @@ public class MeetupApplicationController {
 
 	private final MeetupApplicationService meetupApplicationService;
 
-	public MeetupApplicationController(MeetupApplicationService meetupApplicationService) {
+	private final PenaltyService penaltyService;
+
+	public MeetupApplicationController(MeetupApplicationService meetupApplicationService,
+			PenaltyService penaltyService) {
 		this.meetupApplicationService = meetupApplicationService;
+		this.penaltyService = penaltyService;
 	}
 
 	@RequireRole(Role.MEMBER)
@@ -46,5 +52,14 @@ public class MeetupApplicationController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void remove(@PathVariable long id) {
 		meetupApplicationService.remove(id);
+	}
+
+	/** 늦은 취소로 표시된 신청에 블랙리스트를 매긴다. */
+	@RequireRole(Role.ADMIN)
+	@PostMapping("/api/v1/meetup-applications/{id}/penalties")
+	@ResponseStatus(HttpStatus.CREATED)
+	public ApiResponse<PenaltyResponse> addLateCancelPenalty(@CurrentUser AuthenticatedUser user,
+			@PathVariable long id) {
+		return ApiResponse.success(penaltyService.addLateCancel(id, user.id()));
 	}
 }

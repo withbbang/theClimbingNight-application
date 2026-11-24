@@ -4,6 +4,7 @@ import com.theclimbingnight.auth.web.AuthenticatedUser;
 import com.theclimbingnight.auth.web.CurrentUser;
 import com.theclimbingnight.auth.web.RequireRole;
 import com.theclimbingnight.common.ApiResponse;
+import com.theclimbingnight.meetup.dto.MeetupApplicationAdminResponse;
 import com.theclimbingnight.meetup.dto.MeetupCopyRequest;
 import com.theclimbingnight.meetup.dto.MeetupCreateRequest;
 import com.theclimbingnight.meetup.dto.MeetupDetailResponse;
@@ -53,6 +54,12 @@ public class MeetupController {
 	@GetMapping("/{id}")
 	public ApiResponse<MeetupDetailResponse> get(@CurrentUser AuthenticatedUser user, @PathVariable long id) {
 		return ApiResponse.success(meetupQueryService.get(id, user.id(), user.role()));
+	}
+
+	@RequireRole(Role.ADMIN)
+	@GetMapping("/{id}/applications")
+	public ApiResponse<List<MeetupApplicationAdminResponse>> applications(@PathVariable long id) {
+		return ApiResponse.success(meetupQueryService.applications(id));
 	}
 
 	@RequireRole(Role.ADMIN)
