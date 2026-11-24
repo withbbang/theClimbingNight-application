@@ -1,4 +1,5 @@
 import { authApi } from '@/lib/auth-api';
+import { clearRegisteredPushToken, getRegisteredPushToken } from '@/lib/push';
 import { queryClient } from '@/lib/query-client';
 import { sessionStore } from '@/lib/session-store';
 import { signOut } from '@/lib/sign-out';
@@ -11,6 +12,10 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(async () => {}),
 }));
 jest.mock('@/lib/auth-api', () => ({ authApi: { logout: jest.fn() } }));
+jest.mock('@/lib/push', () => ({
+  getRegisteredPushToken: jest.fn(),
+  clearRegisteredPushToken: jest.fn(),
+}));
 jest.mock('@/lib/social', () => ({ signOutSocial: jest.fn() }));
 
 const logout = jest.mocked(authApi.logout);
@@ -18,6 +23,8 @@ const logout = jest.mocked(authApi.logout);
 beforeEach(async () => {
   logout.mockReset().mockResolvedValue(undefined);
   jest.mocked(signOutSocial).mockReset().mockResolvedValue(undefined);
+  jest.mocked(getRegisteredPushToken).mockReset().mockResolvedValue(null);
+  jest.mocked(clearRegisteredPushToken).mockReset().mockResolvedValue(undefined);
   queryClient.clear();
   await sessionStore.signIn(tokens('1'));
 });
@@ -53,4 +60,21 @@ it('skips the server call when already a guest', async () => {
   await sessionStore.signOut();
   await signOut();
   expect(logout).not.toHaveBeenCalled();
+});
+
+it('sends the registered push token on logout', async () => {
+  jest.mocked(getRegisteredPushToken).mockResolvedValue('ExponentPushToken[x]');
+  await signOut();
+  expect(logout).toHaveBeenCalledWith('R1', 'ExponentPushToken[x]');
+});
+
+it('forgets the registered token on logout', async () => {
+  await signOut();
+  expect(clearRegisteredPushToken).toHaveBeenCalledTimes(1);
+});
+
+it('still logs out on the server when the stored push token cannot be read', async () => {
+  jest.mocked(getRegisteredPushToken).mockRejectedValue(new Error('keychain'));
+  await signOut();
+  expect(logout).toHaveBeenCalledWith('R1', undefined);
 });

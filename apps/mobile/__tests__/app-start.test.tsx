@@ -1,5 +1,7 @@
+import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 
+import { router } from 'expo-router';
 import { act, renderRouter, screen, fireEvent } from 'expo-router/testing-library';
 
 import { setSessionExpiredHandler } from '@/lib/api';
@@ -142,4 +144,18 @@ it('opens login and clears cached queries when the session expires', async () =>
   });
   expect(app.getPathname()).toBe('/login');
   expect(queryClient.getQueryData(['inquiries'])).toBeUndefined();
+});
+
+it('returns from login to the routed tab when a push is tapped', async () => {
+  const app = await start(tokens('1', 'MEMBER'), '/my');
+  await act(async () => router.push('/login'));
+  jest.mocked(Notifications.useLastNotificationResponse).mockReturnValue({
+    notification: { request: { content: { data: { type: 'MEETUP_CREATED' } } } },
+  } as unknown as Notifications.NotificationResponse);
+  await act(async () => {
+    await sessionStore.updateUser({ id: 1, nickname: '다시', role: 'MEMBER' });
+  });
+  expect(app.getPathname()).toBe('/meetups');
+  expect(router.canDismiss()).toBe(false);
+  jest.mocked(Notifications.useLastNotificationResponse).mockReturnValue(null);
 });

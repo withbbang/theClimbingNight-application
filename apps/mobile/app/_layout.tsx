@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useReducedMotion } from 'react-native-reanimated';
 
+import { usePush } from '@/hooks/use-push';
 import { useSession } from '@/hooks/use-session';
 import { useSyncMe } from '@/hooks/use-sync-me';
 import { useTheme } from '@/hooks/use-theme';
@@ -21,6 +22,7 @@ function Navigation() {
   const theme = useTheme();
   const reduced = useReducedMotion();
   useSyncMe();
+  usePush();
 
   useEffect(() => {
     setSessionExpiredHandler(() => {

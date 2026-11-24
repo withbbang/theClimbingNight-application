@@ -97,7 +97,9 @@ it('keeps the token so the user can retry after a network failure', async () => 
   const app = await renderApp('/signup');
   await submit('가나');
   expect(app.getPathname()).toBe('/signup');
-  expect(screen.getByRole('alert')).toHaveTextContent('네트워크 연결을 확인한 뒤 다시 시도해 주세요.');
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    '네트워크 연결을 확인한 뒤 다시 시도해 주세요.',
+  );
   expect(pendingSignup.get()).toBe('st');
 });
 
