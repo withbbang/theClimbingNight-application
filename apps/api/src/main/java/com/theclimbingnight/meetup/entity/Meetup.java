@@ -76,6 +76,10 @@ public class Meetup extends BaseTimeEntity {
 	@Column(name = "attendance_recorded_at")
 	private Instant attendanceRecordedAt;
 
+	@JdbcTypeCode(SqlTypes.TIMESTAMP)
+	@Column(name = "reminder_sent_at")
+	private Instant reminderSentAt;
+
 	public static Meetup create(MeetupSpec spec, User host) {
 		Meetup meetup = new Meetup();
 		meetup.apply(spec);
@@ -120,12 +124,21 @@ public class Meetup extends BaseTimeEntity {
 		this.attendanceRecordedAt = now;
 	}
 
+	public void markReminderSent(Instant now) {
+		this.reminderSentAt = now;
+	}
+
 	public MeetupSpec toSpec() {
 		return new MeetupSpec(title, description, placeName, startsAt, endsAt,
 				capacity == null ? 0 : capacity, lateCancelHours, participantsVisible);
 	}
 
 	private void apply(MeetupSpec spec) {
+		// 시작 시각이 달라지면 새 날짜로 일정 알림을 다시 보낸다. DB는 마이크로초까지만 저장하므로 그 단위로 비교한다.
+		if (this.startsAt != null
+				&& !this.startsAt.truncatedTo(ChronoUnit.MICROS).equals(spec.startsAt().truncatedTo(ChronoUnit.MICROS))) {
+			this.reminderSentAt = null;
+		}
 		this.title = spec.title();
 		this.description = spec.description();
 		this.placeName = spec.placeName();

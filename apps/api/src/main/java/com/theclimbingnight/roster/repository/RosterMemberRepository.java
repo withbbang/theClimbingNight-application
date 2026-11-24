@@ -19,6 +19,10 @@ public interface RosterMemberRepository extends JpaRepository<RosterMember, Long
 
 	List<RosterMember> findAllByUserIdIn(Collection<Long> userIds);
 
+	/** 연결된 사용자 ID만. 푸시 알림이 읽기만 하며, 연결이 없는 명부는 건너뛴다. */
+	@Query("select r.user.id from RosterMember r where r.id in :rosterIds and r.user is not null")
+	List<Long> findLinkedUserIds(@Param("rosterIds") Collection<Long> rosterIds);
+
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select r from RosterMember r where r.id = :id")
 	Optional<RosterMember> findByIdForUpdate(@Param("id") long id);

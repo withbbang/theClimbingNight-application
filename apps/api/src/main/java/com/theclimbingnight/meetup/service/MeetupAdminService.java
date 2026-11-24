@@ -44,6 +44,7 @@ public class MeetupAdminService {
 	public MeetupResponse create(long adminId, MeetupSpec spec) {
 		requireFuture(spec.startsAt());
 		Meetup meetup = meetupRepository.save(Meetup.create(spec, userRepository.getReferenceById(adminId)));
+		eventPublisher.publishEvent(new MeetupCreatedEvent(meetup.getId(), adminId));
 		return MeetupResponse.from(meetup);
 	}
 

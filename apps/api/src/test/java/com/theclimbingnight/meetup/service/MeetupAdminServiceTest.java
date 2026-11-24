@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.theclimbingnight.auth.service.MutableClock;
@@ -252,6 +253,30 @@ class MeetupAdminServiceTest {
 		assertThat(copy.getEndsAt()).isEqualTo(newEnd);
 		assertThat(copy.getHost()).isSameAs(other);
 		assertThat(response.id()).isEqualTo(99L);
+	}
+
+	@Test
+	void 복제하면_개설_이벤트를_한_번_발행한다() {
+		// given
+		given(meetupRepository.findById(MEETUP_ID)).willReturn(Optional.of(existing()));
+		Instant newStart = STARTS.plus(Duration.ofDays(7));
+
+		// when
+		service.copy(MEETUP_ID, ADMIN_ID, newStart, newStart.plus(Duration.ofHours(2)));
+
+		// then
+		ArgumentCaptor<Object> event = ArgumentCaptor.forClass(Object.class);
+		verify(eventPublisher, times(1)).publishEvent(event.capture());
+		assertThat(event.getValue()).isEqualTo(new MeetupCreatedEvent(99L, ADMIN_ID));
+	}
+
+	@Test
+	void 개설하면_개설_이벤트를_발행한다() {
+		// when
+		service.create(ADMIN_ID, spec(STARTS, ENDS, 10));
+
+		// then
+		verify(eventPublisher).publishEvent(new MeetupCreatedEvent(99L, ADMIN_ID));
 	}
 
 	@Test
