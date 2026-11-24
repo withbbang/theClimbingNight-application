@@ -115,3 +115,14 @@ it('asks a guest to log in', async () => {
   await renderApp('/membership');
   expect(screen.getByRole('button', { name: '로그인하기' })).toBeOnTheScreen();
 });
+
+it('updates the role by itself when the request was just approved', async () => {
+  let me = 0;
+  mockServer({
+    [ME]: ok(request({ status: 'APPROVED' })),
+    '/users/me': () => ok({ id: 1, nickname: '별이', role: me++ === 0 ? 'USER' : 'MEMBER' }),
+  });
+  await renderApp('/membership');
+  expect(await screen.findByText('동호회원 인증을 마쳤어요')).toBeOnTheScreen();
+  expect(me).toBe(2);
+});

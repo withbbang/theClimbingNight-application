@@ -227,3 +227,52 @@ it('shows not found with a way home on 404', async () => {
   await press('홈으로');
   expect(app.getPathname()).toBe('/');
 });
+
+it('shows not found on the cancel screen for a missing meetup', async () => {
+  mockServer({ '/meetups/1': fail(404, 'COMMON_NOT_FOUND', '요청한 항목을 찾을 수 없습니다.') });
+  await renderApp('/meetups/1/cancel');
+  expect(screen.getByText('벙을 찾을 수 없어요')).toBeOnTheScreen();
+});
+
+it('can leave the cancel screen when loading fails', async () => {
+  mockServer({ '/meetups/1': fail(500, 'COMMON_INTERNAL_ERROR', '서버에 문제가 있습니다.') });
+  const app = await renderApp('/meetups/1/cancel');
+  await press('뒤로');
+  expect(app.getPathname()).not.toBe('/meetups/1/cancel');
+});
+
+it.each([null, mine({ status: 'CANCELED' }), mine({ status: 'REMOVED' })])(
+  'offers no cancel form without an active application: %p',
+  async (my) => {
+    mockServer({ '/meetups/1': ok(detail({ my })) });
+    const app = await renderApp('/meetups/1/cancel');
+    expect(screen.getByText('취소할 신청이 없어요')).toBeOnTheScreen();
+    expect(button('취소 확정')).toBeNull();
+    await press('벙으로 돌아가기');
+    expect(app.getPathname()).toBe('/meetups/1');
+  },
+);
+
+it('drops the apply error once the refetch shows the application, also after canceling', async () => {
+  let my: MyApplicationResponse | null = null;
+  mockServer({
+    '/meetups/1': () => ok(detail({ my })),
+    [APPLY]: () => {
+      my = mine();
+      return fail(409, 'MEETUP_ALREADY_APPLIED', '이미 신청한 벙입니다.');
+    },
+    [CANCEL]: () => {
+      my = mine({ status: 'CANCELED' });
+      return ok(my);
+    },
+  });
+  await renderApp('/meetups/1');
+  await press('신청하기');
+  await flush();
+  expect(screen.getByText('참여가 확정됐어요')).toBeOnTheScreen();
+  expect(screen.queryByText('이미 신청한 벙입니다.')).toBeNull();
+  await press('신청 취소');
+  await press('취소 확정');
+  expect(button('신청하기')).not.toBeNull();
+  expect(screen.queryByText('이미 신청한 벙입니다.')).toBeNull();
+});

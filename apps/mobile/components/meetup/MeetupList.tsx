@@ -6,16 +6,16 @@ import { AppText } from '@/components/ui/AppText';
 import { FloatingIcon } from '@/components/ui/FloatingIcon';
 import { Notice } from '@/components/ui/Notice';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
+import { useNow } from '@/hooks/use-now';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDay, toDateKey, type DateKey } from '@/lib/kst';
-import { meetupPhase } from '@/lib/meetup-status';
+import { meetupPhase, phaseBoundaries } from '@/lib/meetup-status';
 import type { MeetupSummaryResponse } from '@/types/api/meetup';
 
 type Row =
   { type: 'day'; day: DateKey } | { type: 'meetup'; meetup: MeetupSummaryResponse; index: number };
 
-function toRows(meetups: MeetupSummaryResponse[]): Row[] {
-  const now = new Date();
+function toRows(meetups: MeetupSummaryResponse[], now: Date): Row[] {
   const rows: Row[] = [];
   let lastDay: DateKey | null = null;
   meetups
@@ -38,10 +38,11 @@ interface MeetupListProps {
 
 export function MeetupList({ meetups, onRefresh }: MeetupListProps) {
   const { space } = useTheme();
+  const now = useNow(meetups.flatMap(phaseBoundaries));
 
   return (
     <FlashList
-      data={toRows(meetups)}
+      data={toRows(meetups, new Date(now))}
       keyExtractor={(row) => (row.type === 'day' ? row.day : String(row.meetup.id))}
       getItemType={(row) => row.type}
       renderItem={({ item }) =>

@@ -3,12 +3,17 @@ import { View } from 'react-native';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { CalendarXIcon } from 'phosphor-react-native/src/icons/CalendarX';
+
 import { RoleGate } from '@/components/auth/RoleGate';
 import { MeetupNotFound } from '@/components/meetup/MeetupNotFound';
 import { AppText } from '@/components/ui/AppText';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FadeInItem } from '@/components/ui/FadeInItem';
+import { FloatingIcon } from '@/components/ui/FloatingIcon';
+import { Notice } from '@/components/ui/Notice';
 import { QueryState } from '@/components/ui/QueryState';
 import { Screen } from '@/components/ui/Screen';
 import { TextField } from '@/components/ui/TextField';
@@ -16,6 +21,7 @@ import { useCancelApplication } from '@/hooks/use-meetup-application';
 import { useMeetup } from '@/hooks/use-meetups';
 import { useNow } from '@/hooks/use-now';
 import { useTheme } from '@/hooks/use-theme';
+import { ApiError } from '@/lib/api-error';
 import { errorMessage } from '@/lib/error-message';
 import { formatDateTime } from '@/lib/kst';
 import { parseId } from '@/lib/parse-id';
@@ -33,6 +39,7 @@ function CancelForm({ detail }: { detail: MeetupDetailResponse }) {
   const now = useNow([deadline]);
   // 기준 뒤에 승격된 사람은 늦은 취소가 아니다. 판정은 서버가 하므로 단정하지 않는다.
   const maybeLate = my?.status === 'CONFIRMED' && now >= deadline;
+  const active = my?.status === 'CONFIRMED' || my?.status === 'WAITLISTED';
   const back = () => router.dismissTo(`/meetups/${meetup.id}`);
 
   async function submit() {
@@ -41,6 +48,18 @@ function CancelForm({ detail }: { detail: MeetupDetailResponse }) {
     }
   }
 
+  // 방금 취소했다면 화면이 닫히는 동안 폼을 그대로 둔다.
+  if (!active && (cancel.isIdle || cancel.isError)) {
+    return (
+      <Notice
+        illustration={<FloatingIcon icon={CalendarXIcon} />}
+        title="취소할 신청이 없어요"
+        description="이미 취소했거나 신청하지 않은 벙이에요."
+        actionLabel="벙으로 돌아가기"
+        onAction={back}
+      />
+    );
+  }
   return (
     <View style={{ gap: space(5) }}>
       <FadeInItem index={0} style={{ gap: space(2) }}>
@@ -79,10 +98,12 @@ function CancelForm({ detail }: { detail: MeetupDetailResponse }) {
 export default function MeetupCancelScreen() {
   const id = parseId(useLocalSearchParams().id);
   const query = useMeetup(id);
+  const missing = id === null || (query.error instanceof ApiError && query.error.status === 404);
   return (
     <Screen scroll>
+      {query.data && !missing ? null : <BackButton />}
       <RoleGate role="MEMBER">
-        {id === null ? (
+        {missing ? (
           <MeetupNotFound />
         ) : (
           <QueryState query={query}>{(detail) => <CancelForm detail={detail} />}</QueryState>

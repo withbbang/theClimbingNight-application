@@ -152,3 +152,15 @@ it('shows verification when membership was just revoked', async () => {
   await flush();
   expect(screen.getByText('동호회원 인증이 필요해요')).toBeOnTheScreen();
 });
+
+it('updates and then drops a card as time passes on an open screen', async () => {
+  mockServer({
+    [LIST]: ok([summary({ startsAt: '2026-11-24T03:01:00Z', endsAt: '2026-11-24T03:02:00Z' })]),
+  });
+  await renderApp('/meetups');
+  expect(screen.queryByText('진행 중')).toBeNull();
+  await act(async () => jest.advanceTimersByTimeAsync(61_000));
+  expect(screen.getByText('진행 중')).toBeOnTheScreen();
+  await act(async () => jest.advanceTimersByTimeAsync(61_000));
+  expect(screen.queryByText('화요 정기벙')).toBeNull();
+});

@@ -13,7 +13,8 @@ export function useNow(boundaries: number[]): number {
     if (delay > MAX_DELAY_MS) {
       return;
     }
-    const timer = setTimeout(() => setNow(Date.now()), delay);
+    // 타이머가 조금 일찍 울려도 경계를 지난 것으로 본다.
+    const timer = setTimeout(() => setNow(Math.max(Date.now(), next)), delay);
     return () => clearTimeout(timer);
   }, [next]);
 

@@ -1,6 +1,6 @@
 import { Linking } from 'react-native';
 
-import { screen } from 'expo-router/testing-library';
+import { act, screen } from 'expo-router/testing-library';
 
 import { fail, mockServer, ok, renderApp } from '@/test-utils/app';
 import { summary } from '@/test-utils/meetups';
@@ -102,4 +102,15 @@ it('still shows notices when the meetups request fails', async () => {
   await renderApp('/');
   expect(screen.getByText('11월 정기총회')).toBeOnTheScreen();
   expect(screen.getByText('서버에 문제가 있습니다.')).toBeOnTheScreen();
+});
+
+it('drops a meetup that starts while the screen stays open', async () => {
+  await startAs('MEMBER');
+  mockServer({
+    [LIST]: ok([summary({ startsAt: '2026-11-24T03:01:00Z', endsAt: '2026-11-24T05:00:00Z' })]),
+  });
+  await renderApp('/');
+  expect(screen.getByText('화요 정기벙')).toBeOnTheScreen();
+  await act(async () => jest.advanceTimersByTimeAsync(61_000));
+  expect(screen.queryByText('화요 정기벙')).toBeNull();
 });

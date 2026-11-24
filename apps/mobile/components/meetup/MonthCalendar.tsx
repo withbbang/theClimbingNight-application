@@ -133,7 +133,11 @@ export function MonthCalendar({ selected, marks, onSelect }: MonthCalendarProps)
           <CaretRightIcon size={22} color={colors.text} weight="bold" />
         </Pressable>
       </View>
-      <View style={styles.week} importantForAccessibility="no-hide-descendants">
+      <View
+        style={styles.week}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
         {WEEKDAYS.map((name) => (
           <View key={name} style={styles.cell}>
             <AppText variant="caption" tone="muted" maxFontSizeMultiplier={1.4} style={styles.name}>

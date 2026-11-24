@@ -7,10 +7,11 @@ import Animated from 'react-native-reanimated';
 import { StatusBadge } from '@/components/meetup/StatusBadge';
 import { AppText } from '@/components/ui/AppText';
 import { FadeInItem } from '@/components/ui/FadeInItem';
+import { useNow } from '@/hooks/use-now';
 import { usePressScale } from '@/hooks/use-press-scale';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDay, formatTime, toDateKey } from '@/lib/kst';
-import { capacityText, meetupPhase } from '@/lib/meetup-status';
+import { capacityText, meetupPhase, phaseBoundaries } from '@/lib/meetup-status';
 import type { MeetupSummaryResponse } from '@/types/api/meetup';
 
 const MAX_STAGGER = 6;
@@ -29,7 +30,8 @@ export function MeetupCard({ meetup, index, showDate = false }: MeetupCardProps)
   const { colors, radius, space } = useTheme();
   const press = usePressScale();
   const stacked = useWindowDimensions().fontScale > STACK_FONT_SCALE;
-  const phase = meetupPhase(meetup, new Date());
+  const now = useNow(phaseBoundaries(meetup));
+  const phase = meetupPhase(meetup, new Date(now));
   const phaseLabel = {
     CANCELED: '취소된 벙',
     ONGOING: '진행 중',
@@ -64,7 +66,7 @@ export function MeetupCard({ meetup, index, showDate = false }: MeetupCardProps)
               {formatTime(meetup.startsAt)}
             </AppText>
           </View>
-          <View style={[stacked ? null : styles.body, { gap: space(1) }]}>
+          <View style={[stacked ? styles.stackedBody : styles.body, { gap: space(1) }]}>
             <AppText
               variant="label"
               tone={faded ? 'muted' : 'default'}
@@ -96,7 +98,9 @@ export function MeetupCard({ meetup, index, showDate = false }: MeetupCardProps)
 
 const styles = StyleSheet.create({
   time: { minWidth: 68 },
-  body: { flex: 1 },
+  // flex를 뺐다 다시 넣으면 iOS에서 적용되지 않아 두 배치의 값을 모두 적는다.
+  body: { flexGrow: 1, flexShrink: 1, flexBasis: 0 },
+  stackedBody: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto' },
   counts: { flexDirection: 'row', flexWrap: 'wrap' },
   canceled: { textDecorationLine: 'line-through' },
 });

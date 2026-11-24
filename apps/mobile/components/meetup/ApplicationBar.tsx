@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { View } from 'react-native';
 
 import { useRouter } from 'expo-router';
@@ -47,6 +48,15 @@ export function ApplicationBar({ detail, phase, started }: ApplicationBarProps) 
   const active = status === 'CONFIRMED' || status === 'WAITLISTED';
   const canApply = phase === 'UPCOMING' && !active && status !== 'REMOVED';
   const canCancel = active && !started;
+  const { isError, reset } = apply;
+
+  // 다시 받은 상태가 신청 결과를 말해 주면 지난 오류는 지운다.
+  useEffect(() => {
+    if (!canApply && isError) {
+      reset();
+    }
+  }, [canApply, isError, reset]);
+
   const text = statusText(detail, phase, started);
 
   return (
