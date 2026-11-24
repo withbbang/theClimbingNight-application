@@ -43,7 +43,10 @@ function Attendance() {
   const [date, setDate] = useState(() => todayKst());
   const [step, setStep] = useState<1 | -1>(1);
   const query = useAttendanceRate(period, date);
-  const canGoNext = (query.data?.to ?? date) < todayKst();
+  // 아직 받지 못했으면 옮겨 갈 날이 오늘을 넘지 않는지로 본다.
+  const canGoNext = query.data
+    ? query.data.to < todayKst()
+    : shiftPeriod(period, date, 1) <= todayKst();
 
   function move(by: 1 | -1) {
     setStep(by);

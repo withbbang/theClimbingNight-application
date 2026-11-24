@@ -100,3 +100,12 @@ it('keeps the last selected period when responses arrive out of order', async ()
   expect(await screen.findByText('50%')).toBeOnTheScreen();
   expect(screen.queryByText('100%')).toBeNull();
 });
+
+it('cannot pass the current period while it is not loaded', async () => {
+  await startAs('MEMBER', '2026-03-31T03:00:00Z');
+  mockServer({ [path('MONTH', '2026-03-31')]: rate({ from: '2026-03-01', to: '2026-03-31' }) });
+  await renderApp('/attendance');
+  await press('이전 기간');
+  await press('다음 기간');
+  expect(screen.getByRole('button', { name: '다음 기간' })).toBeDisabled();
+});

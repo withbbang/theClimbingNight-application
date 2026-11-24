@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
@@ -10,6 +11,7 @@ import { RoleGate } from '@/components/auth/RoleGate';
 import { AppText } from '@/components/ui/AppText';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
+import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FadeInItem } from '@/components/ui/FadeInItem';
 import { FloatingIcon } from '@/components/ui/FloatingIcon';
 import { Hold } from '@/components/ui/Hold';
@@ -20,6 +22,7 @@ import { Screen } from '@/components/ui/Screen';
 import { useMyInquiries } from '@/hooks/use-inquiries';
 import { usePressScale } from '@/hooks/use-press-scale';
 import { useTheme } from '@/hooks/use-theme';
+import { errorMessage } from '@/lib/error-message';
 import { formatDateTime } from '@/lib/kst';
 import type { InquiryResponse } from '@/types/api/inquiry';
 
@@ -67,6 +70,19 @@ function Inquiries() {
   const router = useRouter();
   const { space } = useTheme();
   const query = useMyInquiries();
+  const { fetchNextPage, hasNextPage, isFetching } = query;
+  // 다시 받는 중에 끝에 닿으면 목록은 다시 알려 주지 않으므로 기억했다가 이어 받는다.
+  const reachedEnd = useRef(false);
+
+  useEffect(() => {
+    if (reachedEnd.current && !isFetching) {
+      reachedEnd.current = false;
+      if (hasNextPage) {
+        void fetchNextPage();
+      }
+    }
+  }, [fetchNextPage, hasNextPage, isFetching]);
+
   return (
     <View style={[styles.fill, { gap: space(4) }]}>
       <AppText variant="display" accessibilityRole="header">
@@ -81,10 +97,27 @@ function Inquiries() {
               keyExtractor={(inquiry) => String(inquiry.id)}
               renderItem={({ item, index }) => <InquiryRow inquiry={item} index={index} />}
               onEndReached={() => {
-                if (query.hasNextPage && !query.isFetching) {
-                  void query.fetchNextPage();
+                if (query.isFetchingNextPage) {
+                  return;
+                }
+                if (isFetching) {
+                  reachedEnd.current = true;
+                } else if (hasNextPage) {
+                  void fetchNextPage();
                 }
               }}
+              ListFooterComponent={
+                query.isFetchNextPageError ? (
+                  <View style={{ gap: space(2) }}>
+                    <ErrorBanner message={errorMessage(query.error)} />
+                    <Button
+                      label="다시 시도"
+                      variant="secondary"
+                      onPress={() => void fetchNextPage()}
+                    />
+                  </View>
+                ) : null
+              }
               ListEmptyComponent={
                 <Notice
                   illustration={<FloatingIcon icon={ChatCircleTextIcon} />}

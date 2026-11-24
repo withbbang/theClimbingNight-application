@@ -8,7 +8,7 @@ import { errorMessage } from '@/lib/error-message';
 import { notifyError, notifySuccess } from '@/lib/haptics';
 import { loginNotice } from '@/lib/login-notice';
 import { pendingSignup } from '@/lib/pending-signup';
-import { queryClient } from '@/lib/query-client';
+import { clearSessionCache } from '@/lib/query-client';
 import { sessionStore } from '@/lib/session-store';
 import { waitForCleanUp } from '@/lib/sign-out';
 import type { SocialAdapter } from '@/lib/social/types';
@@ -109,7 +109,7 @@ export function useLogin() {
         return;
       }
       notifySuccess();
-      queryClient.clear();
+      void clearSessionCache();
       await sessionStore.signIn(result.tokens);
       if (isCurrent()) {
         router.dismissTo('/');

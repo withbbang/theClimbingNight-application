@@ -1,6 +1,8 @@
-import { fireEvent, screen } from 'expo-router/testing-library';
+import { router } from 'expo-router';
+import { act, fireEvent, screen } from 'expo-router/testing-library';
 
-import { fail, flush, mockServer, ok, renderApp } from '@/test-utils/app';
+import { queryClient } from '@/lib/query-client';
+import { fail, flush, mockServer, ok, renderApp, type Reply } from '@/test-utils/app';
 import { press, type } from '@/test-utils/screen';
 import { startAs } from '@/test-utils/session';
 import type { InquiryResponse } from '@/types/api/inquiry';
@@ -126,4 +128,55 @@ it('shows not found on 404', async () => {
   });
   await renderApp('/inquiries/1');
   expect(screen.getByText('문의를 찾을 수 없어요')).toBeOnTheScreen();
+});
+
+it('does not navigate when the form was left before the response', async () => {
+  let finish = (_: Reply) => {};
+  mockServer({ [POST]: () => new Promise<Reply>((resolve) => (finish = resolve)) });
+  const app = await renderApp('/inquiries/new');
+  await type('제목', '회비');
+  await type('내용', '언제');
+  await press('보내기');
+  await act(async () => router.dismissTo('/goods'));
+  await flush();
+  expect(app.getPathname()).toBe('/goods');
+  await act(async () => finish(ok(inquiry())));
+  await flush();
+  expect(app.getPathname()).toBe('/goods');
+});
+
+it('loads the next page after a refetch that was running at the end of the list', async () => {
+  let finish = (_: Reply) => {};
+  let loads = 0;
+  const server = mockServer({
+    [PAGE(0)]: () =>
+      loads++ === 0 ? page(0, [inquiry()], 1) : new Promise<Reply>((resolve) => (finish = resolve)),
+    [PAGE(1)]: page(1, [inquiry({ id: 9, title: '아홉' })], 2),
+  });
+  await renderApp('/inquiries');
+  await act(async () => void queryClient.invalidateQueries({ queryKey: ['inquiries'] }));
+  await flush();
+  await fireEvent(screen.getByLabelText('문의 목록'), 'endReached');
+  await act(async () => finish(page(0, [inquiry()], 2)));
+  await flush();
+  expect(server.count(PAGE(1))).toBe(1);
+  expect(screen.getByText('아홉')).toBeOnTheScreen();
+});
+
+it('offers a retry when the next page fails', async () => {
+  let broken = true;
+  mockServer({
+    [PAGE(0)]: page(0, [inquiry()], 2),
+    [PAGE(1)]: () =>
+      broken
+        ? fail(500, 'COMMON_INTERNAL_ERROR', '서버에 문제가 있습니다.')
+        : page(1, [inquiry({ id: 9, title: '아홉' })], 2),
+  });
+  await renderApp('/inquiries');
+  await fireEvent(screen.getByLabelText('문의 목록'), 'endReached');
+  await flush();
+  expect(screen.getByText('서버에 문제가 있습니다.')).toBeOnTheScreen();
+  broken = false;
+  await press('다시 시도');
+  expect(screen.getByText('아홉')).toBeOnTheScreen();
 });

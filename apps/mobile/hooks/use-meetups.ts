@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useIsMember } from '@/hooks/use-role';
-import { addDays, todayKst, type DateKey } from '@/lib/kst';
+import { useToday } from '@/hooks/use-now';
+import { addDays, type DateKey } from '@/lib/kst';
 import { meetupApi } from '@/lib/meetup-api';
 
 /** 서버가 한 번에 허용하는 최대 범위. */
@@ -16,7 +17,7 @@ export function useMeetups(from: DateKey, to: DateKey) {
 }
 
 export function useUpcomingMeetups() {
-  const today = todayKst();
+  const today = useToday();
   return useMeetups(today, addDays(today, MAX_RANGE_DAYS));
 }
 

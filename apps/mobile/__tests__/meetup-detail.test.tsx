@@ -1,6 +1,7 @@
+import { router } from 'expo-router';
 import { act, fireEvent, screen } from 'expo-router/testing-library';
 
-import { fail, flush, mockServer, ok, renderApp } from '@/test-utils/app';
+import { fail, flush, mockServer, ok, renderApp, type Reply } from '@/test-utils/app';
 import { detail } from '@/test-utils/meetups';
 import { startAs } from '@/test-utils/session';
 import type { MyApplicationResponse } from '@/types/api/meetup';
@@ -275,4 +276,21 @@ it('drops the apply error once the refetch shows the application, also after can
   await press('취소 확정');
   expect(button('신청하기')).not.toBeNull();
   expect(screen.queryByText('이미 신청한 벙입니다.')).toBeNull();
+});
+
+it('does not navigate when the cancel screen was left before the response', async () => {
+  let finish = (_: Reply) => {};
+  mockServer({
+    '/meetups/1': ok(detail({ my: mine() })),
+    [CANCEL]: () => new Promise<Reply>((resolve) => (finish = resolve)),
+  });
+  const app = await renderApp('/meetups/1');
+  await press('신청 취소');
+  await press('취소 확정');
+  await act(async () => router.dismissTo('/goods'));
+  await flush();
+  expect(app.getPathname()).toBe('/goods');
+  await act(async () => finish(ok(mine({ status: 'CANCELED' }))));
+  await flush();
+  expect(app.getPathname()).toBe('/goods');
 });

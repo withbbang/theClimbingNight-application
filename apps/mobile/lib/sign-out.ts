@@ -4,7 +4,7 @@ import {
   getRegisteredPushToken,
   waitForPushRegistration,
 } from '@/lib/push';
-import { queryClient } from '@/lib/query-client';
+import { clearSessionCache } from '@/lib/query-client';
 import { sessionStore } from '@/lib/session-store';
 import { signOutSocial } from '@/lib/social';
 
@@ -42,7 +42,7 @@ export function waitForCleanUp(): Promise<unknown> {
 export async function signOut() {
   const session = sessionStore.getState();
   const cleared = sessionStore.signOut();
-  queryClient.clear();
+  void clearSessionCache();
   if (session.status === 'authenticated') {
     await cleanUpSession(session.tokens.refreshToken);
   }

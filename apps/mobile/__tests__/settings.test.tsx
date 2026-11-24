@@ -1,10 +1,12 @@
-import { Linking } from 'react-native';
+import { AppState, Linking } from 'react-native';
 
+import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 
 import { act, fireEvent, screen } from 'expo-router/testing-library';
 
+import { registerPushToken } from '@/lib/push';
 import { queryClient } from '@/lib/query-client';
 import { sessionStore } from '@/lib/session-store';
 import { fail, flush, mockServer, ok, renderApp, type Reply } from '@/test-utils/app';
@@ -18,6 +20,12 @@ jest.mock('expo-splash-screen', () => jest.requireActual('@/test-utils/native-mo
 jest.mock('expo-haptics', () => jest.requireActual('@/test-utils/native-mocks').hapticsMock());
 jest.mock('@/lib/social', () => jest.requireActual('@/test-utils/native-mocks').socialMock());
 
+jest.mock('@/lib/push', () => ({
+  registerPushToken: jest.fn(async () => {}),
+  getRegisteredPushToken: jest.fn(async () => null),
+  clearRegisteredPushToken: jest.fn(async () => {}),
+  waitForPushRegistration: jest.fn(async () => {}),
+}));
 jest.mock('expo-notifications', () => ({
   setNotificationHandler: jest.fn(),
   useLastNotificationResponse: jest.fn(() => null),
@@ -171,4 +179,36 @@ it('stays signed in when withdrawing fails', async () => {
   await press('탈퇴하기');
   expect(sessionStore.getState().status).toBe('authenticated');
   expect(screen.getByText('서버에 문제가 있습니다.')).toBeOnTheScreen();
+});
+
+it('registers this device once notifications are allowed in the system settings', async () => {
+  allow(false);
+  const listen = jest.mocked(AppState.addEventListener);
+  listen.mockClear();
+  mockServer({ [SETTINGS]: bothOn });
+  await renderApp('/settings/notifications');
+  expect(screen.getByRole('button', { name: '기기 설정 열기' })).toBeOnTheScreen();
+  jest.mocked(registerPushToken).mockClear();
+  allow(true);
+  const becomeActive = () =>
+    act(async () => listen.mock.calls.forEach(([type, on]) => type === 'change' && on('active')));
+  await becomeActive();
+  await flush();
+  expect(button('기기 설정 열기')).toBeNull();
+  await becomeActive();
+  await flush();
+  expect(registerPushToken).toHaveBeenCalledTimes(1);
+});
+
+it('does not navigate when the nickname screen was left before the response', async () => {
+  let finish = (_: Reply) => {};
+  mockServer({ ['PATCH ' + ME]: () => new Promise<Reply>((resolve) => (finish = resolve)) });
+  const app = await renderApp('/settings/nickname');
+  await type('닉네임', '달이');
+  await press('저장');
+  await act(async () => router.dismissTo('/goods'));
+  await flush();
+  await act(async () => finish(ok({ id: 1, nickname: '달이', role: 'MEMBER' })));
+  await flush();
+  expect(app.getPathname()).toBe('/goods');
 });

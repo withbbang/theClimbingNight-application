@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { AppState, Linking, View } from 'react-native';
 
 import { useFocusEffect } from 'expo-router';
@@ -19,15 +19,23 @@ import {
 } from '@/hooks/use-notification-settings';
 import { useTheme } from '@/hooks/use-theme';
 import { errorMessage } from '@/lib/error-message';
+import { registerPushToken } from '@/lib/push';
 
-/** 화면을 열 때와 기기 설정에서 돌아올 때 다시 확인한다. */
+/** 화면을 열 때와 기기 설정에서 돌아올 때 다시 확인한다. 그사이 허용했으면 이 기기를 등록한다. */
 function usePermissionDenied() {
   const [denied, setDenied] = useState(false);
+  const wasDenied = useRef(false);
   useFocusEffect(
     useCallback(() => {
       const check = () => {
         Notifications.getPermissionsAsync()
-          .then(({ granted }) => setDenied(!granted))
+          .then(({ granted }) => {
+            if (granted && wasDenied.current) {
+              void registerPushToken();
+            }
+            wasDenied.current = !granted;
+            setDenied(!granted);
+          })
           .catch(() => {});
       };
       check();

@@ -17,6 +17,7 @@ import { Notice } from '@/components/ui/Notice';
 import { QueryState } from '@/components/ui/QueryState';
 import { Screen } from '@/components/ui/Screen';
 import { TextField } from '@/components/ui/TextField';
+import { useLeft } from '@/hooks/use-left';
 import { useCancelApplication } from '@/hooks/use-meetup-application';
 import { useMeetup } from '@/hooks/use-meetups';
 import { useNow } from '@/hooks/use-now';
@@ -34,6 +35,7 @@ function CancelForm({ detail }: { detail: MeetupDetailResponse }) {
   const { space } = useTheme();
   const { meetup, my } = detail;
   const [reason, setReason] = useState('');
+  const left = useLeft();
   const cancel = useCancelApplication(meetup.id);
   const deadline = Date.parse(meetup.startsAt) - meetup.lateCancelHours * HOUR_MS;
   const now = useNow([deadline]);
@@ -43,7 +45,7 @@ function CancelForm({ detail }: { detail: MeetupDetailResponse }) {
   const back = () => router.dismissTo(`/meetups/${meetup.id}`);
 
   async function submit() {
-    if (await cancel.submit(reason)) {
+    if ((await cancel.submit(reason)) && !left.current) {
       back();
     }
   }

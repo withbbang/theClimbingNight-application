@@ -15,16 +15,9 @@ import Animated, {
 import { AppText } from '@/components/ui/AppText';
 import { Hold } from '@/components/ui/Hold';
 import { usePressScale } from '@/hooks/use-press-scale';
+import { useToday } from '@/hooks/use-now';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  addMonths,
-  formatDay,
-  monthGrid,
-  monthStart,
-  todayKst,
-  WEEKDAYS,
-  type DateKey,
-} from '@/lib/kst';
+import { addMonths, formatDay, monthGrid, monthStart, WEEKDAYS, type DateKey } from '@/lib/kst';
 
 export interface DayMark {
   count: number;
@@ -35,15 +28,15 @@ export interface DayMark {
 interface DayCellProps {
   day: DateKey;
   mark: DayMark | undefined;
+  today: boolean;
   selected: boolean;
   onPress: () => void;
 }
 
-function DayCell({ day, mark, selected, onPress }: DayCellProps) {
+function DayCell({ day, mark, today, selected, onPress }: DayCellProps) {
   const { colors, motion } = useTheme();
   const reduced = useReducedMotion();
   const press = usePressScale(0.82);
-  const today = day === todayKst();
 
   return (
     <Animated.View style={[styles.cell, press.style]}>
@@ -92,6 +85,7 @@ interface MonthCalendarProps {
 export function MonthCalendar({ selected, marks, onSelect }: MonthCalendarProps) {
   const { colors, space } = useTheme();
   const reduced = useReducedMotion();
+  const today = useToday();
   const [step, setStep] = useState(0);
   const month = monthStart(selected);
   const [year, monthNumber] = month.split('-').map(Number);
@@ -154,6 +148,7 @@ export function MonthCalendar({ selected, marks, onSelect }: MonthCalendarProps)
                 <DayCell
                   key={day}
                   day={day}
+                  today={day === today}
                   mark={marks.get(day)}
                   selected={day === selected}
                   onPress={() => onSelect(day)}

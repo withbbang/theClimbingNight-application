@@ -11,6 +11,7 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FadeInItem } from '@/components/ui/FadeInItem';
 import { Screen } from '@/components/ui/Screen';
 import { TextField } from '@/components/ui/TextField';
+import { useLeft } from '@/hooks/use-left';
 import { useChangeNickname } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
@@ -25,6 +26,7 @@ function NicknameForm() {
   const current = session.status === 'authenticated' ? session.tokens.user.nickname : '';
   const [nickname, setNickname] = useState(current);
   const [invalid, setInvalid] = useState<string | null>(null);
+  const left = useLeft();
   const change = useChangeNickname();
   const ofField = change.error instanceof ApiError && change.error.code.startsWith('USER_NICKNAME');
 
@@ -35,7 +37,7 @@ function NicknameForm() {
     if (error) {
       return;
     }
-    if (next === current || (await change.submit(next))) {
+    if ((next === current || (await change.submit(next))) && !left.current) {
       router.dismissTo('/my');
     }
   }

@@ -12,6 +12,7 @@ import { FadeInItem } from '@/components/ui/FadeInItem';
 import { Screen } from '@/components/ui/Screen';
 import { TextField } from '@/components/ui/TextField';
 import { useCreateInquiry } from '@/hooks/use-inquiries';
+import { useLeft } from '@/hooks/use-left';
 import { useTheme } from '@/hooks/use-theme';
 import { errorMessage } from '@/lib/error-message';
 
@@ -21,12 +22,13 @@ function InquiryForm() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [tried, setTried] = useState(false);
+  const left = useLeft();
   const create = useCreateInquiry();
 
   async function submit() {
     setTried(true);
     const inquiry = { title: title.trim(), body: body.trim() };
-    if (inquiry.title && inquiry.body && (await create.submit(inquiry))) {
+    if (inquiry.title && inquiry.body && (await create.submit(inquiry)) && !left.current) {
       router.dismissTo('/inquiries');
     }
   }

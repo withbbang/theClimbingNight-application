@@ -9,17 +9,17 @@ import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { useNow } from '@/hooks/use-now';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDay, toDateKey, type DateKey } from '@/lib/kst';
-import { meetupPhase, phaseBoundaries } from '@/lib/meetup-status';
+import { phaseBoundaries } from '@/lib/meetup-status';
 import type { MeetupSummaryResponse } from '@/types/api/meetup';
 
 type Row =
   { type: 'day'; day: DateKey } | { type: 'meetup'; meetup: MeetupSummaryResponse; index: number };
 
-function toRows(meetups: MeetupSummaryResponse[], now: Date): Row[] {
+function toRows(meetups: MeetupSummaryResponse[], now: number): Row[] {
   const rows: Row[] = [];
   let lastDay: DateKey | null = null;
   meetups
-    .filter((m) => meetupPhase(m, now) !== 'ENDED')
+    .filter((m) => Date.parse(m.endsAt ?? m.startsAt) > now)
     .forEach((meetup, index) => {
       const day = toDateKey(meetup.startsAt);
       if (day !== lastDay) {
@@ -42,7 +42,7 @@ export function MeetupList({ meetups, onRefresh }: MeetupListProps) {
 
   return (
     <FlashList
-      data={toRows(meetups, new Date(now))}
+      data={toRows(meetups, now)}
       keyExtractor={(row) => (row.type === 'day' ? row.day : String(row.meetup.id))}
       getItemType={(row) => row.type}
       renderItem={({ item }) =>

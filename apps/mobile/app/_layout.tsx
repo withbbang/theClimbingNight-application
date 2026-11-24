@@ -12,7 +12,7 @@ import { useSession } from '@/hooks/use-session';
 import { useSyncMe } from '@/hooks/use-sync-me';
 import { useTheme } from '@/hooks/use-theme';
 import { setSessionExpiredHandler } from '@/lib/api';
-import { queryClient } from '@/lib/query-client';
+import { clearSessionCache, queryClient } from '@/lib/query-client';
 import { sessionStore } from '@/lib/session-store';
 import { cleanUpSession } from '@/lib/sign-out';
 
@@ -30,7 +30,7 @@ function Navigation() {
 
   useEffect(() => {
     setSessionExpiredHandler((refreshToken) => {
-      queryClient.clear();
+      void clearSessionCache();
       void cleanUpSession(refreshToken);
       router.navigate('/login');
     });

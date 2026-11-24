@@ -2,7 +2,10 @@ import { Linking } from 'react-native';
 
 import { act, screen } from 'expo-router/testing-library';
 
-import { fail, mockServer, ok, renderApp } from '@/test-utils/app';
+import { queryClient } from '@/lib/query-client';
+import { sessionStore } from '@/lib/session-store';
+import { signOut } from '@/lib/sign-out';
+import { fail, flush, mockServer, ok, renderApp, type Reply } from '@/test-utils/app';
 import { summary } from '@/test-utils/meetups';
 import { button, press } from '@/test-utils/screen';
 import { startAs } from '@/test-utils/session';
@@ -113,4 +116,46 @@ it('drops a meetup that starts while the screen stays open', async () => {
   expect(screen.getByText('화요 정기벙')).toBeOnTheScreen();
   await act(async () => jest.advanceTimersByTimeAsync(61_000));
   expect(screen.queryByText('화요 정기벙')).toBeNull();
+});
+
+it('keeps refreshing notices after signing out', async () => {
+  let title = '옛 공지';
+  mockServer({
+    [NOTICES]: () =>
+      ok({
+        items: [{ id: 1, title, pinned: false, publishedAt: '2026-11-20T03:00:00Z' }],
+        page: 0,
+        size: 3,
+        totalElements: 1,
+        totalPages: 1,
+      }),
+    'POST /auth/logout': { status: 204 },
+  });
+  await renderApp('/');
+  expect(screen.getByText('옛 공지')).toBeOnTheScreen();
+  await act(async () => signOut());
+  await flush();
+  expect(sessionStore.getState().status).toBe('guest');
+  title = '새 공지';
+  await act(async () => queryClient.invalidateQueries({ queryKey: ['notices'] }));
+  await flush();
+  expect(screen.getByText('새 공지')).toBeOnTheScreen();
+});
+
+it('does not stay loading when signed out while notices load', async () => {
+  let first = true;
+  mockServer({
+    [NOTICES]: () => {
+      if (first) {
+        first = false;
+        return new Promise<Reply>(() => {});
+      }
+      return notices;
+    },
+    'POST /auth/logout': { status: 204 },
+  });
+  await renderApp('/');
+  await act(async () => signOut());
+  await flush();
+  expect(screen.getByText('11월 정기총회')).toBeOnTheScreen();
 });

@@ -1,3 +1,5 @@
+import { AppState } from 'react-native';
+
 import { act, fireEvent, screen } from 'expo-router/testing-library';
 
 import { queryClient } from '@/lib/query-client';
@@ -163,4 +165,48 @@ it('updates and then drops a card as time passes on an open screen', async () =>
   expect(screen.getByText('진행 중')).toBeOnTheScreen();
   await act(async () => jest.advanceTimersByTimeAsync(61_000));
   expect(screen.queryByText('화요 정기벙')).toBeNull();
+});
+
+it('moves the range when the Seoul day changes on an open screen', async () => {
+  await startAs('MEMBER', '2026-11-24T14:59:30Z');
+  const server = mockServer({
+    [LIST]: ok([]),
+    '/meetups?from=2026-11-25&to=2027-01-26': ok([summary()]),
+  });
+  await renderApp('/meetups');
+  await act(async () => jest.advanceTimersByTimeAsync(31_000));
+  await flush();
+  expect(server.count('/meetups?from=2026-11-25&to=2027-01-26')).toBe(1);
+  expect(screen.getByText('화요 정기벙')).toBeOnTheScreen();
+});
+
+it('catches up when the app returns after its timers were suspended', async () => {
+  const listen = jest.mocked(AppState.addEventListener);
+  listen.mockClear();
+  const server = mockServer({
+    [LIST]: ok([]),
+    '/meetups?from=2026-11-27&to=2027-01-28': ok([]),
+  });
+  await renderApp('/meetups');
+  jest.setSystemTime(new Date('2026-11-27T03:00:00Z'));
+  await act(async () =>
+    listen.mock.calls.forEach(([type, on]) => type === 'change' && on('active')),
+  );
+  await flush();
+  expect(server.count('/meetups?from=2026-11-27&to=2027-01-28')).toBe(1);
+});
+
+it('drops canceled meetups that are over', async () => {
+  mockServer({
+    [LIST]: ok([
+      summary({
+        title: '지난 취소',
+        status: 'CANCELED',
+        startsAt: '2026-11-24T01:00:00Z',
+        endsAt: '2026-11-24T02:00:00Z',
+      }),
+    ]),
+  });
+  await renderApp('/meetups');
+  expect(screen.queryByText('지난 취소')).toBeNull();
 });

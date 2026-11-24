@@ -9,7 +9,7 @@ import { notifyError, notifySuccess } from '@/lib/haptics';
 import { loginNotice } from '@/lib/login-notice';
 import { nicknameError } from '@/lib/nickname';
 import { pendingSignup } from '@/lib/pending-signup';
-import { queryClient } from '@/lib/query-client';
+import { clearSessionCache } from '@/lib/query-client';
 import { sessionStore } from '@/lib/session-store';
 
 const RESTART_CODES = ['AUTH_SIGNUP_EXPIRED', 'AUTH_ALREADY_REGISTERED'];
@@ -55,7 +55,7 @@ export function useSignup(signupToken: string | null) {
       }
       pendingSignup.clear();
       notifySuccess();
-      queryClient.clear();
+      void clearSessionCache();
       await sessionStore.signIn(tokens);
       if (!left.current) {
         router.dismissTo('/');

@@ -22,6 +22,11 @@ export function toDateKey(iso: string): DateKey {
   return todayKst(new Date(iso));
 }
 
+/** 서울 자정의 시각(ms). */
+export function startOfDay(key: DateKey): number {
+  return toUtc(key).getTime() - OFFSET_MS;
+}
+
 export function addDays(key: DateKey, days: number): DateKey {
   return fromUtc(new Date(toUtc(key).getTime() + days * DAY_MS));
 }

@@ -1,5 +1,7 @@
+import { QueryObserver } from '@tanstack/react-query';
+
 import { ApiError, networkError } from '@/lib/api-error';
-import { queryClient } from '@/lib/query-client';
+import { clearSessionCache, queryClient } from '@/lib/query-client';
 
 const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
 
@@ -37,3 +39,26 @@ it.each([new ApiError('COMMON_NOT_FOUND', '없음', 404), networkError()])(
     expect(invalidate).not.toHaveBeenCalled();
   },
 );
+
+it.each([['notices', 'recent'], ['app-settings']])(
+  'keeps an observer of public %p working after the session cache is cleared',
+  async (...queryKey) => {
+    const queryFn = jest.fn(async () => 1);
+    const observer = new QueryObserver(queryClient, { queryKey, queryFn });
+    const unsubscribe = observer.subscribe(() => {});
+    await queryClient.getQueryCache().find({ queryKey })?.promise;
+    await clearSessionCache();
+    expect(queryFn).toHaveBeenCalledTimes(2);
+    await queryClient.invalidateQueries({ queryKey });
+    expect(queryFn).toHaveBeenCalledTimes(3);
+    unsubscribe();
+  },
+);
+
+it('removes everything else with the session', async () => {
+  queryClient.setQueryData(['users', 'me'], 1);
+  queryClient.setQueryData(['inquiries', 'me', 1], 1);
+  queryClient.setQueryData(['meetups', 'detail', 1], 1);
+  await clearSessionCache();
+  expect(queryClient.getQueryCache().getAll()).toEqual([]);
+});
