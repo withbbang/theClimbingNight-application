@@ -298,4 +298,28 @@ class MeetupFlowIntegrationTest {
 		assertThat(aRow.at("/somoimNickname").asText()).isEqualTo("벙플로우A2");
 		assertThat(rosterMemberRepository.findById(a.rosterId())).isPresent();
 	}
+
+	@Test
+	void 자격을_해제하면_확정_자리가_대기자에게_넘어간다() throws Exception {
+		// given: 정원 1, A 확정, B 대기
+		User admin = saveUser("벙플로우운영3", Role.ADMIN);
+		Member a = saveMember("벙플로우A3");
+		Member b = saveMember("벙플로우B3");
+		Instant startsAt = clock.instant().plus(Duration.ofDays(3));
+		long meetupId = createMeetup(admin, startsAt, startsAt.plus(Duration.ofHours(3)), 1, true);
+		assertThat(apply(a.user(), meetupId).at("/status").asText()).isEqualTo("CONFIRMED");
+		assertThat(apply(b.user(), meetupId).at("/status").asText()).isEqualTo("WAITLISTED");
+
+		// when: 운영진이 A의 자격을 해제한다
+		mockMvc.perform(delete("/api/v1/members/" + a.user().getId()).header("Authorization", bearer(admin)))
+				.andExpect(status().isNoContent());
+
+		// then: B가 확정되고, A의 신청은 늦은 취소 없이 사유와 함께 취소되며 명부 연결은 남는다
+		assertThat(detail(b.user(), meetupId).at("/my/status").asText()).isEqualTo("CONFIRMED");
+		JsonNode aRow = byRoster(applications(admin, meetupId), a.rosterId());
+		assertThat(aRow.at("/status").asText()).isEqualTo("CANCELED");
+		assertThat(aRow.at("/lateCancel").asBoolean()).isFalse();
+		assertThat(aRow.at("/cancelReason").asText()).isEqualTo("동호회원 자격 해제");
+		assertThat(aRow.at("/userId").asLong()).isEqualTo(a.user().getId());
+	}
 }

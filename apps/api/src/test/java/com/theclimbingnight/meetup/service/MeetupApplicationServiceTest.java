@@ -22,6 +22,9 @@ import com.theclimbingnight.meetup.repository.MeetupRepository;
 import com.theclimbingnight.roster.entity.RosterMember;
 import com.theclimbingnight.roster.entity.RosterSource;
 import com.theclimbingnight.roster.repository.RosterMemberRepository;
+import com.theclimbingnight.user.entity.Role;
+import com.theclimbingnight.user.entity.User;
+import com.theclimbingnight.user.repository.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -51,6 +54,7 @@ class MeetupApplicationServiceTest {
 	@Mock MeetupApplicationRepository applicationRepository;
 	@Mock RosterMemberRepository rosterMemberRepository;
 	@Mock WaitlistPromoter promoter;
+	@Mock UserRepository userRepository;
 
 	private MutableClock clock;
 	private MeetupApplicationService service;
@@ -62,9 +66,10 @@ class MeetupApplicationServiceTest {
 	void setUp() {
 		clock = new MutableClock(NOW);
 		service = new MeetupApplicationService(meetupRepository, applicationRepository, rosterMemberRepository,
-				promoter, clock);
+				userRepository, promoter, clock);
 		roster = roster(ROSTER_ID);
 		meetup = meetup(2);
+		given(userRepository.findByIdForUpdate(USER_ID)).willReturn(Optional.of(user(Role.MEMBER)));
 		given(rosterMemberRepository.findByUserId(USER_ID)).willReturn(Optional.of(roster));
 		given(meetupRepository.findByIdForUpdate(MEETUP_ID)).willReturn(Optional.of(meetup));
 		given(applicationRepository.findByMeetupIdAndRosterMemberId(MEETUP_ID, ROSTER_ID)).willReturn(Optional.empty());
@@ -108,6 +113,41 @@ class MeetupApplicationServiceTest {
 		// then
 		assertThat(response.status()).isEqualTo(MeetupApplicationStatus.WAITLISTED);
 		assertThat(response.waitlistPosition()).isEqualTo(2);
+	}
+
+	private static User user(Role role) {
+		User user = User.create("회원");
+		user.changeRole(role);
+		ReflectionTestUtils.setField(user, "id", USER_ID);
+		return user;
+	}
+
+	@Test
+	void 사용자_잠금이_벙_잠금보다_먼저다() {
+		// when
+		service.apply(MEETUP_ID, USER_ID);
+
+		// then
+		InOrder order = inOrder(userRepository, meetupRepository);
+		order.verify(userRepository).findByIdForUpdate(USER_ID);
+		order.verify(meetupRepository).findByIdForUpdate(MEETUP_ID);
+	}
+
+	@Test
+	void 자격이_없거나_비활성이면_403이고_벙을_잠그지_않는다() {
+		// given
+		User plain = user(Role.USER);
+		User withdrawn = user(Role.MEMBER);
+		withdrawn.withdraw(NOW);
+		for (User blocked : List.of(plain, withdrawn)) {
+			given(userRepository.findByIdForUpdate(USER_ID)).willReturn(Optional.of(blocked));
+
+			// when & then
+			assertThatThrownBy(() -> service.apply(MEETUP_ID, USER_ID)).isInstanceOf(BusinessException.class)
+					.extracting(e -> ((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN);
+		}
+		verify(meetupRepository, never()).findByIdForUpdate(anyLong());
+		verify(applicationRepository, never()).save(any());
 	}
 
 	@Test

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.theclimbingnight.common.BusinessException;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -31,11 +33,14 @@ class MemberServiceTest {
 	@Mock
 	com.theclimbingnight.membership.repository.MemberQueryRepository memberQueryRepository;
 
+	@Mock
+	ApplicationEventPublisher eventPublisher;
+
 	private MemberService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new MemberService(memberQueryRepository, userRepository);
+		service = new MemberService(memberQueryRepository, userRepository, eventPublisher);
 	}
 
 	private User user(Role role) {
@@ -57,6 +62,7 @@ class MemberServiceTest {
 		// then
 		assertThat(member.getRole()).isEqualTo(Role.USER);
 		verify(userRepository).findByIdForUpdate(USER_ID);
+		verify(eventPublisher).publishEvent(new MemberRevokedEvent(USER_ID));
 		verifyNoMoreInteractions(userRepository, memberQueryRepository);
 	}
 
@@ -79,5 +85,6 @@ class MemberServiceTest {
 		}
 		assertThat(admin.getRole()).isEqualTo(Role.ADMIN);
 		assertThat(plain.getRole()).isEqualTo(Role.USER);
+		verifyNoInteractions(eventPublisher);
 	}
 }

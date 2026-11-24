@@ -49,8 +49,8 @@ class MeetupWithdrawalListenerTest {
 
 	@BeforeEach
 	void setUp() {
-		listener = new MeetupWithdrawalListener(meetupRepository, applicationRepository, rosterMemberRepository,
-				promoter, new MutableClock(NOW));
+		listener = new MeetupWithdrawalListener(new UpcomingApplicationCanceler(meetupRepository,
+				applicationRepository, rosterMemberRepository, promoter, new MutableClock(NOW)));
 	}
 
 	@Test

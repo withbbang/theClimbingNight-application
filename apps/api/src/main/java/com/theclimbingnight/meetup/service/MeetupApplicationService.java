@@ -10,6 +10,9 @@ import com.theclimbingnight.meetup.repository.MeetupApplicationRepository;
 import com.theclimbingnight.meetup.repository.MeetupRepository;
 import com.theclimbingnight.roster.entity.RosterMember;
 import com.theclimbingnight.roster.repository.RosterMemberRepository;
+import com.theclimbingnight.user.entity.Role;
+import com.theclimbingnight.user.entity.User;
+import com.theclimbingnight.user.repository.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -28,21 +31,24 @@ public class MeetupApplicationService {
 	private final MeetupRepository meetupRepository;
 	private final MeetupApplicationRepository applicationRepository;
 	private final RosterMemberRepository rosterMemberRepository;
+	private final UserRepository userRepository;
 	private final WaitlistPromoter promoter;
 	private final Clock clock;
 
 	public MeetupApplicationService(MeetupRepository meetupRepository,
 			MeetupApplicationRepository applicationRepository, RosterMemberRepository rosterMemberRepository,
-			WaitlistPromoter promoter, Clock clock) {
+			UserRepository userRepository, WaitlistPromoter promoter, Clock clock) {
 		this.meetupRepository = meetupRepository;
 		this.applicationRepository = applicationRepository;
 		this.rosterMemberRepository = rosterMemberRepository;
+		this.userRepository = userRepository;
 		this.promoter = promoter;
 		this.clock = clock;
 	}
 
 	@Transactional
 	public MyApplicationResponse apply(long meetupId, long userId) {
+		requireActiveMember(userId);
 		RosterMember roster = requireRoster(userId);
 		Meetup meetup = lock(meetupId);
 		Instant now = clock.instant();
@@ -142,6 +148,18 @@ public class MeetupApplicationService {
 		List<MeetupApplication> waiting = applicationRepository.findAllByMeetupIdAndStatusOrderByAppliedAtAscIdAsc(
 				application.getMeetup().getId(), MeetupApplicationStatus.WAITLISTED);
 		return MyApplicationResponse.of(application, WaitlistPositions.of(application, waiting));
+	}
+
+	/**
+	 * 사용자 행을 먼저 잠그고(잠금 순서: 사용자 → 벙 → 신청) 활성 동호회원인지 다시 확인한다.
+	 * 인터셉터의 역할 검사 뒤 자격 해제·탈퇴가 끼어들어도, 그 트랜잭션이 끝난 뒤의 상태로 판단해 신청이 새어 들어오지 않는다.
+	 */
+	private void requireActiveMember(long userId) {
+		User user = userRepository.findByIdForUpdate(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_FORBIDDEN));
+		if (!user.isActive() || !user.getRole().atLeast(Role.MEMBER)) {
+			throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+		}
 	}
 
 	private RosterMember requireRoster(long userId) {
