@@ -1,17 +1,40 @@
-import { MountainsIcon } from 'phosphor-react-native/src/icons/Mountains';
+import { ScrollView } from 'react-native';
 
-import { FloatingIcon } from '@/components/ui/FloatingIcon';
-import { Notice } from '@/components/ui/Notice';
+import { useQueryClient } from '@tanstack/react-query';
+
+import { HomeHeader } from '@/components/home/HomeHeader';
+import { JoinBanner } from '@/components/home/JoinBanner';
+import { NextMeetups } from '@/components/home/NextMeetups';
+import { RecentNotices } from '@/components/home/RecentNotices';
+import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { Screen } from '@/components/ui/Screen';
+import { useIsMember } from '@/hooks/use-role';
+import { useTheme } from '@/hooks/use-theme';
+
+const REFRESH_KEYS = [['meetups'], ['notices'], ['app-settings']];
 
 export default function HomeScreen() {
+  const { space } = useTheme();
+  const client = useQueryClient();
+  const isMember = useIsMember();
+
   return (
-    <Screen scroll bottomInset={false}>
-      <Notice
-        illustration={<FloatingIcon icon={MountainsIcon} />}
-        title="벽헤는밤"
-        description="공지와 다가오는 벙을 이곳에서 보여 드릴게요."
-      />
+    <Screen bottomInset={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ gap: space(8), paddingBottom: space(6) }}
+        refreshControl={
+          <PullToRefresh
+            onRefresh={() =>
+              Promise.all(REFRESH_KEYS.map((queryKey) => client.invalidateQueries({ queryKey })))
+            }
+          />
+        }
+      >
+        <HomeHeader />
+        {isMember ? <NextMeetups /> : <JoinBanner />}
+        <RecentNotices />
+      </ScrollView>
     </Screen>
   );
 }

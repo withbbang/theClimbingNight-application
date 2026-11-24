@@ -1,6 +1,3 @@
-import { useState } from 'react';
-import { RefreshControl } from 'react-native';
-
 import { FlashList } from '@shopify/flash-list';
 import { CalendarDotsIcon } from 'phosphor-react-native/src/icons/CalendarDots';
 
@@ -8,6 +5,7 @@ import { MeetupCard } from '@/components/meetup/MeetupCard';
 import { AppText } from '@/components/ui/AppText';
 import { FloatingIcon } from '@/components/ui/FloatingIcon';
 import { Notice } from '@/components/ui/Notice';
+import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDay, toDateKey, type DateKey } from '@/lib/kst';
 import { meetupPhase } from '@/lib/meetup-status';
@@ -39,8 +37,7 @@ interface MeetupListProps {
 }
 
 export function MeetupList({ meetups, onRefresh }: MeetupListProps) {
-  const { colors, space } = useTheme();
-  const [refreshing, setRefreshing] = useState(false);
+  const { space } = useTheme();
 
   return (
     <FlashList
@@ -69,16 +66,7 @@ export function MeetupList({ meetups, onRefresh }: MeetupListProps) {
       }
       contentContainerStyle={{ paddingBottom: space(6) }}
       showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          tintColor={colors.accent}
-          onRefresh={() => {
-            setRefreshing(true);
-            void onRefresh().finally(() => setRefreshing(false));
-          }}
-        />
-      }
+      refreshControl={<PullToRefresh onRefresh={onRefresh} />}
     />
   );
 }

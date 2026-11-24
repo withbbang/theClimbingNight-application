@@ -101,7 +101,7 @@ it('signs in and returns to the tabs', async () => {
   });
   const app = await renderApp('/login');
   await press('카카오 로그인');
-  expect(server.calls[0]).toEqual({
+  expect(server.calls.find((c) => c.method === 'POST')).toEqual({
     method: 'POST',
     path: '/auth/login',
     body: { provider: 'KAKAO', token: 'social' },
@@ -133,7 +133,7 @@ it('shows no error when the user cancels', async () => {
   await press('카카오 로그인');
   expect(screen.queryByRole('alert')).toBeNull();
   expect(button('카카오 로그인')).not.toBeDisabled();
-  expect(server.calls).toHaveLength(0);
+  expect(server.calls.filter((c) => c.method === 'POST')).toHaveLength(0);
 });
 
 it('shows the server message on failure and clears it on the next try', async () => {

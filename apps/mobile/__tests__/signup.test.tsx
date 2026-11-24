@@ -51,7 +51,7 @@ it('creates the account and returns to the tabs', async () => {
   });
   const app = await renderApp('/signup');
   await submit(' 가나 ');
-  expect(server.calls[0]).toEqual({
+  expect(server.calls.find((c) => c.method === 'POST')).toEqual({
     method: 'POST',
     path: '/auth/signup',
     body: { signupToken: 'st', nickname: '가나' },
@@ -68,7 +68,7 @@ it('shows the nickname rule without calling the server', async () => {
   expect(screen.getByRole('alert')).toHaveTextContent(
     '닉네임은 2~16자의 한글, 영문, 숫자, 밑줄(_)만 쓸 수 있습니다.',
   );
-  expect(server.calls).toHaveLength(0);
+  expect(server.calls.filter((c) => c.method === 'POST')).toHaveLength(0);
 });
 
 it('shows the taken-nickname message under the field', async () => {

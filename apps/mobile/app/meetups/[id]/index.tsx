@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { useLocalSearchParams } from 'expo-router';
 
@@ -13,6 +12,7 @@ import { ParticipantList } from '@/components/meetup/ParticipantList';
 import { AppText } from '@/components/ui/AppText';
 import { BackButton } from '@/components/ui/BackButton';
 import { FadeInItem } from '@/components/ui/FadeInItem';
+import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { QueryState } from '@/components/ui/QueryState';
 import { Screen } from '@/components/ui/Screen';
 import { useMeetup } from '@/hooks/use-meetups';
@@ -31,7 +31,6 @@ interface DetailProps {
 
 function Detail({ detail, onRefresh }: DetailProps) {
   const { colors, space } = useTheme();
-  const [refreshing, setRefreshing] = useState(false);
   const { meetup } = detail;
   const start = Date.parse(meetup.startsAt);
   const now = useNow(meetup.endsAt ? [start, Date.parse(meetup.endsAt)] : [start]);
@@ -44,16 +43,7 @@ function Detail({ detail, onRefresh }: DetailProps) {
         style={styles.fill}
         contentContainerStyle={{ gap: space(6), paddingBottom: space(4) }}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            tintColor={colors.accent}
-            onRefresh={() => {
-              setRefreshing(true);
-              void onRefresh().finally(() => setRefreshing(false));
-            }}
-          />
-        }
+        refreshControl={<PullToRefresh onRefresh={onRefresh} />}
       >
         <View style={{ gap: space(2) }}>
           <FadeInItem index={0}>
