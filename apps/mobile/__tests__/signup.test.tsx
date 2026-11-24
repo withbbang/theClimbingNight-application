@@ -1,5 +1,7 @@
+import { router } from 'expo-router';
 import { act, fireEvent, screen } from 'expo-router/testing-library';
 
+import { loginNotice } from '@/lib/login-notice';
 import { pendingSignup } from '@/lib/pending-signup';
 import { queryClient } from '@/lib/query-client';
 import { sessionStore } from '@/lib/session-store';
@@ -122,4 +124,21 @@ it('sends one request when submit is pressed twice', async () => {
   expect(server.count('/auth/signup')).toBe(1);
   await act(async () => finish(ok(tokens('1'))));
   await flush();
+});
+
+it('ignores a late result after leaving the screen', async () => {
+  let finish: (reply: Reply) => void = () => {};
+  mockServer({
+    '/auth/signup': () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  });
+  const app = await renderApp('/signup');
+  await submit('가나');
+  await act(async () => router.replace('/goods'));
+  await act(async () => finish(fail(400, 'AUTH_SIGNUP_EXPIRED', '가입 시간이 지났습니다.')));
+  await flush();
+  expect(app.getPathname()).toBe('/goods');
+  expect(loginNotice.take()).toBeNull();
 });

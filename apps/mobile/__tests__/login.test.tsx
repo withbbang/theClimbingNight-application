@@ -109,6 +109,14 @@ it('signs in and returns to the tabs', async () => {
   expect(app.getPathname()).toBe('/');
 });
 
+it('drops data cached for an earlier account', async () => {
+  mockServer({ '/auth/login': ok({ status: 'LOGGED_IN', tokens: tokens('1') }) });
+  await renderApp('/login');
+  queryClient.setQueryData(['inquiries'], [1]);
+  await press('카카오 로그인');
+  expect(queryClient.getQueryData(['inquiries'])).toBeUndefined();
+});
+
 it('moves to signup when signup is required', async () => {
   mockServer({ '/auth/login': ok({ status: 'SIGNUP_REQUIRED', signupToken: 'secret-token' }) });
   const app = await renderApp('/login');

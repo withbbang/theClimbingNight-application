@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useRouter } from 'expo-router';
 
@@ -9,6 +9,7 @@ import { notifyError, notifySuccess } from '@/lib/haptics';
 import { loginNotice } from '@/lib/login-notice';
 import { nicknameError } from '@/lib/nickname';
 import { pendingSignup } from '@/lib/pending-signup';
+import { queryClient } from '@/lib/query-client';
 import { sessionStore } from '@/lib/session-store';
 
 const RESTART_CODES = ['AUTH_SIGNUP_EXPIRED', 'AUTH_ALREADY_REGISTERED'];
@@ -19,6 +20,14 @@ export function useSignup(signupToken: string | null) {
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const left = useRef(false);
+  useEffect(() => {
+    left.current = false;
+    return () => {
+      left.current = true;
+    };
+  }, []);
 
   function changeNickname(value: string) {
     setNickname(value);
@@ -40,11 +49,21 @@ export function useSignup(signupToken: string | null) {
     setError(null);
     try {
       const tokens = await authApi.signup(signupToken, nickname.trim());
+      // 화면을 떠났으면 적용하지 않는다. 계정은 만들어졌으니 다시 로그인하면 된다.
+      if (left.current) {
+        return;
+      }
       pendingSignup.clear();
       notifySuccess();
+      queryClient.clear();
       await sessionStore.signIn(tokens);
-      router.dismissTo('/');
+      if (!left.current) {
+        router.dismissTo('/');
+      }
     } catch (e) {
+      if (left.current) {
+        return;
+      }
       notifyError();
       if (e instanceof ApiError && RESTART_CODES.includes(e.code)) {
         pendingSignup.clear();

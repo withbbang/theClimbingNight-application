@@ -128,6 +128,34 @@ it('refreshes the cached user after start', async () => {
   expect(await screen.findByText('벙 일정을 준비하고 있어요')).toBeOnTheScreen();
 });
 
+it('shows the server role again when a token refresh had changed it', async () => {
+  getMe.mockResolvedValue({ id: 1, nickname: '별이', role: 'USER' });
+  await start(tokens('1', 'USER'), '/meetups');
+  // 시작할 때 받은 내 정보가 먼저 반영되게 한다.
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(20);
+  });
+  await act(async () => {
+    await sessionStore.updateTokens(tokens('2', 'MEMBER'), sessionStore.getGeneration());
+  });
+  expect(screen.getByText('벙 일정을 준비하고 있어요')).toBeOnTheScreen();
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(10);
+    await queryClient.refetchQueries({ queryKey: ['users', 'me'] });
+  });
+  expect(await screen.findByText('동호회원 인증이 필요해요')).toBeOnTheScreen();
+});
+
+it('leaves login when a session already exists', async () => {
+  const app = await start(tokens('1'), '/my');
+  await act(async () => router.push('/login'));
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(20);
+  });
+  expect(app.getPathname()).toBe('/my');
+  expect(router.canDismiss()).toBe(false);
+});
+
 it('stays usable when getMe fails on the network', async () => {
   await start(tokens('1', 'USER', '별이'), '/my');
   expect(getMe).toHaveBeenCalled();
@@ -140,9 +168,10 @@ it('opens login and clears cached queries when the session expires', async () =>
   const handler = jest.mocked(setSessionExpiredHandler).mock.calls.at(-1)![0];
   await act(async () => {
     await sessionStore.signOut();
-    handler();
+    handler('OLD');
   });
   expect(app.getPathname()).toBe('/login');
+  expect(authApi.logout).toHaveBeenCalledWith('OLD', undefined);
   expect(queryClient.getQueryData(['inquiries'])).toBeUndefined();
 });
 
@@ -173,11 +202,11 @@ it('opens the routed tab when a push is tapped on another tab', async () => {
 });
 
 it('returns from login to the routed tab when a push is tapped', async () => {
-  const app = await start(tokens('1', 'MEMBER'), '/my');
+  const app = await start(undefined, '/my');
   await act(async () => router.push('/login'));
   tapPush('MEETUP_CREATED');
   await act(async () => {
-    await sessionStore.updateUser({ id: 1, nickname: '다시', role: 'MEMBER' });
+    await sessionStore.signIn(tokens('1', 'MEMBER'));
   });
   expect(app.getPathname()).toBe('/meetups');
   expect(router.canDismiss()).toBe(false);

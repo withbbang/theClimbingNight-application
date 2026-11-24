@@ -10,7 +10,7 @@ import { sessionStore } from '@/lib/session-store';
 /** 시작할 때와 앱으로 돌아올 때 내 정보를 다시 받아 승인된 등급을 반영한다. */
 export function useSyncMe() {
   const session = useSession();
-  const { data } = useQuery({
+  const { data, dataUpdatedAt } = useQuery({
     queryKey: ['users', 'me'],
     queryFn: authApi.getMe,
     enabled: session.status === 'authenticated',
@@ -27,5 +27,6 @@ export function useSyncMe() {
     if (data) {
       void sessionStore.updateUser(data);
     }
-  }, [data]);
+    // 내용이 같으면 data 참조가 그대로라, 다시 받은 시각으로 반영한다.
+  }, [data, dataUpdatedAt]);
 }

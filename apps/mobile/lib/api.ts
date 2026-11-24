@@ -21,10 +21,10 @@ type Envelope =
   | { success: true; data: unknown }
   | { success: false; error: { code: string; message: string; fields?: FieldError[] } };
 
-let onSessionExpired: () => void = () => {};
+let onSessionExpired: (refreshToken: string) => void = () => {};
 
-/** 리프레시까지 거부되어 로그아웃했을 때 한 번 불린다. */
-export function setSessionExpiredHandler(handler: () => void) {
+/** 리프레시까지 거부되어 로그아웃했을 때 끝난 세션의 리프레시 토큰으로 한 번 불린다. */
+export function setSessionExpiredHandler(handler: (refreshToken: string) => void) {
   onSessionExpired = handler;
 }
 
@@ -91,7 +91,7 @@ function refresh(generation: number, refreshToken: string): Promise<void> {
     } catch (error) {
       if (isAuthRequired(error) && sessionStore.getGeneration() === generation) {
         await sessionStore.signOut();
-        onSessionExpired();
+        onSessionExpired(refreshToken);
       }
       throw error;
     }

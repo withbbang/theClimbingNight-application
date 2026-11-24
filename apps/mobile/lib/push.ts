@@ -10,6 +10,8 @@ import { sessionStore } from '@/lib/session-store';
 
 const KEY = 'expoPushToken';
 
+let inFlight: Promise<unknown> = Promise.resolve();
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -25,6 +27,11 @@ export function getRegisteredPushToken(): Promise<string | null> {
 
 export function clearRegisteredPushToken(): Promise<void> {
   return SecureStore.deleteItemAsync(KEY);
+}
+
+/** 서버로 보낸 등록 요청이 끝날 때까지 기다린다. 실패해도 기다림은 끝난다. */
+export async function waitForPushRegistration(): Promise<void> {
+  await inFlight;
 }
 
 async function isPermitted() {
@@ -53,10 +60,12 @@ async function register(projectId: string) {
   }
   // 서버에 보내기 전에 남겨야, 등록 중에 로그아웃해도 서버에서 지울 수 있다.
   await SecureStore.setItemAsync(KEY, expoPushToken);
-  await apiFetch<void>('/push-tokens', {
+  const sending = apiFetch<void>('/push-tokens', {
     method: 'PUT',
     body: { expoPushToken, platform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID' },
   });
+  inFlight = sending.catch(() => {});
+  await sending;
 }
 
 /** 푸시는 없어도 앱을 쓸 수 있으므로 실패를 알리지 않는다. */

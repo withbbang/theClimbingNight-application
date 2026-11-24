@@ -156,6 +156,7 @@ it('signs out and calls the expired handler once when refresh returns AUTH_REQUI
   expect(errors.map((e) => e.code)).toEqual(['AUTH_REQUIRED', 'AUTH_REQUIRED']);
   expect(sessionStore.getState()).toEqual({ status: 'guest' });
   expect(expired).toHaveBeenCalledTimes(1);
+  expect(expired).toHaveBeenCalledWith('R1');
 });
 
 it('keeps the session when refresh fails on the network', async () => {

@@ -5,7 +5,12 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 
 import { apiFetch } from '@/lib/api';
-import { clearRegisteredPushToken, getRegisteredPushToken, registerPushToken } from '@/lib/push';
+import {
+  clearRegisteredPushToken,
+  getRegisteredPushToken,
+  registerPushToken,
+  waitForPushRegistration,
+} from '@/lib/push';
 import { sessionStore } from '@/lib/session-store';
 import { tokens } from '@/test-utils/tokens';
 
@@ -144,4 +149,25 @@ it('does not register when the user logged out while fetching the token', async 
   await registerPushToken();
   expect(put).not.toHaveBeenCalled();
   expect(mockStored.has('expoPushToken')).toBe(false);
+});
+
+it('lets a logout wait for the server call in flight', async () => {
+  let finish = () => {};
+  put.mockReturnValue(
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    }),
+  );
+  const registering = registerPushToken();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  let waited = false;
+  const wait = waitForPushRegistration().then(() => {
+    waited = true;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  expect(put).toHaveBeenCalled();
+  expect(waited).toBe(false);
+  finish();
+  await Promise.all([registering, wait]);
+  expect(waited).toBe(true);
 });

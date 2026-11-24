@@ -8,7 +8,9 @@ import { errorMessage } from '@/lib/error-message';
 import { notifyError, notifySuccess } from '@/lib/haptics';
 import { loginNotice } from '@/lib/login-notice';
 import { pendingSignup } from '@/lib/pending-signup';
+import { queryClient } from '@/lib/query-client';
 import { sessionStore } from '@/lib/session-store';
+import { waitForCleanUp } from '@/lib/sign-out';
 import type { SocialAdapter } from '@/lib/social/types';
 import type { SocialProvider } from '@/types/api/auth';
 
@@ -56,6 +58,18 @@ export function useLogin() {
     [],
   );
 
+  // 로그인된 채로 딥링크 등으로 열렸으면 있던 곳으로 돌려보낸다.
+  useEffect(() => {
+    if (sessionStore.getState().status !== 'authenticated') {
+      return;
+    }
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  }, [router]);
+
   function unlock() {
     busy.current = false;
     setPending(null);
@@ -72,6 +86,7 @@ export function useLogin() {
     setError(null);
     pendingSignup.clear();
     try {
+      await waitForCleanUp();
       // 잠금을 풀어도 다른 시도가 없으면 늦게 온 답을 받는다.
       const stopWatching = watchReturn(() => {
         if (isCurrent()) {
@@ -94,8 +109,11 @@ export function useLogin() {
         return;
       }
       notifySuccess();
+      queryClient.clear();
       await sessionStore.signIn(result.tokens);
-      router.dismissTo('/');
+      if (isCurrent()) {
+        router.dismissTo('/');
+      }
     } catch (e) {
       if (!isCurrent()) {
         return;

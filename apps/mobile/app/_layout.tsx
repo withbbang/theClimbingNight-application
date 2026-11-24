@@ -14,6 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { setSessionExpiredHandler } from '@/lib/api';
 import { queryClient } from '@/lib/query-client';
 import { sessionStore } from '@/lib/session-store';
+import { cleanUpSession } from '@/lib/sign-out';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -25,8 +26,9 @@ function Navigation() {
   usePush();
 
   useEffect(() => {
-    setSessionExpiredHandler(() => {
+    setSessionExpiredHandler((refreshToken) => {
       queryClient.clear();
+      void cleanUpSession(refreshToken);
       router.navigate('/login');
     });
     return () => setSessionExpiredHandler(() => {});
