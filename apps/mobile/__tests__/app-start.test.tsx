@@ -196,11 +196,11 @@ it('opens the routed tab on a cold start', async () => {
 
 it('opens the routed tab when a push is tapped on another tab', async () => {
   const app = await start(tokens('1', 'MEMBER'), '/goods');
-  tapPush('INQUIRY_ANSWERED');
+  tapPush('MEETUP_CREATED');
   await act(async () => {
     await sessionStore.updateUser({ id: 1, nickname: '다시', role: 'MEMBER' });
   });
-  expect(app.getPathname()).toBe('/my');
+  expect(app.getPathname()).toBe('/meetups');
   expect(router.canDismiss()).toBe(false);
 });
 

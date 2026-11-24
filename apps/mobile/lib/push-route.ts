@@ -1,26 +1,61 @@
+import type { QueryKey } from '@tanstack/react-query';
 import type { Href } from 'expo-router';
 
-const ROUTES = new Map<unknown, Href>([
-  ['MEETUP_PROMOTED', '/meetups'],
-  ['MEETUP_CANCELED', '/meetups'],
-  ['MEETUP_CREATED', '/meetups'],
-  ['MEETUP_REMINDER', '/meetups'],
-  ['MEMBERSHIP_APPROVED', '/my'],
-  ['MEMBERSHIP_REJECTED', '/my'],
-  ['INQUIRY_ANSWERED', '/my'],
-  ['NOTICE_PUBLISHED', '/'],
+import { parseId } from '@/lib/parse-id';
+
+interface PushRule {
+  route: (data: object) => Href;
+  keys: QueryKey[];
+}
+
+function idOf(data: object, key: string) {
+  return parseId((data as Record<string, unknown>)[key]);
+}
+
+const meetup: PushRule = {
+  route: (data) => {
+    const id = idOf(data, 'meetupId');
+    return id === null ? '/meetups' : `/meetups/${id}`;
+  },
+  keys: [['meetups']],
+};
+const membership = (route: Href): PushRule => ({
+  route: () => route,
+  keys: [['users', 'me'], ['membership-requests']],
+});
+
+const RULES = new Map<unknown, PushRule>([
+  ['MEETUP_PROMOTED', meetup],
+  ['MEETUP_CANCELED', meetup],
+  ['MEETUP_CREATED', meetup],
+  ['MEETUP_REMINDER', meetup],
+  ['MEMBERSHIP_APPROVED', membership('/meetups')],
+  ['MEMBERSHIP_REJECTED', membership('/membership')],
+  [
+    'INQUIRY_ANSWERED',
+    {
+      route: (data) => {
+        const id = idOf(data, 'inquiryId');
+        return id === null ? '/inquiries' : `/inquiries/${id}`;
+      },
+      keys: [['inquiries']],
+    },
+  ],
+  ['NOTICE_PUBLISHED', { route: () => '/', keys: [['notices']] }],
 ]);
 
-function typeOf(data: unknown) {
-  return typeof data === 'object' && data !== null && 'type' in data ? data.type : undefined;
+function ruleOf(data: unknown) {
+  return typeof data === 'object' && data !== null && 'type' in data
+    ? { data, rule: RULES.get(data.type) }
+    : null;
 }
 
 export function routeForPush(data: unknown): Href | null {
-  return ROUTES.get(typeOf(data)) ?? null;
+  const found = ruleOf(data);
+  return found?.rule?.route(found.data) ?? null;
 }
 
-/** 내 등급이 바뀌었다는 푸시인가. */
-export function isMembershipPush(data: unknown) {
-  const type = typeOf(data);
-  return typeof type === 'string' && type.startsWith('MEMBERSHIP_');
+/** 푸시가 알린 변화로 낡은 조회들. */
+export function queryKeysForPush(data: unknown): QueryKey[] {
+  return ruleOf(data)?.rule?.keys ?? [];
 }

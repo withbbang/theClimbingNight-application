@@ -102,7 +102,7 @@ it('refreshes the user when a membership push arrives', async () => {
   await renderHook(() => usePush());
   const receive = onReceived.mock.calls[0][0];
   receive(notification('MEETUP_CREATED'));
-  expect(invalidate).not.toHaveBeenCalled();
+  expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ['users', 'me'] });
   receive(notification('MEMBERSHIP_APPROVED'));
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['users', 'me'] });
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['membership-requests'] });
