@@ -6,6 +6,7 @@ import com.theclimbingnight.common.PageResponse;
 import com.theclimbingnight.common.TimeZones;
 import com.theclimbingnight.meetup.entity.MeetupApplication;
 import com.theclimbingnight.meetup.repository.MeetupApplicationRepository;
+import com.theclimbingnight.meetup.repository.MeetupRepository;
 import com.theclimbingnight.penalty.dto.PenaltyResponse;
 import com.theclimbingnight.penalty.dto.PenaltySummaryResponse;
 import com.theclimbingnight.penalty.dto.RosterPenaltiesResponse;
@@ -32,14 +33,17 @@ public class PenaltyService {
 
 	private final PenaltyRepository penaltyRepository;
 	private final MeetupApplicationRepository applicationRepository;
+	private final MeetupRepository meetupRepository;
 	private final RosterMemberRepository rosterMemberRepository;
 	private final UserRepository userRepository;
 	private final Clock clock;
 
 	public PenaltyService(PenaltyRepository penaltyRepository, MeetupApplicationRepository applicationRepository,
-			RosterMemberRepository rosterMemberRepository, UserRepository userRepository, Clock clock) {
+			MeetupRepository meetupRepository, RosterMemberRepository rosterMemberRepository,
+			UserRepository userRepository, Clock clock) {
 		this.penaltyRepository = penaltyRepository;
 		this.applicationRepository = applicationRepository;
+		this.meetupRepository = meetupRepository;
 		this.rosterMemberRepository = rosterMemberRepository;
 		this.userRepository = userRepository;
 		this.clock = clock;
@@ -50,15 +54,21 @@ public class PenaltyService {
 		return clock.instant().atZone(TimeZones.KST).minusMonths(RECENT_MONTHS).toInstant();
 	}
 
-	/** 신청 행을 잠가 같은 건에 대한 동시 요청을 직렬화한 뒤, 활성 늦은 취소 기록이 없을 때만 저장한다. */
+	/**
+	 * 잠금 순서(벙 → 신청)를 지키려고 신청의 벙 ID만 먼저 읽고, 벙과 신청을 차례로 잠근 뒤 활성 늦은 취소 기록이 없을 때만 저장한다.
+	 * 신청만 잠그고 INSERT하면 FK 부모(벙)에 공유 잠금이 걸려 신청 → 벙 순서가 되어 재신청(벙 → 신청)과 교착할 수 있다.
+	 */
 	@Transactional
 	public PenaltyResponse addLateCancel(long applicationId, long adminId) {
+		long meetupId = applicationRepository.findMeetupIdById(applicationId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
+		meetupRepository.findByIdForUpdate(meetupId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 		MeetupApplication application = applicationRepository.findByIdForUpdate(applicationId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 		if (!application.isLateCancel()) {
 			throw new BusinessException(ErrorCode.PENALTY_NOT_LATE_CANCEL);
 		}
-		long meetupId = application.getMeetup().getId();
 		long rosterId = application.getRosterMember().getId();
 		if (penaltyRepository.findActive(meetupId, rosterId, PenaltyType.LATE_CANCEL).isPresent()) {
 			throw new BusinessException(ErrorCode.PENALTY_ALREADY_EXISTS);

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -16,6 +17,7 @@ import com.theclimbingnight.meetup.entity.Meetup;
 import com.theclimbingnight.meetup.entity.MeetupApplication;
 import com.theclimbingnight.meetup.entity.MeetupSpec;
 import com.theclimbingnight.meetup.repository.MeetupApplicationRepository;
+import com.theclimbingnight.meetup.repository.MeetupRepository;
 import com.theclimbingnight.penalty.dto.PenaltyResponse;
 import com.theclimbingnight.penalty.dto.RosterPenaltiesResponse;
 import com.theclimbingnight.penalty.entity.Penalty;
@@ -34,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -50,6 +53,7 @@ class PenaltyServiceTest {
 
 	@Mock PenaltyRepository penaltyRepository;
 	@Mock MeetupApplicationRepository applicationRepository;
+	@Mock MeetupRepository meetupRepository;
 	@Mock RosterMemberRepository rosterMemberRepository;
 	@Mock UserRepository userRepository;
 
@@ -60,8 +64,8 @@ class PenaltyServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new PenaltyService(penaltyRepository, applicationRepository, rosterMemberRepository, userRepository,
-				new MutableClock(NOW));
+		service = new PenaltyService(penaltyRepository, applicationRepository, meetupRepository, rosterMemberRepository,
+				userRepository, new MutableClock(NOW));
 		admin = User.create("admin");
 		ReflectionTestUtils.setField(admin, "id", ADMIN_ID);
 		given(userRepository.getReferenceById(ADMIN_ID)).willReturn(admin);
@@ -82,6 +86,8 @@ class PenaltyServiceTest {
 		MeetupApplication application = MeetupApplication.create(meetup, roster, true, NOW.minusSeconds(86400 * 3));
 		application.cancel(late, "야근", NOW.minusSeconds(3600));
 		ReflectionTestUtils.setField(application, "id", APPLICATION_ID);
+		given(applicationRepository.findMeetupIdById(APPLICATION_ID)).willReturn(Optional.of(10L));
+		given(meetupRepository.findByIdForUpdate(10L)).willReturn(Optional.of(meetup));
 		given(applicationRepository.findByIdForUpdate(APPLICATION_ID)).willReturn(Optional.of(application));
 		return application;
 	}
@@ -141,12 +147,31 @@ class PenaltyServiceTest {
 	@Test
 	void 없는_신청에_매기면_404다() {
 		// given
-		given(applicationRepository.findByIdForUpdate(APPLICATION_ID)).willReturn(Optional.empty());
+		given(applicationRepository.findMeetupIdById(APPLICATION_ID)).willReturn(Optional.empty());
 
 		// when, then
 		assertThatThrownBy(() -> service.addLateCancel(APPLICATION_ID, ADMIN_ID))
 				.isInstanceOf(BusinessException.class)
 				.extracting(e -> ((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND);
+		verify(meetupRepository, never()).findByIdForUpdate(anyLong());
+		verify(applicationRepository, never()).findByIdForUpdate(anyLong());
+	}
+
+	@Test
+	void 늦은_취소_블랙리스트는_벙을_먼저_잠그고_신청을_잠근다() {
+		// given
+		canceledApplication(true);
+		given(penaltyRepository.findActive(10L, 5L, PenaltyType.LATE_CANCEL)).willReturn(Optional.empty());
+
+		// when
+		service.addLateCancel(APPLICATION_ID, ADMIN_ID);
+
+		// then
+		InOrder order = inOrder(applicationRepository, meetupRepository, penaltyRepository);
+		order.verify(applicationRepository).findMeetupIdById(APPLICATION_ID);
+		order.verify(meetupRepository).findByIdForUpdate(10L);
+		order.verify(applicationRepository).findByIdForUpdate(APPLICATION_ID);
+		order.verify(penaltyRepository).save(any(Penalty.class));
 	}
 
 	@Test
