@@ -68,7 +68,6 @@ class PenaltyServiceTest {
 				userRepository, new MutableClock(NOW));
 		admin = User.create("admin");
 		ReflectionTestUtils.setField(admin, "id", ADMIN_ID);
-		given(userRepository.getReferenceById(ADMIN_ID)).willReturn(admin);
 		given(userRepository.findByIdForUpdate(ADMIN_ID)).willReturn(Optional.of(admin));
 		Instant starts = Instant.parse("2026-05-20T10:00:00Z");
 		meetup = Meetup.create(new MeetupSpec("정기벙", null, "장소", starts, starts.plusSeconds(10800), 10, 24, true),
@@ -334,5 +333,20 @@ class PenaltyServiceTest {
 				.isInstanceOf(BusinessException.class)
 				.extracting(e -> ((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.AUTH_REQUIRED);
 		verify(meetupRepository, never()).findByIdForUpdate(10L);
+	}
+
+	@Test
+	void 취소할_때도_운영진_행을_먼저_잠근다() {
+		// given
+		Penalty penalty = penalty(7L, meetup, PenaltyType.NO_SHOW);
+		given(penaltyRepository.findByIdForUpdate(7L)).willReturn(Optional.of(penalty));
+
+		// when
+		service.revoke(7L, ADMIN_ID, "착오");
+
+		// then
+		InOrder order = inOrder(userRepository, penaltyRepository);
+		order.verify(userRepository).findByIdForUpdate(ADMIN_ID);
+		order.verify(penaltyRepository).findByIdForUpdate(7L);
 	}
 }

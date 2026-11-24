@@ -86,14 +86,17 @@ public class PenaltyService {
 		return PenaltyResponse.from(penalty);
 	}
 
+	/** 운영진 행을 먼저 잠근다 (사용자 → 블랙리스트). revoked_by FK 공유 잠금이 블랙리스트 잠금 뒤에 걸리면 참석 보정과 교착할 수 있다. */
 	@Transactional
 	public PenaltyResponse revoke(long penaltyId, long adminId, String reason) {
+		User admin = userRepository.findByIdForUpdate(adminId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 		Penalty penalty = penaltyRepository.findByIdForUpdate(penaltyId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 		if (!penalty.isActive()) {
 			throw new BusinessException(ErrorCode.PENALTY_ALREADY_REVOKED);
 		}
-		penalty.revoke(userRepository.getReferenceById(adminId), reason.strip(), clock.instant());
+		penalty.revoke(admin, reason.strip(), clock.instant());
 		return PenaltyResponse.from(penalty);
 	}
 
