@@ -78,3 +78,19 @@ export function formatTime(iso: string): string {
 export function formatDateTime(iso: string): string {
   return `${formatDay(toDateKey(iso))} ${formatTime(iso)}`;
 }
+
+/** '1930', '9:30'처럼 적은 시각을 'HH:MM'으로 바꾼다. 시각이 아니면 null. */
+export function parseTime(text: string): string | null {
+  const match = /^(\d{1,2}):?(\d{2})$/.exec(text.trim());
+  if (!match) {
+    return null;
+  }
+  const [hour, minute] = [Number(match[1]), Number(match[2])];
+  return hour < 24 && minute < 60 ? `${pad(hour)}:${pad(minute)}` : null;
+}
+
+/** 서울 날짜와 'HH:MM'을 UTC ISO 문자열로 바꾼다. */
+export function toIso(day: DateKey, time: string): string {
+  const [hour, minute] = time.split(':').map(Number);
+  return new Date(startOfDay(day) + (hour * 60 + minute) * 60_000).toISOString();
+}

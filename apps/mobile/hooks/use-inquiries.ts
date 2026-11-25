@@ -1,24 +1,14 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { usePagedQuery } from '@/hooks/use-paged-query';
 import { useRole } from '@/hooks/use-role';
 import { useSubmit } from '@/hooks/use-submit';
 import { notifyError, notifySuccess } from '@/lib/haptics';
 import { inquiryApi } from '@/lib/inquiry-api';
 
-const PAGE_SIZE = 20;
-
 export function useMyInquiries() {
-  return useInfiniteQuery({
-    queryKey: ['inquiries', 'me', 'list'],
-    queryFn: ({ pageParam }) => inquiryApi.mine(pageParam, PAGE_SIZE),
-    initialPageParam: 0,
-    getNextPageParam: ({ page, totalPages }) => (page + 1 < totalPages ? page + 1 : undefined),
-    // 불러오는 사이 새 문의가 생기면 페이지가 밀려 같은 항목이 다시 올 수 있다.
-    select: ({ pages }) => [
-      ...new Map(pages.flatMap((p) => p.items).map((item) => [item.id, item])).values(),
-    ],
-    enabled: useRole() !== null,
-  });
+  const role = useRole();
+  return usePagedQuery(['inquiries', 'me', 'list'], inquiryApi.mine, role !== null);
 }
 
 export function useMyInquiry(id: number | null) {

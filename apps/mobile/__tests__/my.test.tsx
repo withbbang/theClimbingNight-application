@@ -20,6 +20,7 @@ it.each([
   expect(button('내 참석률') !== null).toBe(member);
   expect(button('내 블랙리스트 기록') !== null).toBe(member);
   expect(button('동호회원 인증') !== null).toBe(verification);
+  expect(button('운영진 메뉴') !== null).toBe(role === 'ADMIN');
 });
 
 it.each([

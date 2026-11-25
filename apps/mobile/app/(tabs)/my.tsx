@@ -32,6 +32,7 @@ const MEMBER_MENUS: Menu[] = [
   { label: '내 블랙리스트 기록', href: '/penalties' },
 ];
 const USER_MENUS: Menu[] = [{ label: '동호회원 인증', href: '/membership' }];
+const ADMIN_MENUS: Menu[] = [{ label: '운영진 메뉴', href: '/admin' }];
 const COMMON_MENUS: Menu[] = [
   { label: '문의', href: '/inquiries' },
   { label: '알림 설정', href: '/settings/notifications' },
@@ -58,7 +59,11 @@ export default function MyScreen() {
     );
   }
   const { nickname, role } = session.tokens.user;
-  const menus = [...(role === 'USER' ? USER_MENUS : MEMBER_MENUS), ...COMMON_MENUS];
+  const menus = [
+    ...(role === 'ADMIN' ? ADMIN_MENUS : []),
+    ...(role === 'USER' ? USER_MENUS : MEMBER_MENUS),
+    ...COMMON_MENUS,
+  ];
   return (
     <Screen scroll bottomInset={false}>
       <View style={{ gap: space(2) }}>

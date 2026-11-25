@@ -11,3 +11,7 @@ export function useIsMember() {
   const role = useRole();
   return role === 'MEMBER' || role === 'ADMIN';
 }
+
+export function useIsAdmin() {
+  return useRole() === 'ADMIN';
+}

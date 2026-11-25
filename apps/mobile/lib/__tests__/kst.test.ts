@@ -5,8 +5,10 @@ import {
   formatDay,
   formatTime,
   monthGrid,
+  parseTime,
   toDateKey,
   todayKst,
+  toIso,
 } from '@/lib/kst';
 
 it('uses the Seoul date, not the device date', () => {
@@ -52,4 +54,22 @@ it('decides the year by the Seoul date', () => {
   expect(formatDateTime('2026-12-31T14:59:00Z')).toBe('2026년 12월 31일(목) 23:59');
   expect(formatDateTime('2026-12-31T15:00:00Z')).toBe('1월 1일(금) 00:00');
   jest.useRealTimers();
+});
+
+it.each([
+  ['1930', '19:30'],
+  ['930', '09:30'],
+  ['19:30', '19:30'],
+  ['9:30', '09:30'],
+  ['0000', '00:00'],
+  ['2400', null],
+  ['1260', null],
+  ['19', null],
+  ['', null],
+  ['오후 7시', null],
+])('parses %p to %p', (text, out) => expect(parseTime(text)).toBe(out));
+
+it('reads the input as Seoul time', () => {
+  expect(toIso('2026-11-25', '19:30')).toBe('2026-11-25T10:30:00.000Z');
+  expect(toIso('2027-01-01', '00:00')).toBe('2026-12-31T15:00:00.000Z');
 });

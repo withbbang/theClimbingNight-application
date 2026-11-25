@@ -21,6 +21,8 @@ interface ButtonProps {
   loading?: boolean;
   disabled?: boolean;
   icon?: ReactNode;
+  /** 같은 버튼이 여럿일 때 무엇에 대한 것인지 읽어 준다. */
+  accessibilityLabel?: string;
   /** 제공자 브랜드 색처럼 테마 밖의 색이 필요할 때만 쓴다. */
   colors?: { background: string; text: string; border?: string };
 }
@@ -32,6 +34,7 @@ export function Button({
   loading = false,
   disabled = false,
   icon,
+  accessibilityLabel = label,
   colors: override,
 }: ButtonProps) {
   const { colors, motion, radius, space } = useTheme();
@@ -60,7 +63,7 @@ export function Button({
     <Animated.View style={animated}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={label}
+        accessibilityLabel={accessibilityLabel}
         accessibilityState={{ disabled: inactive, busy: loading }}
         disabled={inactive}
         onPress={handlePress}

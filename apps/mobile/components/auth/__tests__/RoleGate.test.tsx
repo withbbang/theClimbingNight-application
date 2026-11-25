@@ -6,7 +6,10 @@ import { sessionStore } from '@/lib/session-store';
 import { tokens } from '@/test-utils/tokens';
 
 const mockPush = jest.fn();
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+const mockDismissTo = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush, dismissTo: mockDismissTo }),
+}));
 jest.mock('expo-secure-store', () =>
   jest.requireActual('@/test-utils/native-mocks').secureStoreMock(),
 );
@@ -17,7 +20,7 @@ beforeEach(async () => {
   await sessionStore.signOut();
 });
 
-const show = (role: 'USER' | 'MEMBER') =>
+const show = (role: 'USER' | 'MEMBER' | 'ADMIN') =>
   render(
     <RoleGate role={role}>
       <AppText>안쪽</AppText>
@@ -43,8 +46,18 @@ it.each([
   ['USER', 'USER'],
   ['MEMBER', 'MEMBER'],
   ['ADMIN', 'MEMBER'],
+  ['ADMIN', 'ADMIN'],
 ] as const)('shows the children to %s when %s is needed', async (mine, needed) => {
   await sessionStore.signIn(tokens('1', mine));
   await show(needed);
   expect(screen.getByText('안쪽')).toBeOnTheScreen();
+});
+
+it.each(['USER', 'MEMBER'] as const)('blocks %s from admin children', async (mine) => {
+  await sessionStore.signIn(tokens('1', mine));
+  await show('ADMIN');
+  expect(screen.queryByText('안쪽')).toBeNull();
+  expect(screen.getByText('운영진만 볼 수 있어요')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '홈으로' }));
+  expect(mockDismissTo).toHaveBeenCalledWith('/');
 });
