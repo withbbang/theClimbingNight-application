@@ -50,7 +50,7 @@ it.each([
   '회원 번호',
   '탈퇴 시각',
   '지난 신청과 취소 기록',
-  '명부 연결 정보',
+  '인증 신청 기록, 문의와 답변 | 바로 삭제',
   '기기 알림 토큰이 들어',
 ])('says what remains after withdrawal: %s', (text) => {
   expect(privacyBody('retention')).toContain(text);
