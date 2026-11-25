@@ -14,12 +14,13 @@ import type {
   MembershipApproveRequest,
   MembershipReviewItemResponse,
 } from '@/types/api/membership';
+import type { RosterCandidateResponse } from '@/types/api/roster';
 
-type Choice = number | 'NEW' | null;
+type Choice = RosterCandidateResponse | 'NEW' | null;
 
 /** 후보가 하나면 그 명부, 없으면 새 항목. 여럿이면 운영진이 고른다. */
 function defaultChoice({ candidates }: MembershipReviewItemResponse): Choice {
-  return candidates.length === 0 ? 'NEW' : candidates.length === 1 ? candidates[0].id : null;
+  return candidates.length === 0 ? 'NEW' : candidates.length === 1 ? candidates[0] : null;
 }
 
 interface RequestCardProps {
@@ -46,13 +47,20 @@ export function RequestCard({
   const [searching, setSearching] = useState(false);
   const [reason, setReason] = useState('');
   const choice = chosen ?? defaultChoice(request);
+  const choiceId = choice !== null && choice !== 'NEW' ? choice.id : null;
+  const isCandidate = request.candidates.some((roster) => roster.id === choiceId);
+  // 검색으로 고른 명부는 검색어가 바뀌어도 보이게 카드에 함께 둔다.
+  const rosters =
+    choice === null || choice === 'NEW' || isCandidate
+      ? request.candidates
+      : [...request.candidates, choice];
   const name = request.user.nickname;
   const busy = locked || sending !== null;
   const trimmed = reason.trim();
 
   function approve() {
     if (choice !== null) {
-      onApprove(choice === 'NEW' ? { createNew: true } : { rosterMemberId: choice });
+      onApprove(choice === 'NEW' ? { createNew: true } : { rosterMemberId: choice.id });
     }
   }
 
@@ -76,15 +84,15 @@ export function RequestCard({
       </View>
       <View accessibilityRole="radiogroup">
         <AppText variant="label">어느 명부에 연결할까요?</AppText>
-        {request.candidates.map((roster) => (
+        {rosters.map((roster) => (
           <RadioRow
             key={roster.id}
             label={roster.somoimNickname}
             caption={roster.note}
             accessibilityLabel={rosterLabel(name, roster)}
-            selected={choice === roster.id}
+            selected={choiceId === roster.id}
             disabled={busy}
-            onPress={() => setChosen(roster.id)}
+            onPress={() => setChosen(roster)}
           />
         ))}
         <RadioRow
@@ -98,9 +106,9 @@ export function RequestCard({
         {searching ? (
           <RosterPicker
             target={name}
-            selectedId={typeof choice === 'number' ? choice : null}
+            shownIds={rosters.map((roster) => roster.id)}
             disabled={busy}
-            onSelect={(roster) => setChosen(roster.id)}
+            onSelect={setChosen}
           />
         ) : (
           <Button

@@ -185,3 +185,32 @@ it('shows the server message and drops a request handled elsewhere', async () =>
   expect(screen.getByText('이미 처리된 신청입니다.')).toBeOnTheScreen();
   expect(screen.queryByText('앱별이')).toBeNull();
 });
+
+it('keeps showing the picked roster entry after the search changes', async () => {
+  const found = { ...candidate(9, '옛 닉네임'), somoimNickname: '달', userId: null };
+  const SEARCH = (q: string) =>
+    `/roster-members?q=${encodeURIComponent(q)}&linked=false&page=0&size=20`;
+  const server = mockServer({
+    [LIST]: list([request()]),
+    [SEARCH('달')]: list([found]),
+    [SEARCH('없음')]: list([]),
+    [APPROVE]: ok({ id: 1 }),
+  });
+  await renderApp('/admin/requests');
+  await press('앱별이 다른 명부 찾기');
+  await type('명부 검색', '달');
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(300);
+  });
+  await flush();
+  await fireEvent.press(choice('앱별이 명부: 달, 옛 닉네임'));
+  expect(choice('앱별이 명부: 달, 옛 닉네임')).toBeChecked();
+  await type('명부 검색', '없음');
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(300);
+  });
+  await flush();
+  expect(choice('앱별이 명부: 달, 옛 닉네임')).toBeChecked();
+  await press('앱별이 승인');
+  expect(body(server)).toEqual({ rosterMemberId: 9 });
+});

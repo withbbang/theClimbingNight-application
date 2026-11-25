@@ -18,13 +18,14 @@ export const rosterLabel = (target: string, roster: RosterCandidateResponse) =>
 
 interface RosterPickerProps {
   target: string;
-  selectedId: number | null;
+  /** 카드에 이미 보이는 명부. 결과에서 뺀다. */
+  shownIds: number[];
   disabled: boolean;
   onSelect: (roster: RosterCandidateResponse) => void;
 }
 
 /** 닉네임이 바뀐 사람을 위해 연결되지 않은 명부를 찾는다. */
-export function RosterPicker({ target, selectedId, disabled, onSelect }: RosterPickerProps) {
+export function RosterPicker({ target, shownIds, disabled, onSelect }: RosterPickerProps) {
   const { space } = useTheme();
   const reduced = useReducedMotion();
   const [text, setText] = useState('');
@@ -49,17 +50,19 @@ export function RosterPicker({ target, selectedId, disabled, onSelect }: RosterP
           {({ items, totalPages }) => (
             <View>
               {items.length === 0 ? <AppText tone="muted">찾는 명부가 없어요</AppText> : null}
-              {items.map((roster) => (
-                <RadioRow
-                  key={roster.id}
-                  label={roster.somoimNickname}
-                  caption={roster.note}
-                  accessibilityLabel={rosterLabel(target, roster)}
-                  selected={roster.id === selectedId}
-                  disabled={disabled}
-                  onPress={() => onSelect(roster)}
-                />
-              ))}
+              {items
+                .filter((roster) => !shownIds.includes(roster.id))
+                .map((roster) => (
+                  <RadioRow
+                    key={roster.id}
+                    label={roster.somoimNickname}
+                    caption={roster.note}
+                    accessibilityLabel={rosterLabel(target, roster)}
+                    selected={false}
+                    disabled={disabled}
+                    onPress={() => onSelect(roster)}
+                  />
+                ))}
               {totalPages > 1 ? (
                 <AppText variant="caption" tone="muted">
                   더 있어요. 닉네임을 더 적어 좁혀 보세요.
