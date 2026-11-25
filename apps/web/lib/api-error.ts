@@ -28,5 +28,5 @@ export function badResponseError(status: number) {
 }
 
 export function isNotFound(error: unknown) {
-  return error instanceof ApiError && error.status === 404;
+  return error instanceof ApiError && error.code === 'COMMON_NOT_FOUND';
 }

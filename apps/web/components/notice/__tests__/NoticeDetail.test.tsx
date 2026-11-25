@@ -63,3 +63,11 @@ it.each(['abc', '0', '-1', '1.5', '9007199254740993'])(
     expect(calls).toEqual([]);
   },
 );
+
+it('offers a retry when a 404 did not come from the API', async () => {
+  mockServer({ '/notices/1': { status: 404 } });
+  renderWithQuery(<NoticeDetail id={1} />);
+
+  expect(await screen.findByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+  expect(screen.queryByText('없는 공지예요')).toBeNull();
+});
