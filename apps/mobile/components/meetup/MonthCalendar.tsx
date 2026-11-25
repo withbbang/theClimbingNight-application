@@ -121,8 +121,8 @@ export function MonthCalendar({
         >
           <CaretLeftIcon size={22} color={colors.text} weight="bold" />
         </Pressable>
-        <Animated.View key={month} entering={entering}>
-          <AppText variant="title" accessibilityLiveRegion="polite">
+        <Animated.View key={month} entering={entering} style={styles.month}>
+          <AppText variant="title" accessibilityLiveRegion="polite" style={styles.name}>
             {`${year}년 ${monthNumber}월`}
           </AppText>
         </Animated.View>
@@ -174,6 +174,7 @@ export function MonthCalendar({
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  month: { flexShrink: 1 },
   arrow: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   week: { flexDirection: 'row' },
   cell: { flex: 1 },
