@@ -63,6 +63,7 @@ pnpm build
 ## 더 읽을 곳 (필요할 때만 로드됨)
 
 - 설계 → `docs/architecture.md`
+- 출시 전에 채울 문안(`[확인 필요]`) → `docs/content-todo.md`
 - 경로별 컨벤션 → `.claude/rules/` : `mobile.md`, `web.md`, `api.md`, `testing.md`
 - 절차 → `/new-feature` (API→앱·웹 기능 구현), `/project-review` (diff 점검, 기본 `/review`와 다름), `/release` (배포 전 체크)
 - 참조 → `api-conventions` 스킬 (URL · 응답 래퍼 · 에러 코드 · 페이징)

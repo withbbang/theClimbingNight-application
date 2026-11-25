@@ -17,6 +17,7 @@ paths:
 - 동시성: 벙 정원처럼 동시에 몰리는 쓰기는 DB 유니크 제약·락으로 막는다. 애플리케이션에서 "조회 후 비교"만으로 막지 않는다.
 - 테스트: Service는 Mockito 단위 테스트, Controller는 `@WebMvcTest`, Repository는 `@DataJpaTest`. `@SpringBootTest`는 꼭 필요할 때만.
 - 시간·난수: `Clock`과 `java.security.SecureRandom`을 빈으로 등록해 주입. `LocalDateTime.now()`·`new Random()` 직접 호출 금지 → 테스트에서 고정 불가.
+- 개인정보를 저장하는 테이블을 늘리면 탈퇴 처리(`UserWithdrawnEvent` 리스너)와 `apps/web/content/privacy.ts`를 함께 고친다.
 - Flyway 마이그레이션은 적용된 버전을 고치지 말고 새 버전을 만든다.
 - 미디어: 파일 본문은 API 서버를 거치지 않는다. API는 R2 presigned URL 발급과 업로드 완료 통보만 받고, 변환·원본 보관은 별도 워커가 한다.
 - 메모리: 운영 API는 `-Xmx512m` + `ExitOnOutOfMemoryError`. 파일을 `byte[]`로 통째로 들고 있지 말고 스트림으로 처리한다.
