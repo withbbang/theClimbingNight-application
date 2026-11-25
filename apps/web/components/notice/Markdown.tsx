@@ -50,6 +50,7 @@ const components: Components = {
   blockquote: ({ children }) => (
     <blockquote className="mt-4 border-l-4 border-accent pl-4 text-muted">{children}</blockquote>
   ),
+  section: ({ children }) => <section className="mt-8">{children}</section>,
   hr: () => <hr className="my-8 border-hold-off" />,
   pre: ({ children }) => (
     <pre className="mt-4 overflow-x-auto rounded-xl bg-surface p-4">{children}</pre>
@@ -89,7 +90,7 @@ const components: Components = {
     ),
 };
 
-const FOOTNOTES = { footnoteLabel: '각주', footnoteBackLabel: '본문으로 돌아가기' };
+const FOOTNOTES = { footnoteLabel: '각주', footnoteBackContent: '본문으로' };
 
 function transformUrl(url: string) {
   return /^tel:/i.test(url) ? url : defaultUrlTransform(url);

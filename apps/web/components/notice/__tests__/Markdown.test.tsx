@@ -104,3 +104,10 @@ it('links footnotes both ways', () => {
   }
   expect(screen.getByRole('heading', { name: '각주' })).toBeInTheDocument();
 });
+
+// ↩는 iOS에서 이모지로 그려진다.
+it('labels the way back from a footnote in words', () => {
+  render(<Markdown>{'본문[^1]\n\n[^1]: 각주 내용'}</Markdown>);
+
+  expect(screen.getByRole('link', { name: '본문으로' })).toBeInTheDocument();
+});
