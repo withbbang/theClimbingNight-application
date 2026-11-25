@@ -59,6 +59,7 @@ export default function createConfig(): ExpoConfig {
     },
     plugins: [
       'expo-router',
+      './plugins/with-config-changes',
       'expo-secure-store',
       'expo-apple-authentication',
       ['expo-notifications', { color: '#FFC83D', defaultChannel: 'default' }],

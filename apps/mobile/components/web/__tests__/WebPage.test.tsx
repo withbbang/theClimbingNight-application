@@ -1,4 +1,4 @@
-import { BackHandler, Linking, StyleSheet, Text } from 'react-native';
+import { BackHandler, Dimensions, Linking, StyleSheet, Text } from 'react-native';
 
 import { router, Stack, type Href } from 'expo-router';
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
@@ -241,4 +241,11 @@ it('keeps our own pages while they load', async () => {
   await emit('onLoadStart', { url: 'about:blank' });
 
   expect(webView.mounts).toBe(1);
+});
+
+// Android 웹뷰는 만들 때의 글꼴 크기를 계속 쓴다.
+it('follows the font size while the page is open', async () => {
+  await open();
+
+  expect(webView.props.textZoom).toBe(Dimensions.get('window').fontScale * 100);
 });

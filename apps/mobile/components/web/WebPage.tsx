@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BackHandler, Linking, StyleSheet, View } from 'react-native';
+import { BackHandler, Linking, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { useFocusEffect } from 'expo-router';
 
@@ -38,6 +38,7 @@ function Viewer({ path, tab, onFail, onGone }: ViewerProps) {
   const { colors, space } = useTheme();
   const reduced = useReducedMotion();
   const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const view = useRef<WebView<object>>(null);
   const [loaded, setLoaded] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -107,6 +108,8 @@ function Viewer({ path, tab, onFail, onGone }: ViewerProps) {
           ref={view}
           source={{ uri: webUrl(path) }}
           style={{ backgroundColor: colors.background }}
+          // Android 전용. 열어 둔 채 글꼴 크기를 바꿔도 따라가게 한다.
+          textZoom={Math.round(fontScale * 100)}
           // 라이브러리가 다른 앱을 열지 않게 하고 직접 판정한다.
           originWhitelist={['*']}
           onShouldStartLoadWithRequest={shouldStart}
