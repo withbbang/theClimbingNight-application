@@ -15,7 +15,7 @@ Expo(앱) + Next.js(웹뷰·관리자) + Spring Boot(API) 모노레포, 1인 개
 | `docs/` | 아키텍처 등 설계 문서 | — | — |
 | `.claude/` | Claude Code 설정 (rules · skills · agents · hooks) | — | — |
 
-앱 디렉터리는 apps/api, apps/mobile이 있다.
+앱 디렉터리는 apps/api, apps/mobile, apps/web이 있다.
 
 ## 명령
 
@@ -28,8 +28,9 @@ pnpm test           # jest-expo
 pnpm expo install <패키지>   # 네이티브 의존성은 SDK 호환 버전으로 설치
 
 # apps/web
-pnpm dev
+pnpm dev            # /api는 API_ORIGIN(기본 http://localhost:8080)으로 보냄
 pnpm lint
+pnpm typecheck
 pnpm test           # Vitest (vitest run)
 pnpm build
 

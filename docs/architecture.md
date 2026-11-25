@@ -248,7 +248,7 @@ k-drinker와 같은 패턴: `master` 푸시 → GitHub Actions가 이미지 빌�
 
 탭 구성 (제안): 홈 / 벙 / (2단계) 피드 / 굿즈 / 마이. 벙 탭은 MEMBER가 아니면 "동호회원 인증" 안내를 보여준다. 운영진 화면은 마이 탭 안의 "운영진 메뉴"로 들어간다.
 
-웹뷰 페이지는 `apps/web`의 `/app/*` 경로 아래에 두고, 같은 페이지를 브라우저로도 열 수 있게 한다 (공지·소개 링크 공유용). 외부 링크(스마트스토어, 소모임)는 웹뷰 안에서 열지 않고 시스템 브라우저로 넘긴다.
+웹뷰 페이지는 `apps/web`의 `/app/*` 경로 아래에 두고, 같은 페이지를 브라우저로도 열 수 있게 한다 (공지·소개 링크 공유용). 경로는 `/app/notices`, `/app/notices/{id}`, `/app/about`, `/app/goods`, `/app/terms`, `/app/privacy`다. `/app/privacy#account-deletion`은 스토어에 내는 계정 삭제 안내다. 외부 링크(스마트스토어, 소모임)는 웹뷰 안에서 열지 않고 시스템 브라우저로 넘긴다. 로그인·가입 화면에는 약관과 개인정보처리방침에 동의한다는 안내와 링크를 둔다.
 
 ## 10. 데이터 모델 초안 (MySQL)
 
@@ -393,6 +393,7 @@ media_jobs       id, post_media_id, status, attempts, last_error   -- 워커 작
 | 결정 | 내용 |
 |---|---|
 | 앱 | Expo SDK 58 (React Native, TypeScript), Expo Router. 앱 식별자 `com.theclimbingnight.app` (iOS·Android 공통) |
+| 웹뷰 주소 | `EXPO_PUBLIC_WEB_URL`, 비우면 API 주소. 웹뷰와 앱이 주고받는 메시지 없음. 굿즈 목록은 `apps/web/content/goods.ts`에서 관리하고 가격은 싣지 않음 |
 | 서버 | Spring Boot + nginx + Next.js, NAS Docker Compose |
 | 로그인 | 카카오·네이버·구글 + iOS Apple, Spring 자체 JWT (접근 방식 A) |
 | 소모임 병행 | 소모임은 계속 운영(모집 창구), 회원을 주기적으로 앱으로 일괄 이동 |

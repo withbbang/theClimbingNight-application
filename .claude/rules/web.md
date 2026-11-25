@@ -10,7 +10,10 @@ paths:
 - 데이터는 클라이언트 React Query로 조회. 호출은 같은 주소의 `/api/*` 상대 경로만. 서버 컴포넌트는 데이터 API를 호출하지 않는다.
 - API 호출은 `lib/api.ts`의 래퍼를 통해서만. 컴포넌트에서 `fetch` 직접 호출 금지.
 - 상태: 서버 상태는 React Query. 전역 UI 상태가 정말 필요할 때만 Redux Toolkit 도입, 그 전엔 로컬 state.
-- 웹뷰 화면은 모바일 화면 폭 기준으로 만들고, 앱과 주고받는 메시지는 `apps/mobile/types/bridge.ts`와 같은 타입을 쓴다.
+- 웹뷰 화면은 모바일 화면 폭 기준으로 만들고, 다른 사이트 링크는 `ExternalLink`로 연다 (앱이 시스템 브라우저로 넘김). 앱과 주고받는 메시지가 생기면 `apps/mobile/types/bridge.ts`와 같은 타입을 쓴다.
+- 소개·굿즈·약관 문안은 `content/`에 둔다. 정해지지 않은 값은 `[확인 필요: 무엇]`으로 적고 지어내지 않는다 (남아 있으면 배포하지 않음). 개인정보처리방침은 `apps/api`가 실제로 저장·삭제하는 것과 맞춘다.
+- 색은 `app/globals.css`의 변수만 쓴다. 값은 `apps/mobile/lib/theme.ts`와 같게 유지한다. 애니메이션은 CSS `transform`·`opacity`만 쓰고 `prefers-reduced-motion`을 지킨다.
+- 운영진이 쓴 마크다운은 `components/notice/Markdown.tsx`로만 그린다 (`rehype-raw` 금지).
 - 관리자 페이지는 `app/admin/` 아래. 권한 검사는 API가 하고, 웹은 `AUTH_FORBIDDEN`을 받으면 막는 화면만 보여준다.
 - 디렉토리: `app/`(라우트) · `components/ui/`(범용) · `components/<feature>/`(도메인) · `hooks/` · `lib/` · `types/api/`.
 - 파일명: 컴포넌트 `PascalCase.tsx`, 훅 `use-xxx.ts`, 그 외 `kebab-case.ts`.

@@ -21,7 +21,7 @@ paths:
 - 애니메이션은 Reanimated로 `transform`·`opacity`만 움직이고, `useReducedMotion`이면 끝 상태로 둔다.
 - 미디어 업로드: API에서 presigned URL을 받아 R2로 직접 PUT. 업로드 전에 앱에서 리사이즈·압축한다. API 서버로 파일 본문을 보내지 않는다.
 - 이미지 표시는 `expo-image` (캐시·placeholder). 피드 같은 긴 목록은 `FlatList`가 아닌 FlashList를 쓴다.
-- 웹뷰 화면은 `react-native-webview`로 `apps/web` 페이지를 연다. 웹뷰와 앱 사이 통신은 `postMessage` 메시지 타입을 `types/bridge.ts` 한 곳에 정의한다.
+- 웹뷰 화면은 `WebPage`로 `apps/web`의 `/app/*` 페이지를 연다 (주소는 `EXPO_PUBLIC_WEB_URL`, 비우면 API 주소). 안에서 열 주소는 `lib/web-url.ts`의 `decideLink`로만 판정한다. 지금은 웹뷰와 앱이 주고받는 메시지가 없다. 필요해지면 `postMessage` 메시지 타입을 `types/bridge.ts` 한 곳에 정의한다.
 - 디렉토리: `app/`(라우트) · `components/ui/`(범용) · `components/<feature>/`(도메인) · `hooks/` · `lib/` · `types/api/`.
 - 파일명: 컴포넌트 `PascalCase.tsx`, 훅 `use-xxx.ts`, 그 외 `kebab-case.ts`. 라우트 파일은 Expo Router 규칙을 따른다.
 - 타입: `any` 금지. API 응답 타입은 `types/api/`에 두고 백엔드 DTO 이름(`XxxResponse`)과 일치시킨다.
