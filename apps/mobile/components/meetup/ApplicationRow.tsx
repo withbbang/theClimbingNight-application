@@ -35,8 +35,8 @@ export function ApplicationRow({
 }: ApplicationRowProps) {
   const router = useRouter();
   const { colors, radius, space } = useTheme();
-  const remove = useRemoveApplication(onError);
-  const penalize = useAddLateCancelPenalty(onError);
+  const remove = useRemoveApplication(meetupId, onError);
+  const penalize = useAddLateCancelPenalty(meetupId, onError);
   const correct = useCorrectAttendance(meetupId, onError);
   const { id, somoimNickname: name, status, attendanceId, attendanceResult } = application;
   const active = status === 'CONFIRMED' || status === 'WAITLISTED';

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View } from 'react-native';
 
 import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
@@ -6,7 +7,7 @@ import { MonthCalendar, type DayMark } from '@/components/meetup/MonthCalendar';
 import { AppText } from '@/components/ui/AppText';
 import { TextField } from '@/components/ui/TextField';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDay, parseTime, type DateKey } from '@/lib/kst';
+import { formatDay, monthStart, parseTime, type DateKey } from '@/lib/kst';
 import { endsNextDay, type MeetupFormErrors, type Schedule } from '@/lib/meetup-form';
 
 const NO_MARKS = new Map<DateKey, DayMark>();
@@ -21,6 +22,8 @@ interface ScheduleFieldsProps {
 export function ScheduleFields({ value, onChange, errors, editable }: ScheduleFieldsProps) {
   const { space } = useTheme();
   const reduced = useReducedMotion();
+  // 달만 넘겨 보는 것으로 벙 날짜가 바뀌지 않게 한다.
+  const [month, setMonth] = useState(() => monthStart(value.day));
   return (
     <View style={{ gap: space(5) }}>
       <View
@@ -32,6 +35,8 @@ export function ScheduleFields({ value, onChange, errors, editable }: ScheduleFi
         <MonthCalendar
           selected={value.day}
           marks={NO_MARKS}
+          month={month}
+          onMonthChange={setMonth}
           onSelect={(day) => onChange({ day })}
         />
       </View>

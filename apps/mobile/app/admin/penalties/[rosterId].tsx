@@ -24,10 +24,16 @@ import type { PenaltyResponse } from '@/types/api/penalty';
 
 const MAX_STAGGER = 10;
 
-function PenaltyCard({ penalty, index }: { penalty: PenaltyResponse; index: number }) {
+interface PenaltyCardProps {
+  rosterMemberId: number;
+  penalty: PenaltyResponse;
+  index: number;
+}
+
+function PenaltyCard({ rosterMemberId, penalty, index }: PenaltyCardProps) {
   const { colors, radius, space } = useTheme();
   const [reason, setReason] = useState('');
-  const revoke = useRevokePenalty();
+  const revoke = useRevokePenalty(rosterMemberId);
   const trimmed = reason.trim();
 
   return (
@@ -95,7 +101,12 @@ export default function RosterPenaltiesScreen() {
               </FadeInItem>
               {roster.penalties.length === 0 ? <AppText>기록이 없어요</AppText> : null}
               {roster.penalties.map((penalty, i) => (
-                <PenaltyCard key={penalty.id} penalty={penalty} index={i + 2} />
+                <PenaltyCard
+                  key={penalty.id}
+                  rosterMemberId={roster.rosterMemberId}
+                  penalty={penalty}
+                  index={i + 2}
+                />
               ))}
             </View>
           )}

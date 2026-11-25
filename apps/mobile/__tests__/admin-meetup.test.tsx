@@ -232,3 +232,13 @@ it.each(['edit', 'copy'])('does not request for a bad id: %s', async (screenName
   expect(screen.getByText('벙을 찾을 수 없어요')).toBeOnTheScreen();
   expect(server.calls.some((c) => c.path.startsWith('/meetups/'))).toBe(false);
 });
+
+it('keeps the day while looking at another month', async () => {
+  mockServer({ [D1]: ok(detail()) });
+  await renderApp('/admin/meetups/1/edit');
+  await press('다음 달');
+  expect(screen.getByText('2026년 12월')).toBeOnTheScreen();
+  expect(screen.getByText('11월 26일(목)')).toBeOnTheScreen();
+  await press('이전 달');
+  expect(screen.getByLabelText('11월 26일(목)')).toBeSelected();
+});

@@ -11,7 +11,7 @@ import { FloatingIcon } from '@/components/ui/FloatingIcon';
 import { FreshQuery } from '@/components/ui/FreshQuery';
 import { Notice } from '@/components/ui/Notice';
 import { useLeft } from '@/hooks/use-left';
-import { useDeleteNotice, useNotice } from '@/hooks/use-notice-admin';
+import { useDeleteNotice, useNotice, useSaveNotice } from '@/hooks/use-notice-admin';
 import { useTheme } from '@/hooks/use-theme';
 import { isNotFound } from '@/lib/api-error';
 import { errorMessage } from '@/lib/error-message';
@@ -22,6 +22,7 @@ function EditNotice({ notice }: { notice: NoticeResponse }) {
   const router = useRouter();
   const { space } = useTheme();
   const left = useLeft();
+  const save = useSaveNotice(notice.id);
   const remove = useDeleteNotice(notice.id);
 
   async function confirm() {
@@ -34,13 +35,14 @@ function EditNotice({ notice }: { notice: NoticeResponse }) {
 
   return (
     <View style={{ gap: space(4) }}>
-      <NoticeForm notice={notice} locked={remove.isPending || remove.isSuccess} />
+      <NoticeForm notice={notice} save={save} locked={remove.isPending || remove.isSuccess} />
       <ConfirmAction
         label="공지 삭제"
         confirmLabel="공지 삭제 확정"
         message="지운 공지는 되돌릴 수 없어요."
         loading={remove.isPending}
-        locked={remove.isSuccess}
+        locked={save.isPending || save.isSuccess || remove.isSuccess}
+        disabled={save.isPending || save.isSuccess}
         error={remove.error ? errorMessage(remove.error) : null}
         onConfirm={confirm}
       />

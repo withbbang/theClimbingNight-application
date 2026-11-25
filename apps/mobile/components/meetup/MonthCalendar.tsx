@@ -80,20 +80,28 @@ interface MonthCalendarProps {
   selected: DateKey;
   marks: Map<DateKey, DayMark>;
   onSelect: (day: DateKey) => void;
+  /** 보이는 달의 1일. 고른 날과 따로 넘길 때 onMonthChange와 함께 준다. */
+  month?: DateKey;
+  onMonthChange?: (month: DateKey) => void;
 }
 
-export function MonthCalendar({ selected, marks, onSelect }: MonthCalendarProps) {
+export function MonthCalendar({
+  selected,
+  marks,
+  onSelect,
+  month = monthStart(selected),
+  onMonthChange = onSelect,
+}: MonthCalendarProps) {
   const { colors, space } = useTheme();
   const reduced = useReducedMotion();
   const today = useToday();
   const [step, setStep] = useState(0);
-  const month = monthStart(selected);
   const [year, monthNumber] = month.split('-').map(Number);
 
   function move(by: 1 | -1) {
     void Haptics.selectionAsync().catch(() => {});
     setStep(by);
-    onSelect(addMonths(month, by));
+    onMonthChange(addMonths(month, by));
   }
 
   // 옮긴 방향에서 새 달이 들어온다.

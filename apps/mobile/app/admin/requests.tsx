@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { IdentificationCardIcon } from 'phosphor-react-native/src/icons/IdentificationCard';
 import Animated, { useReducedMotion, ZoomIn } from 'react-native-reanimated';
 
 import { AdminScreen } from '@/components/admin/AdminScreen';
-import { RequestCard } from '@/components/membership/RequestCard';
+import { RequestCard, type RequestDraft } from '@/components/membership/RequestCard';
 import { AppText } from '@/components/ui/AppText';
 import { ConfirmAction } from '@/components/ui/ConfirmAction';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
@@ -23,6 +23,7 @@ import { ApiError } from '@/lib/api-error';
 import { errorMessage } from '@/lib/error-message';
 
 const MAX_STAGGER = 8;
+const EMPTY_DRAFT: RequestDraft = { chosen: null, reason: '' };
 
 /** 수백 건이면 응답을 기다리다 끊겨도 서버는 계속 처리한다. */
 function bulkErrorMessage(error: Error) {
@@ -39,6 +40,8 @@ function Requests() {
   const reject = useRejectRequest();
   const bulk = useBulkApprove();
   const [message, setMessage] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<number, RequestDraft>>({});
+  const busy = useRef(false);
 
   const sending = approve.isPending || reject.isPending || bulk.isPending;
   const locked = sending || query.isRefetching;
@@ -48,11 +51,24 @@ function Requests() {
 
   /** 지난 결과를 지우고 보낸다. */
   async function run(send: () => Promise<unknown>) {
+    // 보내는 중에 지우면 그 결과와 오류를 놓친다.
+    if (busy.current) {
+      return false;
+    }
+    busy.current = true;
     approve.reset();
     reject.reset();
     bulk.reset();
     setMessage(null);
-    return (await send()) !== undefined;
+    try {
+      return (await send()) !== undefined;
+    } finally {
+      busy.current = false;
+    }
+  }
+
+  function changeDraft(id: number, change: Partial<RequestDraft>) {
+    setDrafts((old) => ({ ...old, [id]: { ...(old[id] ?? EMPTY_DRAFT), ...change } }));
   }
 
   async function approveAll() {
@@ -107,6 +123,8 @@ function Requests() {
                   : null
             }
             locked={locked}
+            draft={drafts[request.id]}
+            onDraft={(change) => changeDraft(request.id, change)}
             onApprove={(body) => void run(() => approve.submit({ id: request.id, body }))}
             onReject={(reason) => run(() => reject.submit({ id: request.id, reason }))}
           />

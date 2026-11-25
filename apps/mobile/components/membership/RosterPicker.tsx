@@ -47,12 +47,16 @@ export function RosterPicker({ target, shownIds, disabled, onSelect }: RosterPic
       />
       {q === '' ? null : (
         <QueryState query={query}>
-          {({ items, totalPages }) => (
-            <View>
-              {items.length === 0 ? <AppText tone="muted">찾는 명부가 없어요</AppText> : null}
-              {items
-                .filter((roster) => !shownIds.includes(roster.id))
-                .map((roster) => (
+          {({ items, totalPages }) => {
+            const others = items.filter((roster) => !shownIds.includes(roster.id));
+            return (
+              <View>
+                {others.length === 0 ? (
+                  <AppText tone="muted">
+                    {items.length === 0 ? '찾는 명부가 없어요' : '다른 명부가 없어요'}
+                  </AppText>
+                ) : null}
+                {others.map((roster) => (
                   <RadioRow
                     key={roster.id}
                     label={roster.somoimNickname}
@@ -63,13 +67,14 @@ export function RosterPicker({ target, shownIds, disabled, onSelect }: RosterPic
                     onPress={() => onSelect(roster)}
                   />
                 ))}
-              {totalPages > 1 ? (
-                <AppText variant="caption" tone="muted">
-                  더 있어요. 닉네임을 더 적어 좁혀 보세요.
-                </AppText>
-              ) : null}
-            </View>
-          )}
+                {totalPages > 1 ? (
+                  <AppText variant="caption" tone="muted">
+                    더 있어요. 닉네임을 더 적어 좁혀 보세요.
+                  </AppText>
+                ) : null}
+              </View>
+            );
+          }}
         </QueryState>
       )}
     </Animated.View>

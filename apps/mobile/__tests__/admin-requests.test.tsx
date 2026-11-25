@@ -1,5 +1,6 @@
 import { act, fireEvent, screen } from 'expo-router/testing-library';
 
+import { queryClient } from '@/lib/query-client';
 import { fail, flush, mockServer, ok, renderApp, type Reply } from '@/test-utils/app';
 import { button, press, type } from '@/test-utils/screen';
 import { startAs } from '@/test-utils/session';
@@ -213,4 +214,70 @@ it('keeps showing the picked roster entry after the search changes', async () =>
   expect(choice('앱별이 명부: 달, 옛 닉네임')).toBeChecked();
   await press('앱별이 승인');
   expect(body(server)).toEqual({ rosterMemberId: 9 });
+});
+
+it('does not preselect an entry claimed by two requests', async () => {
+  mockServer({ [LIST]: list([request({ bulkApprovable: false })]) });
+  await renderApp('/admin/requests');
+  expect(choice('앱별이 명부: 별이')).not.toBeChecked();
+  expect(button('앱별이 승인')).toBeDisabled();
+  expect(
+    screen.getByText('다른 신청도 이 명부를 기다려요. 누구인지 확인해 주세요.'),
+  ).toBeOnTheScreen();
+});
+
+it('keeps the first request in flight when another is pressed before a re-render', async () => {
+  let finish = (_: Reply) => {};
+  const server = mockServer({
+    [LIST]: list([request(), request({ id: 2, user: { id: 22, nickname: '달이', role: 'USER' } })]),
+    [APPROVE]: () => new Promise<Reply>((resolve) => (finish = resolve)),
+  });
+  await renderApp('/admin/requests');
+  const first = button('앱별이 승인')!.props.onClick;
+  const second = button('달이 승인')!.props.onClick;
+  await act(async () => {
+    first({ stopPropagation() {} });
+    second({ stopPropagation() {} });
+  });
+  await act(async () => finish(fail(409, 'ROSTER_ALREADY_LINKED', '이미 연결된 명부입니다.')));
+  await flush();
+  expect(server.calls.filter((c) => c.method === 'POST')).toHaveLength(1);
+  expect(screen.getByText('이미 연결된 명부입니다.')).toBeOnTheScreen();
+});
+
+it('says so when every match is already on the card', async () => {
+  mockServer({
+    [LIST]: list([request()]),
+    [`/roster-members?q=${encodeURIComponent('별')}&linked=false&page=0&size=20`]: list([
+      { ...candidate(3), userId: null },
+    ]),
+  });
+  await renderApp('/admin/requests');
+  await press('앱별이 다른 명부 찾기');
+  await type('명부 검색', '별');
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(300);
+  });
+  await flush();
+  expect(screen.getByText('다른 명부가 없어요')).toBeOnTheScreen();
+});
+
+it('keeps the choice and the reason when the card is mounted again', async () => {
+  const items = [request()];
+  let shown = true;
+  mockServer({ [LIST]: () => list(shown ? items : []) });
+  await renderApp('/admin/requests');
+  await fireEvent.press(choice('앱별이 새 명부 항목'));
+  await press('앱별이 거절');
+  await type('거절 사유', '확인 중');
+  for (const next of [false, true]) {
+    shown = next;
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ['membership-requests'] });
+    });
+    await flush();
+  }
+  expect(choice('앱별이 새 명부 항목')).toBeChecked();
+  await press('앱별이 거절');
+  expect(screen.getByLabelText('거절 사유').props.value).toBe('확인 중');
 });

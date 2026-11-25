@@ -1,6 +1,6 @@
 import { screen } from 'expo-router/testing-library';
 
-import { fail, mockServer, ok, renderApp } from '@/test-utils/app';
+import { fail, mockServer, ok, renderApp, type Reply } from '@/test-utils/app';
 import { button, press, type } from '@/test-utils/screen';
 import { startAs } from '@/test-utils/session';
 import type { PenaltyResponse } from '@/types/api/penalty';
@@ -137,4 +137,21 @@ it('shows not found on 404', async () => {
   mockServer({ [ROSTER]: fail(404, 'COMMON_NOT_FOUND', '없음') });
   await renderApp('/admin/penalties/101');
   expect(screen.getByText('명부에서 찾을 수 없어요')).toBeOnTheScreen();
+});
+
+it('does not offer the revoke again while the records are refetched', async () => {
+  let sent = false;
+  mockServer({
+    [ROSTER]: () => (sent ? new Promise<Reply>(() => {}) : roster([penalty()])),
+    'POST /penalties/7/revoke': () => {
+      sent = true;
+      return ok(penalty({ active: false, revokeReason: '착오' }));
+    },
+  });
+  await renderApp('/admin/penalties/101');
+  await press('기록 취소');
+  await type('취소 사유', '착오');
+  await press('기록 취소 확정');
+  expect(screen.getByText('취소됨: 착오')).toBeOnTheScreen();
+  expect(button('기록 취소')).toBeNull();
 });

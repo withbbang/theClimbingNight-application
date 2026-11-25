@@ -238,3 +238,23 @@ it('does not request for a bad id', async () => {
   expect(screen.getByText('벙을 찾을 수 없어요')).toBeOnTheScreen();
   expect(server.calls.some((c) => c.path.startsWith('/meetups/'))).toBe(false);
 });
+
+it.each([
+  ['내보내기', '내보내기 확정', 'POST /meetup-applications/11/remove', row()],
+  ['블랙리스트에 기록', '기록 확정', 'POST /meetup-applications/11/penalties', late()],
+])('does not offer %s again while the list is refetched', async (label, confirm, path, item) => {
+  let sent = false;
+  mockServer({
+    '/meetups/1': ok(detail()),
+    [LIST]: () => (sent ? new Promise<Reply>(() => {}) : ok([item])),
+    [path]: () => {
+      sent = true;
+      return label === '내보내기' ? { status: 204 } : ok({ id: 1 });
+    },
+  });
+  await renderApp(PATH);
+  await press(`별이 ${label}`);
+  await press(`별이 ${confirm}`);
+  expect(sent).toBe(true);
+  expect(button(`별이 ${label}`)).toBeNull();
+});

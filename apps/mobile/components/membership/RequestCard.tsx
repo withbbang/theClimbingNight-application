@@ -18,14 +18,30 @@ import type { RosterCandidateResponse } from '@/types/api/roster';
 
 type Choice = RosterCandidateResponse | 'NEW' | null;
 
+/** 아직 보내지 않은 심사. 카드가 화면 밖으로 나가도 남도록 화면이 들고 있는다. */
+export interface RequestDraft {
+  chosen: Choice;
+  reason: string;
+}
+
+/** 후보가 하나인데 일괄 승인할 수 없으면 다른 신청도 같은 명부를 기다린다. */
+const isContested = ({ candidates, bulkApprovable }: MembershipReviewItemResponse) =>
+  candidates.length === 1 && !bulkApprovable;
+
 /** 후보가 하나면 그 명부, 없으면 새 항목. 여럿이면 운영진이 고른다. */
-function defaultChoice({ candidates }: MembershipReviewItemResponse): Choice {
-  return candidates.length === 0 ? 'NEW' : candidates.length === 1 ? candidates[0] : null;
+function defaultChoice(request: MembershipReviewItemResponse): Choice {
+  const { candidates } = request;
+  if (candidates.length === 0) {
+    return 'NEW';
+  }
+  return candidates.length === 1 && !isContested(request) ? candidates[0] : null;
 }
 
 interface RequestCardProps {
   request: MembershipReviewItemResponse;
   index: number;
+  draft: RequestDraft | undefined;
+  onDraft: (change: Partial<RequestDraft>) => void;
   /** 이 신청을 보내는 중인 동작. */
   sending: 'approve' | 'reject' | null;
   /** 다른 신청을 보내거나 목록을 다시 받는 중. */
@@ -37,16 +53,17 @@ interface RequestCardProps {
 export function RequestCard({
   request,
   index,
+  draft,
+  onDraft,
   sending,
   locked,
   onApprove,
   onReject,
 }: RequestCardProps) {
   const { colors, radius, space } = useTheme();
-  const [chosen, setChosen] = useState<Choice>(null);
   const [searching, setSearching] = useState(false);
-  const [reason, setReason] = useState('');
-  const choice = chosen ?? defaultChoice(request);
+  const reason = draft?.reason ?? '';
+  const choice = draft?.chosen ?? defaultChoice(request);
   const choiceId = choice !== null && choice !== 'NEW' ? choice.id : null;
   const isCandidate = request.candidates.some((roster) => roster.id === choiceId);
   // 검색으로 고른 명부는 검색어가 바뀌어도 보이게 카드에 함께 둔다.
@@ -84,6 +101,11 @@ export function RequestCard({
       </View>
       <View accessibilityRole="radiogroup">
         <AppText variant="label">어느 명부에 연결할까요?</AppText>
+        {isContested(request) ? (
+          <AppText variant="caption">
+            다른 신청도 이 명부를 기다려요. 누구인지 확인해 주세요.
+          </AppText>
+        ) : null}
         {rosters.map((roster) => (
           <RadioRow
             key={roster.id}
@@ -92,7 +114,7 @@ export function RequestCard({
             accessibilityLabel={rosterLabel(name, roster)}
             selected={choiceId === roster.id}
             disabled={busy}
-            onPress={() => setChosen(roster)}
+            onPress={() => onDraft({ chosen: roster })}
           />
         ))}
         <RadioRow
@@ -101,14 +123,14 @@ export function RequestCard({
           accessibilityLabel={`${name} 새 명부 항목`}
           selected={choice === 'NEW'}
           disabled={busy}
-          onPress={() => setChosen('NEW')}
+          onPress={() => onDraft({ chosen: 'NEW' })}
         />
         {searching ? (
           <RosterPicker
             target={name}
             shownIds={rosters.map((roster) => roster.id)}
             disabled={busy}
-            onSelect={setChosen}
+            onSelect={(roster) => onDraft({ chosen: roster })}
           />
         ) : (
           <Button
@@ -139,7 +161,7 @@ export function RequestCard({
         <TextField
           label="거절 사유"
           value={reason}
-          onChangeText={setReason}
+          onChangeText={(text) => onDraft({ reason: text })}
           maxLength={200}
           multiline
           editable={!busy}

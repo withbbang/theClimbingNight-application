@@ -10,7 +10,7 @@ import { FadeInItem } from '@/components/ui/FadeInItem';
 import { TextField } from '@/components/ui/TextField';
 import { Toggle } from '@/components/ui/Toggle';
 import { useLeft } from '@/hooks/use-left';
-import { useSaveNotice } from '@/hooks/use-notice-admin';
+import type { useSaveNotice } from '@/hooks/use-notice-admin';
 import { useTheme } from '@/hooks/use-theme';
 import { errorMessage } from '@/lib/error-message';
 import type { NoticeResponse } from '@/types/api/notice';
@@ -18,11 +18,12 @@ import type { NoticeResponse } from '@/types/api/notice';
 interface NoticeFormProps {
   /** 없으면 새 공지. */
   notice?: NoticeResponse;
+  save: ReturnType<typeof useSaveNotice>;
   /** 지우는 중처럼 저장하면 안 될 때. */
   locked?: boolean;
 }
 
-export function NoticeForm({ notice, locked = false }: NoticeFormProps) {
+export function NoticeForm({ notice, save, locked = false }: NoticeFormProps) {
   const router = useRouter();
   const { space } = useTheme();
   const [title, setTitle] = useState(notice?.title ?? '');
@@ -30,7 +31,6 @@ export function NoticeForm({ notice, locked = false }: NoticeFormProps) {
   const [pinned, setPinned] = useState(notice?.pinned ?? false);
   const [tried, setTried] = useState(false);
   const left = useLeft();
-  const save = useSaveNotice(notice?.id ?? null);
   const editable = !save.isPending && !locked;
 
   async function submit() {

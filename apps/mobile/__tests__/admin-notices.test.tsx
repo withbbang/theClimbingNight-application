@@ -1,7 +1,7 @@
 import { act, fireEvent, screen } from 'expo-router/testing-library';
 
 import { queryClient } from '@/lib/query-client';
-import { fail, flush, mockServer, ok, renderApp } from '@/test-utils/app';
+import { fail, flush, mockServer, ok, renderApp, type Reply } from '@/test-utils/app';
 import { button, press, type } from '@/test-utils/screen';
 import { startAs } from '@/test-utils/session';
 import type { NoticeResponse } from '@/types/api/notice';
@@ -134,4 +134,19 @@ it('shows not found on 404', async () => {
   await renderApp('/admin/notices/1');
   expect(screen.getByText('공지를 찾을 수 없어요')).toBeOnTheScreen();
   expect(button('저장')).toBeNull();
+});
+
+it('cannot delete while saving', async () => {
+  let finish = (_: Reply) => {};
+  mockServer({
+    '/notices/1': ok(notice()),
+    'PUT /notices/1': () => new Promise<Reply>((resolve) => (finish = resolve)),
+  });
+  await renderApp('/admin/notices/1');
+  await press('공지 삭제');
+  await press('저장');
+  expect(button('공지 삭제 확정')).toBeDisabled();
+  await act(async () => finish(fail(500, 'COMMON_INTERNAL_ERROR', '서버 오류')));
+  await flush();
+  expect(button('공지 삭제 확정')).toBeEnabled();
 });

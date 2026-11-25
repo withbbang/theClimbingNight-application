@@ -11,6 +11,18 @@ const keyOf = (meetupId: number | null) => ['meetups', 'applications', meetupId]
 
 type OnError = (error: Error) => void;
 
+/** 다시 받는 동안 끝난 동작을 또 누르지 않게 줄을 먼저 고친다. */
+function usePatchRow(meetupId: number) {
+  const client = useQueryClient();
+  return (
+    matches: (row: MeetupApplicationAdminResponse) => boolean,
+    change: Partial<MeetupApplicationAdminResponse>,
+  ) =>
+    client.setQueryData<MeetupApplicationAdminResponse[]>(keyOf(meetupId), (old) =>
+      old?.map((row) => (matches(row) ? { ...row, ...change } : row)),
+    );
+}
+
 export function useApplications(meetupId: number | null) {
   const admin = useIsAdmin();
   return useQuery({
@@ -20,34 +32,35 @@ export function useApplications(meetupId: number | null) {
   });
 }
 
-export function useRemoveApplication(onError: OnError) {
+export function useRemoveApplication(meetupId: number, onError: OnError) {
+  const patch = usePatchRow(meetupId);
   return useAdminMutation(
     // 204라 값이 없으므로 성공을 true로 알린다.
     (id: number) => meetupApi.removeApplication(id).then(() => true),
     [['meetups']],
-    { error: onError },
+    {
+      success: (_, id) => patch((row) => row.id === id, { status: 'REMOVED' }),
+      error: onError,
+    },
   );
 }
 
-export function useAddLateCancelPenalty(onError: OnError) {
+export function useAddLateCancelPenalty(meetupId: number, onError: OnError) {
+  const patch = usePatchRow(meetupId);
   return useAdminMutation(meetupApi.addLateCancelPenalty, [['meetups'], ['penalties']], {
+    success: (_, id) => patch((row) => row.id === id, { lateCancelPenalized: true }),
     error: onError,
   });
 }
 
 export function useCorrectAttendance(meetupId: number, onError: OnError) {
-  const client = useQueryClient();
+  const patch = usePatchRow(meetupId);
   return useAdminMutation(
     ({ id, result }: { id: number; result: AttendanceResult }) => attendanceApi.correct(id, result),
     [['meetups'], ['penalties'], ['attendance-rates']],
     {
-      // 다시 받는 동안 옛 결과로 되돌아가 보이지 않게 한다.
       success: (saved, { id }) =>
-        client.setQueryData<MeetupApplicationAdminResponse[]>(keyOf(meetupId), (old) =>
-          old?.map((row) =>
-            row.attendanceId === id ? { ...row, attendanceResult: saved.result } : row,
-          ),
-        ),
+        patch((row) => row.attendanceId === id, { attendanceResult: saved.result }),
       error: onError,
     },
   );
