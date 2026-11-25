@@ -121,6 +121,31 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
+    .wall-hold {
+      animation:
+        hold-on 560ms calc(200ms + var(--i) * 170ms) cubic-bezier(0.2, 0.9, 0.3, 1.5) backwards,
+        hold-breath 4.2s calc(2.2s + var(--i) * 400ms) ease-in-out infinite;
+    }
+
+    .star {
+      animation: twinkle 2.2s calc(var(--i) * 260ms) ease-in-out infinite;
+    }
+
+    /* 스크롤을 따라 나타난다. 지원하지 않는 브라우저는 그대로 보인다. */
+    @supports (animation-timeline: view()) {
+      .rise {
+        animation: reveal linear backwards;
+        animation-timeline: view();
+        animation-range: entry 0% entry 70%;
+      }
+
+      .step-hold {
+        animation: hold-on linear backwards;
+        animation-timeline: view();
+        animation-range: entry 40% cover 40%;
+      }
+    }
+
     .pin {
       animation: pin-drop 620ms 240ms cubic-bezier(0.2, 0.9, 0.3, 1.5) backwards;
     }
@@ -162,5 +187,35 @@
   from {
     opacity: 0;
     transform: translateY(-12px) rotate(24deg);
+  }
+}
+
+@keyframes hold-on {
+  from {
+    opacity: 0;
+    transform: scale(0.3) rotate(-30deg);
+  }
+}
+
+@keyframes hold-breath {
+  12% {
+    transform: translateY(-3px) scale(1.12);
+  }
+
+  24% {
+    transform: none;
+  }
+}
+
+@keyframes twinkle {
+  from,
+  to {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.3);
   }
 }
