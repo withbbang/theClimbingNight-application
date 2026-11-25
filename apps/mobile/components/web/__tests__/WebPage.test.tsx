@@ -90,6 +90,7 @@ it.each([{ isTopFrame: true }, {}, { isTopFrame: false, hasTargetFrame: false }]
   'opens outside links in the browser and stays (%p)',
   async (extra) => {
     await open();
+    await emit('onLoadEnd');
     expect(await request('https://store.test/x', extra)).toBe(false);
     expect(openURL.mock.calls).toEqual([['https://store.test/x']]);
   },
@@ -111,6 +112,7 @@ it('blocks app links', async () => {
 it('tells when the browser does not open', async () => {
   openURL.mockRejectedValue(new Error('no browser'));
   await open();
+  await emit('onLoadEnd');
   await request('https://store.test/x');
   expect(screen.getByText('링크를 열지 못했어요.')).toBeTruthy();
 });
@@ -248,4 +250,42 @@ it('follows the font size while the page is open', async () => {
   await open();
 
   expect(webView.props.textZoom).toBe(Dimensions.get('window').fontScale * 100);
+});
+
+// 취소한 첫 이동은 완료도 오류도 오지 않는다.
+it('asks to retry when the first page redirects elsewhere', async () => {
+  await open();
+
+  expect(await request('https://login.test/', { isTopFrame: true })).toBe(false);
+
+  expect(openURL).not.toHaveBeenCalled();
+  expect(screen.getByText('불러오지 못했어요')).toBeOnTheScreen();
+});
+
+// Android는 실패해도 완료 이벤트를 먼저 보낸다.
+it('asks to retry when the first page fails on another site', async () => {
+  await open();
+
+  await emit('onLoadEnd', { url: 'https://login.test/' });
+  await emit('onError', { url: 'https://login.test/' });
+
+  expect(screen.getByText('불러오지 못했어요')).toBeOnTheScreen();
+  expect(webView.mounts).toBe(1);
+});
+
+it.each([
+  [29_999, true],
+  [30_000, false],
+])('asks to retry when the page dies again within 30 seconds: %i', async (gap, failed) => {
+  await open();
+  // renderRouter가 시계를 바꾸므로 그 뒤에 고정한다.
+  const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+  await emit('onRenderProcessGone');
+
+  now.mockReturnValue(1_000_000 + gap);
+  await emit('onRenderProcessGone');
+  now.mockRestore();
+
+  expect(screen.queryByText('불러오지 못했어요') !== null).toBe(failed);
+  expect(webView.mounts).toBe(failed ? 2 : 3);
 });

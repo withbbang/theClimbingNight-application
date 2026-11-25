@@ -32,9 +32,14 @@ interface ViewerProps {
   tab: boolean;
   onFail: () => void;
   onGone: () => void;
+  /** 웹뷰 프로세스가 죽었다. */
+  onCrash: () => void;
 }
 
-function Viewer({ path, tab, onFail, onGone }: ViewerProps) {
+/** 이 안에 다시 죽으면 되풀이로 보고 안내를 보인다. */
+const CRASH_WINDOW_MS = 30_000;
+
+function Viewer({ path, tab, onFail, onGone, onCrash }: ViewerProps) {
   const { colors, space } = useTheme();
   const reduced = useReducedMotion();
   const insets = useSafeAreaInsets();
@@ -70,6 +75,11 @@ function Viewer({ path, tab, onFail, onGone }: ViewerProps) {
   function shouldStart({ url, isTopFrame, hasTargetFrame }: LoadRequest) {
     const decision = decideLink(url);
     const subframe = isTopFrame === false && hasTargetFrame !== false;
+    if (!loaded && !subframe && strayed(url)) {
+      // 첫 페이지의 이동을 취소하면 완료도 오류도 오지 않는다.
+      onFail();
+      return false;
+    }
     if (decision === 'outside' && !subframe) {
       setLinkFailed(false);
       Linking.openURL(url).catch(() => setLinkFailed(true));
@@ -114,7 +124,12 @@ function Viewer({ path, tab, onFail, onGone }: ViewerProps) {
           originWhitelist={['*']}
           onShouldStartLoadWithRequest={shouldStart}
           onNavigationStateChange={(state: WebViewNavigation) => setCanGoBack(state.canGoBack)}
-          onLoadEnd={() => setLoaded(true)}
+          onLoadEnd={({ nativeEvent }) => {
+            // Android는 실패해도 완료를 먼저 알린다. 벗어난 주소는 연 것으로 치지 않는다.
+            if (!strayed(nativeEvent.url)) {
+              setLoaded(true);
+            }
+          }}
           onLoadStart={({ nativeEvent }) => {
             if (strayed(nativeEvent.url)) {
               startOver();
@@ -126,8 +141,8 @@ function Viewer({ path, tab, onFail, onGone }: ViewerProps) {
               onFail();
             }
           }}
-          onContentProcessDidTerminate={onGone}
-          onRenderProcessGone={onGone}
+          onContentProcessDidTerminate={onCrash}
+          onRenderProcessGone={onCrash}
           setSupportMultipleWindows={false}
           javaScriptCanOpenWindowsAutomatically={false}
           allowFileAccess={false}
@@ -162,6 +177,18 @@ export function WebPage({ path, tab = false }: WebPageProps) {
   const insets = useSafeAreaInsets();
   const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
+  const crashedAt = useRef<number | null>(null);
+
+  function crashed() {
+    const now = Date.now();
+    const again = crashedAt.current !== null && now - crashedAt.current < CRASH_WINDOW_MS;
+    crashedAt.current = now;
+    if (again) {
+      setFailed(true);
+    } else {
+      setAttempt((n) => n + 1);
+    }
+  }
 
   return (
     <View
@@ -187,6 +214,7 @@ export function WebPage({ path, tab = false }: WebPageProps) {
           tab={tab}
           onFail={() => setFailed(true)}
           onGone={() => setAttempt((n) => n + 1)}
+          onCrash={crashed}
         />
       )}
     </View>
