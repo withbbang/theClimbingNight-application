@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -24,13 +24,16 @@ export function Screen({ children, scroll = false, bottomInset = true }: ScreenP
 
   return (
     <KeyboardAvoidingView
-      // Android도 edge-to-edge라 창이 줄지 않으므로 직접 밀어 올린다.
+      // Android는 edge-to-edge라 창이 줄지 않으므로 직접 밀어 올린다.
+      // iOS에서 이러면 입력칸까지 스크롤되지 않아, 스크롤하는 쪽의 automaticallyAdjustKeyboardInsets에 맡긴다.
+      enabled={Platform.OS === 'android'}
       behavior="padding"
       style={[styles.fill, { backgroundColor: colors.background }]}
     >
       {scroll ? (
         <ScrollView
           contentContainerStyle={[styles.grow, padding]}
+          automaticallyAdjustKeyboardInsets
           keyboardShouldPersistTaps="handled"
         >
           {children}

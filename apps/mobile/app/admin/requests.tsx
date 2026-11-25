@@ -76,18 +76,22 @@ function Requests() {
           </AppText>
         </Animated.View>
       ) : null}
-      <ConfirmAction
-        label="일괄 승인"
-        confirmLabel="일괄 승인 확정"
-        message="명부 후보가 하나로 정해진 신청을 모두 승인해요. 나머지는 그대로 남아요."
-        loading={bulk.isPending}
-        locked={locked || !anyApprovable}
-        disabled={locked || !anyApprovable}
-        onConfirm={approveAll}
-      />
       <PagedList
         query={query}
         label="인증 신청 목록"
+        header={
+          <View style={{ marginBottom: space(4) }}>
+            <ConfirmAction
+              label="일괄 승인"
+              confirmLabel="일괄 승인 확정"
+              message="명부 후보가 하나로 정해진 신청을 모두 승인해요. 나머지는 그대로 남아요."
+              loading={bulk.isPending}
+              locked={locked || !anyApprovable}
+              disabled={locked || !anyApprovable}
+              onConfirm={approveAll}
+            />
+          </View>
+        }
         keyOf={(request) => request.id}
         renderItem={(request, index) => (
           // 칸이 재사용돼도 고른 명부와 사유가 다른 신청으로 옮지 않게 한다.

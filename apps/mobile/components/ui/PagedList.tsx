@@ -76,6 +76,7 @@ export function PagedList<T>({
               ) : null
             }
             ListEmptyComponent={empty}
+            automaticallyAdjustKeyboardInsets
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             refreshControl={<PullToRefresh onRefresh={query.refetch} />}
