@@ -106,6 +106,7 @@ class AuthServiceTest {
 		User user = user(7L);
 		given(authIdentityRepository.findByProviderAndProviderUserId(SocialProvider.KAKAO, "42"))
 				.willReturn(Optional.of(AuthIdentity.link(user, SocialProvider.KAKAO, "42")));
+		given(userRepository.findByIdForUpdate(7L)).willReturn(Optional.of(user));
 
 		// when
 		LoginResult result = service.login(SocialProvider.KAKAO, "social-token");
@@ -145,6 +146,7 @@ class AuthServiceTest {
 		user.withdraw(START);
 		given(authIdentityRepository.findByProviderAndProviderUserId(SocialProvider.KAKAO, "42"))
 				.willReturn(Optional.of(AuthIdentity.link(user, SocialProvider.KAKAO, "42")));
+		given(userRepository.findByIdForUpdate(7L)).willReturn(Optional.of(user));
 
 		// when, then
 		assertCode(() -> service.login(SocialProvider.KAKAO, "social-token"), ErrorCode.AUTH_REQUIRED);
@@ -422,12 +424,14 @@ class AuthServiceTest {
 		// given
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		ReflectionTestUtils.setField(old, "id", 99L);
+		given(refreshTokenRepository.revokeIfActive(99L, START)).willReturn(1);
 
 		// when
 		service.logout("old-token", null);
 
 		// then
-		assertThat(old.getRevokedAt()).isEqualTo(START);
+		verify(refreshTokenRepository).revokeIfActive(99L, START);
 	}
 
 	@Test
@@ -445,13 +449,15 @@ class AuthServiceTest {
 		// given
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		ReflectionTestUtils.setField(old, "id", 99L);
+		given(refreshTokenRepository.revokeIfActive(99L, START)).willReturn(1);
 
 		// when
 		service.logout("old-token", "ExponentPushToken[abc]");
 
 		// then
 		verify(pushTokenService).deleteOwned(7L, "ExponentPushToken[abc]");
-		assertThat(old.getRevokedAt()).isEqualTo(START);
+		verify(refreshTokenRepository).revokeIfActive(99L, START);
 	}
 
 	@Test
@@ -459,13 +465,15 @@ class AuthServiceTest {
 		// given
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		ReflectionTestUtils.setField(old, "id", 99L);
+		given(refreshTokenRepository.revokeIfActive(99L, START)).willReturn(1);
 
 		// when
 		service.logout("old-token", "ExponentPushToken[abc]");
 
 		// then
 		org.mockito.InOrder order = org.mockito.Mockito.inOrder(refreshTokenRepository, pushTokenService);
-		order.verify(refreshTokenRepository).flush();
+		order.verify(refreshTokenRepository).revokeIfActive(99L, START);
 		order.verify(pushTokenService).deleteOwned(7L, "ExponentPushToken[abc]");
 	}
 
@@ -476,6 +484,7 @@ class AuthServiceTest {
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
 		old.revoke(revokedAt);
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		ReflectionTestUtils.setField(old, "id", 99L);
 
 		// when
 		service.logout("old-token", "ExponentPushToken[abc]");
@@ -491,6 +500,8 @@ class AuthServiceTest {
 		// given: 만료됐지만 폐기되지 않은 토큰
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.minusSeconds(1));
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		ReflectionTestUtils.setField(old, "id", 99L);
+		given(refreshTokenRepository.revokeIfActive(99L, START)).willReturn(1);
 
 		// when
 		service.logout("old-token", "ExponentPushToken[abc]");
@@ -498,7 +509,7 @@ class AuthServiceTest {
 		// then
 		verify(pushTokenService).deleteOwned(7L, "ExponentPushToken[abc]");
 		verify(pushTokenService, never()).deleteOwnedIfNotSeenSince(org.mockito.ArgumentMatchers.anyLong(), any(), any());
-		assertThat(old.getRevokedAt()).isEqualTo(START);
+		verify(refreshTokenRepository).revokeIfActive(99L, START);
 	}
 
 	@Test
@@ -506,12 +517,14 @@ class AuthServiceTest {
 		// given
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		ReflectionTestUtils.setField(old, "id", 99L);
+		given(refreshTokenRepository.revokeIfActive(99L, START)).willReturn(1);
 
 		// when
 		service.logout("old-token", "토큰[한글]");
 
 		// then
-		assertThat(old.getRevokedAt()).isEqualTo(START);
+		verify(refreshTokenRepository).revokeIfActive(99L, START);
 		verify(pushTokenService, never()).deleteOwned(org.mockito.ArgumentMatchers.anyLong(), any());
 	}
 
@@ -520,13 +533,65 @@ class AuthServiceTest {
 		// given
 		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
 		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		ReflectionTestUtils.setField(old, "id", 99L);
+		given(refreshTokenRepository.revokeIfActive(99L, START)).willReturn(1);
 
 		// when
 		service.logout("old-token", null);
 
 		// then
-		assertThat(old.getRevokedAt()).isEqualTo(START);
+		verify(refreshTokenRepository).revokeIfActive(99L, START);
 		verify(pushTokenService, never()).deleteOwned(org.mockito.ArgumentMatchers.anyLong(), any());
+	}
+
+	@Test
+	void 로그아웃은_사용자를_잠근_뒤에_폐기한다() {
+		// given
+		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
+		ReflectionTestUtils.setField(old, "id", 99L);
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+
+		// when
+		service.logout("old-token", null);
+
+		// then
+		InOrder order = inOrder(userRepository, refreshTokenRepository);
+		order.verify(userRepository).findByIdForUpdate(7L);
+		order.verify(refreshTokenRepository).revokeIfActive(99L, START);
+	}
+
+	@Test
+	void 갱신된_세션을_끝낸_로그아웃은_조건_없이_내_푸시_토큰을_지운다() {
+		// given: 토큰은 갱신으로 폐기됐고, 이어진 토큰이 살아 있다
+		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
+		ReflectionTestUtils.setField(old, "id", 99L);
+		old.revoke(START.minusSeconds(60));
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		given(refreshTokenRepository.revokeFamily(99L, START)).willReturn(1);
+
+		// when
+		service.logout("old-token", "ExponentPushToken[abc]");
+
+		// then
+		verify(pushTokenService).deleteOwned(7L, "ExponentPushToken[abc]");
+	}
+
+	@Test
+	void 잠금을_기다리는_사이_폐기됐으면_다시_읽은_폐기_시각을_쓴다() {
+		// given: 처음 읽을 때는 유효했지만 다른 로그아웃이 먼저 폐기했다
+		Instant revokedAt = START.minusSeconds(1);
+		RefreshToken stale = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
+		ReflectionTestUtils.setField(stale, "id", 99L);
+		RefreshToken fresh = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
+		fresh.revoke(revokedAt);
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token")))
+				.willReturn(Optional.of(stale), Optional.of(fresh));
+
+		// when
+		service.logout("old-token", "ExponentPushToken[abc]");
+
+		// then
+		verify(pushTokenService).deleteOwnedIfNotSeenSince(7L, "ExponentPushToken[abc]", revokedAt);
 	}
 
 	@Test

@@ -20,6 +20,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -77,10 +78,11 @@ public class AuthService {
 		return transactionTemplate.execute(status ->
 				authIdentityRepository.findByProviderAndProviderUserId(identity.provider(), identity.providerUserId())
 						.<LoginResult>map(linked -> {
-							User user = linked.getUser();
-							if (!user.isActive()) {
-								throw new BusinessException(ErrorCode.AUTH_REQUIRED);
-							}
+							// 탈퇴와 겹치면 탈퇴가 폐기한 뒤에 토큰이 생길 수 있으므로 사용자를 잠그고 확인한다.
+							// 잠그기 전에 user를 읽으면 낡은 상태가 영속성 컨텍스트에 남으므로 ID만 쓴다.
+							User user = userRepository.findByIdForUpdate(linked.getUser().getId())
+									.filter(User::isActive)
+									.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 							return new LoginResult.LoggedIn(issueTokens(user));
 						})
 						.orElseGet(() -> new LoginResult.SignupRequired(jwtTokenService.issueSignupToken(identity))));
@@ -122,6 +124,8 @@ public class AuthService {
 			// 이미 폐기된 토큰이 다시 왔다. 만료 전이고 유예가 지났다면 탈취·재사용으로 보고 모두 폐기한다.
 			boolean withinGrace = now.isBefore(stored.getRevokedAt().plus(REUSE_GRACE));
 			if (!withinGrace && now.isBefore(stored.getExpiresAt())) {
+				// 갱신·로그인이 아직 커밋하지 않은 새 토큰까지 폐기하도록 끝나기를 기다린다.
+				userRepository.findByIdForUpdate(stored.getUserId());
 				refreshTokenRepository.revokeAllActiveByUserId(stored.getUserId(), now);
 			}
 			throw new BusinessException(ErrorCode.AUTH_REQUIRED);
@@ -138,24 +142,29 @@ public class AuthService {
 		if (refreshTokenRepository.revokeIfActive(stored.getId(), now) == 0) {
 			throw new BusinessException(ErrorCode.AUTH_REQUIRED);
 		}
-		return issueTokens(user);
+		return issue(user, hash -> stored.rotate(hash, clock.instant().plus(properties.refreshTtl())));
 	}
 
 	@Transactional
 	public void logout(String refreshToken, String expoPushToken) {
-		refreshTokenRepository.findByTokenHash(RefreshTokens.hash(refreshToken)).ifPresent(token -> {
-			boolean alreadyRevoked = token.getRevokedAt() != null;
-			Instant revokedAt = alreadyRevoked ? token.getRevokedAt() : clock.instant();
-			token.revoke(revokedAt);
+		String tokenHash = RefreshTokens.hash(refreshToken);
+		refreshTokenRepository.findByTokenHash(tokenHash).ifPresent(token -> {
+			// 탈퇴·갱신과 같은 잠금 순서(사용자 → 리프레시 토큰 → 푸시 토큰). 갱신 중이면 끝나기를 기다린다.
+			userRepository.findByIdForUpdate(token.getUserId());
+			Instant now = clock.instant();
+			// 앱이 새 토큰을 받기 전에 옛 토큰으로 로그아웃했다면, 그 로그인에서 갱신된 토큰을 폐기한다.
+			boolean ended = refreshTokenRepository.revokeIfActive(token.getId(), now) > 0
+					|| refreshTokenRepository.revokeFamily(token.rootId(), now) > 0;
 			// 한 기기에서 A가 로그아웃하고 B가 로그인할 수 있으므로, 리프레시 토큰 소유자의 토큰만 지운다.
 			if (expoPushToken != null && EXPO_PUSH_TOKEN.matcher(expoPushToken).matches()) {
-				if (alreadyRevoked) {
+				if (!ended) {
 					// 응답이 유실돼 늦게 온 재시도다. 그 사이 같은 토큰을 다시 등록했다면 지우지 않는다.
-					pushTokenService.deleteOwnedIfNotSeenSince(token.getUserId(), expoPushToken, revokedAt);
+					// 잠금을 기다리는 사이 폐기됐을 수 있으므로 폐기 시각을 다시 읽는다.
+					refreshTokenRepository.findByTokenHash(tokenHash).map(RefreshToken::getRevokedAt)
+							.ifPresent(revokedAt -> pushTokenService.deleteOwnedIfNotSeenSince(
+									token.getUserId(), expoPushToken, revokedAt));
 					return;
 				}
-				// 탈퇴(refresh_tokens → push_tokens)와 같은 잠금 순서가 되도록 폐기 UPDATE를 먼저 DB에 반영한다.
-				refreshTokenRepository.flush();
 				pushTokenService.deleteOwned(token.getUserId(), expoPushToken);
 			}
 		});
@@ -163,10 +172,14 @@ public class AuthService {
 
 	@Transactional
 	public TokenPair issueTokens(User user) {
+		return issue(user, hash -> RefreshToken.issue(user.getId(), hash,
+				clock.instant().plus(properties.refreshTtl())));
+	}
+
+	private TokenPair issue(User user, Function<String, RefreshToken> toEntity) {
 		IssuedAccessToken access = jwtTokenService.issueAccessToken(user.getId());
 		String refreshToken = refreshTokens.newToken();
-		refreshTokenRepository.save(RefreshToken.issue(user.getId(), RefreshTokens.hash(refreshToken),
-				clock.instant().plus(properties.refreshTtl())));
+		refreshTokenRepository.save(toEntity.apply(RefreshTokens.hash(refreshToken)));
 		return new TokenPair(access.token(), access.expiresAt(), refreshToken, user);
 	}
 

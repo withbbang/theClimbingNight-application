@@ -30,6 +30,10 @@ public class RefreshToken extends BaseTimeEntity {
 	@Column(name = "token_hash", nullable = false, unique = true, length = 64, columnDefinition = "CHAR(64)")
 	private String tokenHash;
 
+	/** 갱신으로 이어진 토큰이 가리키는 첫 토큰. 첫 토큰이면 null. */
+	@Column(name = "root_id")
+	private Long rootId;
+
 	@JdbcTypeCode(SqlTypes.TIMESTAMP)
 	@Column(name = "expires_at", nullable = false)
 	private Instant expiresAt;
@@ -44,6 +48,18 @@ public class RefreshToken extends BaseTimeEntity {
 		token.tokenHash = tokenHash;
 		token.expiresAt = expiresAt;
 		return token;
+	}
+
+	/** 이 토큰을 갱신한 새 토큰. 같은 로그인에서 이어진 것을 알 수 있게 첫 토큰을 물려준다. */
+	public RefreshToken rotate(String tokenHash, Instant expiresAt) {
+		RefreshToken token = issue(userId, tokenHash, expiresAt);
+		token.rootId = rootId();
+		return token;
+	}
+
+	/** 같은 로그인에서 이어진 첫 토큰의 ID. */
+	public Long rootId() {
+		return rootId == null ? id : rootId;
 	}
 
 	public boolean isUsable(Instant now) {

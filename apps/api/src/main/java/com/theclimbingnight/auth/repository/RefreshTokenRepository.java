@@ -22,4 +22,10 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
 	@Query("update RefreshToken t set t.revokedAt = :now, t.updatedAt = :now "
 			+ "where t.id = :id and t.revokedAt is null")
 	int revokeIfActive(@Param("id") long id, @Param("now") Instant now);
+
+	/** 한 로그인에서 갱신으로 이어진 토큰을 모두 폐기한다. 다른 로그인의 토큰은 건드리지 않는다. */
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query("update RefreshToken t set t.revokedAt = :now, t.updatedAt = :now "
+			+ "where (t.id = :rootId or t.rootId = :rootId) and t.revokedAt is null")
+	int revokeFamily(@Param("rootId") long rootId, @Param("now") Instant now);
 }

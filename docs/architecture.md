@@ -266,7 +266,8 @@ auth_identities                      -- 소셜 로그인 연결
   UNIQUE(provider, provider_user_id)
 
 refresh_tokens
-  id, user_id → users, token_hash UNIQUE, expires_at, revoked_at
+  id, user_id → users, token_hash UNIQUE, expires_at, revoked_at,
+  root_id (같은 로그인에서 갱신으로 이어진 첫 토큰, 첫 토큰이면 NULL)
 
 roster_members                       -- 동호회원 명부
   id, somoim_nickname (유니크 아님: 동명이인·닉네임 변경 대비), user_id → users (nullable, UNIQUE), note,
