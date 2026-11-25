@@ -77,7 +77,6 @@ public class MembershipRequest extends BaseTimeEntity {
 		this.reviewedAt = now;
 	}
 
-	/** reviewer가 null이면 시스템(탈퇴 자동 종료)이 거절한 것이다. */
 	public void reject(String reason, User reviewer, Instant now) {
 		requirePending();
 		this.status = MembershipRequestStatus.REJECTED;
