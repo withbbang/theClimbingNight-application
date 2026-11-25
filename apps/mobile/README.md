@@ -38,6 +38,8 @@ pnpm start               # 빌드가 이미 있으면 개발 서버만
 | Android 에뮬레이터 | `http://10.0.2.2:8080`    |
 | 실기기             | 같은 와이파이의 컴퓨터 IP |
 
+웹뷰 페이지는 `EXPO_PUBLIC_WEB_URL`(비우면 API 주소)에서 연다. 로컬에서는 `apps/web`의 개발 서버(3000)를 넣는다. 호스트는 위 표와 같다.
+
 ## Android 키 해시와 SHA-1
 
 `pnpm expo prebuild -p android`를 한 번 돌린 뒤 debug 키로 구한다. 배포 키는 `pnpm dlx eas-cli credentials`에서 확인한다.

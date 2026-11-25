@@ -11,3 +11,6 @@ jest.mock('expo-notifications', () => ({
   addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   getPermissionsAsync: jest.fn(async () => ({ granted: true })),
 }));
+
+// 네이티브 웹뷰가 없는 테스트 기본값.
+jest.mock('react-native-webview', () => require('./test-utils/web-view'));

@@ -29,8 +29,18 @@ it('reads every provider when all keys are set', () => {
   });
   expect(config).toEqual({
     apiUrl: 'https://a.test',
+    webUrl: 'https://a.test',
     kakaoNativeAppKey: 'k',
     naver: { clientId: 'n', clientSecret: 's' },
     google: { webClientId: 'w', iosClientId: 'i' },
   });
+});
+
+it('reads a separate web address', () => {
+  const env = { ...API, EXPO_PUBLIC_WEB_URL: 'http://localhost:3000/' };
+  expect(readConfig(env).webUrl).toBe('http://localhost:3000');
+});
+
+it('uses the API address when there is no web address', () => {
+  expect(readConfig({ ...API, EXPO_PUBLIC_WEB_URL: '' }).webUrl).toBe('https://a.test');
 });
