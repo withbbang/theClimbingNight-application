@@ -7,16 +7,23 @@ import { notifyError, notifySuccess } from '@/lib/haptics';
 export function useAdminMutation<TData, TVariables = void>(
   mutationFn: (variables: TVariables) => Promise<TData>,
   keys: QueryKey[],
-  onSuccess?: (data: TData, variables: TVariables) => void,
+  on: {
+    success?: (data: TData, variables: TVariables) => void;
+    /** 보낸 줄이 목록에서 사라져도 불린다. */
+    error?: (error: Error) => void;
+  } = {},
 ) {
   const client = useQueryClient();
   const mutation = useMutation({
     mutationFn,
     onSuccess: (data, variables) => {
       notifySuccess();
-      onSuccess?.(data, variables);
+      on.success?.(data, variables);
     },
-    onError: notifyError,
+    onError: (error) => {
+      notifyError();
+      on.error?.(error);
+    },
     onSettled: () => {
       for (const queryKey of keys) {
         void client.invalidateQueries({ queryKey });

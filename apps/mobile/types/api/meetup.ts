@@ -1,3 +1,4 @@
+import type { AttendanceResult } from './attendance';
 import type { UserResponse } from './user';
 
 export type MeetupStatus = 'OPEN' | 'CANCELED';
@@ -69,4 +70,26 @@ export interface MeetupWriteRequest {
 export interface MeetupCopyRequest {
   startsAt: string;
   endsAt: string;
+}
+
+/** 운영진 신청자 목록 한 줄. */
+export interface MeetupApplicationAdminResponse {
+  id: number;
+  rosterMemberId: number;
+  somoimNickname: string;
+  /** 명부가 회원과 연결되지 않았으면 null. */
+  userId: number | null;
+  status: MeetupApplicationStatus;
+  appliedAt: string;
+  confirmedAt: string | null;
+  canceledAt: string | null;
+  lateCancel: boolean;
+  cancelReason: string | null;
+  /** 참석 기록이 없으면 null. */
+  attendanceId: number | null;
+  attendanceResult: AttendanceResult | null;
+  /** 이 벙의 늦은 취소 블랙리스트가 있는가. */
+  lateCancelPenalized: boolean;
+  penaltyTotal: number;
+  penaltyRecent: number;
 }

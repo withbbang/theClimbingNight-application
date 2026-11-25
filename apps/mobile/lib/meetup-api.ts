@@ -1,6 +1,7 @@
 import { apiFetch } from '@/lib/api';
 import type { DateKey } from '@/lib/kst';
 import type {
+  MeetupApplicationAdminResponse,
   MeetupCopyRequest,
   MeetupDetailResponse,
   MeetupResponse,
@@ -8,6 +9,7 @@ import type {
   MeetupWriteRequest,
   MyApplicationResponse,
 } from '@/types/api/meetup';
+import type { PenaltyResponse } from '@/types/api/penalty';
 
 export const meetupApi = {
   list(from: DateKey, to: DateKey) {
@@ -36,5 +38,16 @@ export const meetupApi = {
   },
   copy(id: number, body: MeetupCopyRequest) {
     return apiFetch<MeetupResponse>(`/meetups/${id}/copy`, { method: 'POST', body });
+  },
+  applications(id: number) {
+    return apiFetch<MeetupApplicationAdminResponse[]>(`/meetups/${id}/applications`);
+  },
+  removeApplication(applicationId: number) {
+    return apiFetch<void>(`/meetup-applications/${applicationId}/remove`, { method: 'POST' });
+  },
+  addLateCancelPenalty(applicationId: number) {
+    return apiFetch<PenaltyResponse>(`/meetup-applications/${applicationId}/penalties`, {
+      method: 'POST',
+    });
   },
 };
