@@ -1,14 +1,14 @@
 'use client';
 
 import { Wall } from '@/components/about/Wall';
-import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Reveal } from '@/components/ui/Reveal';
-import { buttonClass } from '@/components/ui/styles';
+import { SettingLink, settingsFailed } from '@/components/ui/SettingLink';
 import { ABOUT } from '@/content/about';
 import { useAppSettings } from '@/hooks/use-app-settings';
 
 export function About() {
-  const joinUrl = useAppSettings().data?.somoimJoinUrl;
+  const settings = useAppSettings();
+  const joinUrl = settings.data?.somoimJoinUrl;
   return (
     <>
       <Wall />
@@ -41,11 +41,14 @@ export function About() {
           ))}
         </ol>
       </section>
-      {joinUrl ? (
+      {joinUrl || settingsFailed(settings) ? (
         <Reveal className="mt-12">
-          <ExternalLink href={joinUrl} className={buttonClass}>
-            소모임에서 가입하기
-          </ExternalLink>
+          <SettingLink
+            query={settings}
+            url={joinUrl}
+            label="소모임에서 가입하기"
+            failedMessage="가입 링크를 불러오지 못했어요."
+          />
         </Reveal>
       ) : null}
     </>

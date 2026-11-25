@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 
 import { Goods } from '@/components/goods/Goods';
 import { fail, mockServer, ok, renderWithQuery } from '@/test-utils/server';
@@ -35,14 +35,46 @@ it('keeps the store link when there are no goods', async () => {
   expect(await screen.findByRole('link', { name: '스마트스토어 보기' })).toBeInTheDocument();
 });
 
-it.each([
-  ['there is no URL', settings(null)],
-  ['settings fail', fail(500, 'COMMON_INTERNAL_ERROR', '서버 오류')],
-])('hides the store link when %s', async (_name, reply) => {
-  mockServer({ '/app-settings': reply });
+it('hides the store link when there is no URL', async () => {
+  mockServer({ '/app-settings': settings(null) });
   const { client } = renderWithQuery(<Goods items={[item]} />);
 
   await waitFor(() => expect(client.getQueryState(['app-settings'])?.fetchStatus).toBe('idle'));
   expect(screen.getByText('초크백')).toBeInTheDocument();
   expect(screen.queryByRole('link')).toBeNull();
+  expect(screen.queryByRole('button')).toBeNull();
+});
+
+it('offers a retry for the link when settings fail', async () => {
+  let down = true;
+  mockServer({
+    '/app-settings': () =>
+      down ? fail(500, 'COMMON_INTERNAL_ERROR', '서버 오류') : settings('https://store.test'),
+  });
+  renderWithQuery(<Goods items={[item]} />);
+  expect(await screen.findByText('스토어 링크를 불러오지 못했어요.')).toBeInTheDocument();
+
+  down = false;
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+
+  const link = await screen.findByRole('link', { name: '스마트스토어에서 구매하기' });
+  expect(link).toHaveAttribute('href', 'https://store.test');
+  expect(screen.queryByText('스토어 링크를 불러오지 못했어요.')).toBeNull();
+});
+
+it('offers a retry for the link when settings fail and there are no goods', async () => {
+  let down = true;
+  mockServer({
+    '/app-settings': () =>
+      down ? fail(500, 'COMMON_INTERNAL_ERROR', '서버 오류') : settings('https://store.test'),
+  });
+  renderWithQuery(<Goods items={[]} />);
+  expect(await screen.findByText('스토어 링크를 불러오지 못했어요.')).toBeInTheDocument();
+
+  down = false;
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+
+  const link = await screen.findByRole('link', { name: '스마트스토어 보기' });
+  expect(link).toHaveAttribute('href', 'https://store.test');
+  expect(screen.queryByText('스토어 링크를 불러오지 못했어요.')).toBeNull();
 });

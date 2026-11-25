@@ -2,20 +2,24 @@
 
 import Image from 'next/image';
 
-import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Notice } from '@/components/ui/Notice';
 import { Reveal } from '@/components/ui/Reveal';
-import { buttonClass } from '@/components/ui/styles';
+import { SettingLink, settingsFailed } from '@/components/ui/SettingLink';
 import type { GoodsItem } from '@/content/goods';
 import { useAppSettings } from '@/hooks/use-app-settings';
 
 export function Goods({ items }: { items: GoodsItem[] }) {
-  const storeUrl = useAppSettings().data?.smartstoreUrl;
+  const settings = useAppSettings();
+  const storeUrl = settings.data?.smartstoreUrl;
+  const showStore = storeUrl || settingsFailed(settings);
   const store = (label: string) =>
-    storeUrl ? (
-      <ExternalLink href={storeUrl} className={buttonClass}>
-        {label}
-      </ExternalLink>
+    showStore ? (
+      <SettingLink
+        query={settings}
+        url={storeUrl}
+        label={label}
+        failedMessage="스토어 링크를 불러오지 못했어요."
+      />
     ) : null;
 
   if (items.length === 0) {
@@ -45,7 +49,7 @@ export function Goods({ items }: { items: GoodsItem[] }) {
           </li>
         ))}
       </ul>
-      {storeUrl ? <Reveal className="mt-10">{store('스마트스토어에서 구매하기')}</Reveal> : null}
+      {showStore ? <Reveal className="mt-10">{store('스마트스토어에서 구매하기')}</Reveal> : null}
     </>
   );
 }
