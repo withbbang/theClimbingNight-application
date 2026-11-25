@@ -21,11 +21,13 @@ export function useUpcomingMeetups() {
   return useMeetups(today, addDays(today, MAX_RANGE_DAYS));
 }
 
-export function useMeetup(id: number | null) {
+/** fresh면 받은 지 얼마 안 됐어도 화면을 열 때 다시 받는다. */
+export function useMeetup(id: number | null, fresh = false) {
   const isMember = useIsMember();
   return useQuery({
     queryKey: ['meetups', 'detail', id],
     queryFn: () => meetupApi.get(id ?? 0),
     enabled: isMember && id !== null,
+    refetchOnMount: fresh ? 'always' : true,
   });
 }

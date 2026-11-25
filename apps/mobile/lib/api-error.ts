@@ -28,3 +28,7 @@ export function badResponseError(status: number) {
     status,
   );
 }
+
+export function isNotFound(error: unknown) {
+  return error instanceof ApiError && error.status === 404;
+}

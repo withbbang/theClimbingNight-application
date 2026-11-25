@@ -5,6 +5,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { MapPinIcon } from 'phosphor-react-native/src/icons/MapPin';
 
 import { RoleGate } from '@/components/auth/RoleGate';
+import { AdminBar } from '@/components/meetup/AdminBar';
 import { ApplicationBar } from '@/components/meetup/ApplicationBar';
 import { CapacityHolds } from '@/components/meetup/CapacityHolds';
 import { MeetupNotFound } from '@/components/meetup/MeetupNotFound';
@@ -17,6 +18,7 @@ import { QueryState } from '@/components/ui/QueryState';
 import { Screen } from '@/components/ui/Screen';
 import { useMeetup } from '@/hooks/use-meetups';
 import { useNow } from '@/hooks/use-now';
+import { useIsAdmin } from '@/hooks/use-role';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api-error';
 import { formatDay, formatTime, toDateKey } from '@/lib/kst';
@@ -31,6 +33,7 @@ interface DetailProps {
 
 function Detail({ detail, onRefresh }: DetailProps) {
   const { colors, space } = useTheme();
+  const admin = useIsAdmin();
   const { meetup } = detail;
   const start = Date.parse(meetup.startsAt);
   const now = useNow(meetup.endsAt ? [start, Date.parse(meetup.endsAt)] : [start]);
@@ -86,6 +89,7 @@ function Detail({ detail, onRefresh }: DetailProps) {
             <AppText variant="caption" tone="muted">{`여는 사람 ${meetup.host.nickname}`}</AppText>
           </FadeInItem>
         ) : null}
+        {admin ? <AdminBar meetup={meetup} phase={phase} started={started} /> : null}
       </ScrollView>
       <ApplicationBar detail={detail} phase={phase} started={started} />
     </View>

@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { useRouter } from 'expo-router';
+
 import Animated, { FadeInLeft, FadeInRight, useReducedMotion } from 'react-native-reanimated';
 
 import { RoleGate } from '@/components/auth/RoleGate';
 import { MeetupCalendar } from '@/components/meetup/MeetupCalendar';
 import { MeetupList } from '@/components/meetup/MeetupList';
 import { AppText } from '@/components/ui/AppText';
+import { Button } from '@/components/ui/Button';
 import { QueryState } from '@/components/ui/QueryState';
 import { Screen } from '@/components/ui/Screen';
 import { Segments } from '@/components/ui/Segments';
 import { useUpcomingMeetups } from '@/hooks/use-meetups';
+import { useIsAdmin } from '@/hooks/use-role';
 import { useTheme } from '@/hooks/use-theme';
 
 const VIEWS = [
@@ -29,6 +33,8 @@ function Upcoming() {
 
 function Meetups() {
   const { space } = useTheme();
+  const router = useRouter();
+  const admin = useIsAdmin();
   const reduced = useReducedMotion();
   const [view, setView] = useState<'list' | 'calendar'>('list');
 
@@ -38,6 +44,13 @@ function Meetups() {
         {view === 'list' ? '다가오는 벙' : '벙 달력'}
       </AppText>
       <Segments options={VIEWS} value={view} onChange={setView} />
+      {admin ? (
+        <Button
+          label="벙 열기"
+          variant="secondary"
+          onPress={() => router.push('/admin/meetups/new')}
+        />
+      ) : null}
       <Animated.View
         key={view}
         style={styles.fill}

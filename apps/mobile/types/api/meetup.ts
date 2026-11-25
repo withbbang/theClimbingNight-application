@@ -53,3 +53,20 @@ export interface MeetupDetailResponse {
   /** 명단을 공개하지 않는 벙이면 null. */
   participants: ParticipantResponse[] | null;
 }
+
+/** 개설과 수정이 함께 쓴다. */
+export interface MeetupWriteRequest {
+  title: string;
+  description: string | null;
+  placeName: string;
+  startsAt: string;
+  endsAt: string;
+  capacity: number;
+  lateCancelHours: number;
+  participantsVisible: boolean;
+}
+
+export interface MeetupCopyRequest {
+  startsAt: string;
+  endsAt: string;
+}

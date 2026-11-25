@@ -1,8 +1,11 @@
 import { apiFetch } from '@/lib/api';
 import type { DateKey } from '@/lib/kst';
 import type {
+  MeetupCopyRequest,
   MeetupDetailResponse,
+  MeetupResponse,
   MeetupSummaryResponse,
+  MeetupWriteRequest,
   MyApplicationResponse,
 } from '@/types/api/meetup';
 
@@ -21,5 +24,17 @@ export const meetupApi = {
       method: 'POST',
       body: reason ? { reason } : {},
     });
+  },
+  create(body: MeetupWriteRequest) {
+    return apiFetch<MeetupResponse>('/meetups', { method: 'POST', body });
+  },
+  update(id: number, body: MeetupWriteRequest) {
+    return apiFetch<MeetupResponse>(`/meetups/${id}`, { method: 'PUT', body });
+  },
+  cancelMeetup(id: number) {
+    return apiFetch<MeetupResponse>(`/meetups/${id}/cancel`, { method: 'POST' });
+  },
+  copy(id: number, body: MeetupCopyRequest) {
+    return apiFetch<MeetupResponse>(`/meetups/${id}/copy`, { method: 'POST', body });
   },
 };
