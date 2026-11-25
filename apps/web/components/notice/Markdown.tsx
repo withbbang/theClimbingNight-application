@@ -82,7 +82,7 @@ function transformUrl(url: string) {
 export function Markdown({ children }: { children: string }) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkBreaks]}
+      remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkBreaks]}
       skipHtml
       urlTransform={transformUrl}
       components={components}

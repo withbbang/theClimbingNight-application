@@ -36,3 +36,22 @@ it.each([
   const ids = sections.map(({ id }) => id);
   expect(new Set(ids).size).toBe(ids.length);
 });
+
+function privacyBody(id: string) {
+  return PRIVACY.sections.find((section) => section.id === id)?.body;
+}
+
+// apps/api의 ParticipantResponse가 소모임 닉네임을 준다.
+it('says participants are shown by somoim nickname', () => {
+  expect(privacyBody('shared')).toContain('신청자의 소모임 닉네임과');
+});
+
+it.each([
+  '회원 번호',
+  '탈퇴 시각',
+  '지난 신청과 취소 기록',
+  '명부 연결 정보',
+  '기기 알림 토큰이 들어',
+])('says what remains after withdrawal: %s', (text) => {
+  expect(privacyBody('retention')).toContain(text);
+});

@@ -56,3 +56,10 @@ it('renders tables', () => {
 
   expect(screen.getByRole('cell', { name: '서울' })).toBeInTheDocument();
 });
+
+it('keeps tilde ranges as text', () => {
+  const { container } = render(<Markdown>{'토 10~12시, 일 14~16시에 열어요. ~~취소~~'}</Markdown>);
+
+  expect(container).toHaveTextContent('토 10~12시, 일 14~16시에 열어요. 취소');
+  expect(container.querySelectorAll('del')).toHaveLength(1);
+});
