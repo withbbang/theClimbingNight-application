@@ -1,0 +1,5 @@
+# 설치 스크립트 없이도 동작한다 (미리 빌드된 바이너리 사용).
+allowBuilds:
+  sharp: false
+  unrs-resolver: false
+  esbuild: false
