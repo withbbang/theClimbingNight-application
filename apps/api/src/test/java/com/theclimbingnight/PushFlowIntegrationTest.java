@@ -172,8 +172,9 @@ class PushFlowIntegrationTest {
 		return saved;
 	}
 
+	/** 토큰 열은 ascii라 한글을 넣으면 MySQL에서 실패한다. */
 	private static String token(String name) {
-		return "ExponentPushToken[푸시플로우-" + name + "]";
+		return "ExponentPushToken[pushflow-" + Integer.toHexString(name.hashCode()) + "]";
 	}
 
 	/** 명부와 연결되고 토큰을 하나 등록한 동호회원. */
