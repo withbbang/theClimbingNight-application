@@ -384,6 +384,56 @@ class AuthServiceTest {
 		verify(refreshTokenRepository, never()).revokeAllActiveByUserId(any(Long.class), any(Instant.class));
 	}
 
+	/** 사용자 잠금을 얻기까지 걸린 시간. */
+	private void lockTakes(Duration wait) {
+		given(userRepository.findByIdForUpdate(7L)).willAnswer(inv -> {
+			clock.advance(wait);
+			return Optional.of(user(7L));
+		});
+	}
+
+	@Test
+	void 재사용_감지는_잠금을_얻은_시각으로_폐기한다() {
+		// given
+		revokedToken(START);
+		clock.advance(Duration.ofSeconds(31));
+		lockTakes(Duration.ofSeconds(35));
+
+		// when, then
+		assertCode(() -> service.refresh("old-token"), ErrorCode.AUTH_REQUIRED);
+		verify(refreshTokenRepository).revokeAllActiveByUserId(7L, START.plusSeconds(66));
+	}
+
+	@Test
+	void 갱신은_잠금을_얻은_시각으로_폐기한다() {
+		// given
+		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plus(Duration.ofDays(30)));
+		ReflectionTestUtils.setField(old, "id", 99L);
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		given(refreshTokenRepository.revokeIfActive(any(Long.class), any(Instant.class))).willReturn(1);
+		lockTakes(Duration.ofSeconds(35));
+
+		// when
+		service.refresh("old-token");
+
+		// then
+		verify(refreshTokenRepository).revokeIfActive(99L, START.plusSeconds(35));
+	}
+
+	@Test
+	void 잠금을_기다리는_사이_만료되면_401이다() {
+		// given
+		RefreshToken old = RefreshToken.issue(7L, RefreshTokens.hash("old-token"), START.plusSeconds(35));
+		ReflectionTestUtils.setField(old, "id", 99L);
+		given(refreshTokenRepository.findByTokenHash(RefreshTokens.hash("old-token"))).willReturn(Optional.of(old));
+		given(refreshTokenRepository.revokeIfActive(any(Long.class), any(Instant.class))).willReturn(1);
+		lockTakes(Duration.ofSeconds(35));
+
+		// when, then
+		assertCode(() -> service.refresh("old-token"), ErrorCode.AUTH_REQUIRED);
+		verify(refreshTokenRepository, never()).save(any());
+	}
+
 	@Test
 	void 없는_리프레시_토큰이면_401이다() {
 		// given

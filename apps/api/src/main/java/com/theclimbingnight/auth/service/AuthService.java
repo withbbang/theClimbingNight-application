@@ -126,7 +126,8 @@ public class AuthService {
 			if (!withinGrace && now.isBefore(stored.getExpiresAt())) {
 				// 갱신·로그인이 아직 커밋하지 않은 새 토큰까지 폐기하도록 끝나기를 기다린다.
 				userRepository.findByIdForUpdate(stored.getUserId());
-				refreshTokenRepository.revokeAllActiveByUserId(stored.getUserId(), now);
+				// 대기 전 시각으로 폐기하면 재사용 유예가 그만큼 줄어든다.
+				refreshTokenRepository.revokeAllActiveByUserId(stored.getUserId(), clock.instant());
 			}
 			throw new BusinessException(ErrorCode.AUTH_REQUIRED);
 		}
@@ -137,9 +138,14 @@ public class AuthService {
 		User user = userRepository.findByIdForUpdate(stored.getUserId())
 				.filter(User::isActive)
 				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
+		// 잠금을 기다린 만큼 시각이 흘렀을 수 있다.
+		Instant lockedAt = clock.instant();
+		if (!stored.isUsable(lockedAt)) {
+			throw new BusinessException(ErrorCode.AUTH_REQUIRED);
+		}
 		// 조회 뒤 다른 요청이 먼저 폐기했을 수 있으므로 조건부 UPDATE로 한 요청만 통과시킨다.
 		// 동시 경합은 재사용 공격이 아니므로 전체 폐기 없이 401만 준다.
-		if (refreshTokenRepository.revokeIfActive(stored.getId(), now) == 0) {
+		if (refreshTokenRepository.revokeIfActive(stored.getId(), lockedAt) == 0) {
 			throw new BusinessException(ErrorCode.AUTH_REQUIRED);
 		}
 		return issue(user, hash -> stored.rotate(hash, clock.instant().plus(properties.refreshTtl())));
