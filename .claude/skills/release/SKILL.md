@@ -16,6 +16,7 @@ disable-model-invocation: true
    ```bash
    pnpm install --frozen-lockfile && pnpm lint && pnpm test && pnpm build
    ```
+   저장소 루트에서 `grep -rn '\[확인 필요' apps/web/content` 결과가 비어 있어야 한다. 남아 있으면 중단하고 채울 값을 보고한다.
 4. `apps/mobile`:
    ```bash
    pnpm install --frozen-lockfile && pnpm lint && pnpm test && pnpm dlx expo-doctor
