@@ -1,6 +1,7 @@
 import { useNavigation, useRouter } from 'expo-router';
 
-const AUTH_ROUTES = ['login', 'signup'];
+// 로그인·가입 화면에서 연 약관도 함께 걷어낸다.
+const AUTH_ROUTES = ['login', 'signup', 'legal/terms', 'legal/privacy'];
 
 /** 로그인과 가입 화면을 걷어내고 그 전에 보던 화면으로 돌아간다. */
 export function useLeaveAuth() {

@@ -41,7 +41,16 @@ const RULES = new Map<unknown, PushRule>([
       keys: [['inquiries']],
     },
   ],
-  ['NOTICE_PUBLISHED', { route: () => '/', keys: [['notices']] }],
+  [
+    'NOTICE_PUBLISHED',
+    {
+      route: (data) => {
+        const id = idOf(data, 'noticeId');
+        return id === null ? '/notices' : `/notices/${id}`;
+      },
+      keys: [['notices']],
+    },
+  ],
 ]);
 
 function ruleOf(data: unknown) {

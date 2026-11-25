@@ -11,7 +11,9 @@ it.each([
   [{ type: 'MEMBERSHIP_REJECTED' }, '/membership'],
   [{ type: 'INQUIRY_ANSWERED', inquiryId: 3 }, '/inquiries/3'],
   [{ type: 'INQUIRY_ANSWERED', inquiryId: 'x' }, '/inquiries'],
-  [{ type: 'NOTICE_PUBLISHED', noticeId: 2 }, '/'],
+  [{ type: 'NOTICE_PUBLISHED', noticeId: 2 }, '/notices/2'],
+  [{ type: 'NOTICE_PUBLISHED', noticeId: '../my' }, '/notices'],
+  [{ type: 'NOTICE_PUBLISHED' }, '/notices'],
 ])('routes %p to %s', (data, route) => {
   expect(routeForPush(data)).toBe(route);
 });

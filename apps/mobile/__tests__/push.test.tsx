@@ -94,8 +94,8 @@ it('closes the login screen before opening the detail', async () => {
 it('opens a tab from a detail', async () => {
   server();
   const app = await renderApp('/meetups/3');
-  await tap({ type: 'NOTICE_PUBLISHED' });
-  expect(app.getPathname()).toBe('/');
+  await tap({ type: 'MEETUP_REMINDER' });
+  expect(app.getPathname()).toBe('/meetups');
 });
 
 it('refetches the open detail when a push arrives in the foreground', async () => {

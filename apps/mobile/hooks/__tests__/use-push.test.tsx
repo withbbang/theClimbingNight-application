@@ -96,7 +96,7 @@ it('waits for the session to load before routing a cold start tap', async () => 
   await renderHook(() => usePush());
   expect(mockNavigate).not.toHaveBeenCalled();
   await act(async () => sessionStore.load());
-  expect(mockNavigate).toHaveBeenCalledWith('/');
+  expect(mockNavigate).toHaveBeenCalledWith('/notices');
 });
 
 it('refreshes the user when a membership push arrives', async () => {

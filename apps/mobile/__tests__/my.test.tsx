@@ -29,6 +29,9 @@ it.each([
   ['문의', '/inquiries'],
   ['알림 설정', '/settings/notifications'],
   ['닉네임 변경', '/settings/nickname'],
+  ['동호회 소개', '/about'],
+  ['이용약관', '/legal/terms'],
+  ['개인정보처리방침', '/legal/privacy'],
   ['탈퇴', '/settings/withdraw'],
 ])('opens %s', async (label, path) => {
   await startAs('MEMBER');

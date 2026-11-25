@@ -143,3 +143,24 @@ it('ignores a late result after leaving the screen', async () => {
   expect(app.getPathname()).toBe('/goods');
   expect(loginNotice.take()).toBeNull();
 });
+
+it('keeps the nickname after reading the terms', async () => {
+  mockServer({});
+  const app = await renderApp('/signup');
+  await fireEvent.changeText(screen.getByLabelText('닉네임'), '가나');
+  await fireEvent.press(screen.getByRole('button', { name: '이용약관' }));
+  await flush();
+  expect(app.getPathname()).toBe('/legal/terms');
+  await act(async () => router.back());
+  expect(screen.getByLabelText('닉네임')).toHaveDisplayValue('가나');
+});
+
+it('leaves past the terms opened during signup', async () => {
+  mockServer({ '/auth/signup': ok(tokens('1')), '/users/me': ok(tokens('1').user) });
+  const app = await renderApp('/');
+  await act(async () => router.push('/login'));
+  await act(async () => router.push('/legal/terms'));
+  await act(async () => router.push('/signup'));
+  await submit('가나');
+  expect(app.getPathname()).toBe('/');
+});

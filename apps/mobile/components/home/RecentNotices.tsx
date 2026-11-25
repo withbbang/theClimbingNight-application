@@ -1,15 +1,19 @@
 import { StyleSheet, View } from 'react-native';
 
+import { useRouter } from 'expo-router';
+
 import { PushPinIcon } from 'phosphor-react-native/src/icons/PushPin';
 
 import { AppText } from '@/components/ui/AppText';
-import { FadeInItem } from '@/components/ui/FadeInItem';
+import { Button } from '@/components/ui/Button';
+import { PressCard } from '@/components/ui/PressCard';
 import { QueryState } from '@/components/ui/QueryState';
 import { useRecentNotices } from '@/hooks/use-home';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDay, toDateKey } from '@/lib/kst';
 
 export function RecentNotices() {
+  const router = useRouter();
   const { colors, space } = useTheme();
   const query = useRecentNotices();
   return (
@@ -22,9 +26,14 @@ export function RecentNotices() {
           items.length === 0 ? (
             <AppText tone="muted">아직 공지가 없어요</AppText>
           ) : (
-            <View style={{ gap: space(4) }}>
+            <View>
               {items.map((notice, i) => (
-                <FadeInItem key={notice.id} index={i + 2} style={[styles.row, { gap: space(2) }]}>
+                <PressCard
+                  key={notice.id}
+                  index={i + 2}
+                  label={notice.pinned ? `고정된 공지, ${notice.title}` : notice.title}
+                  onPress={() => router.push(`/notices/${notice.id}`)}
+                >
                   <View style={styles.fill}>
                     <AppText variant="label">{notice.title}</AppText>
                     <AppText variant="caption" tone="muted">
@@ -32,12 +41,15 @@ export function RecentNotices() {
                     </AppText>
                   </View>
                   {notice.pinned ? (
-                    <View accessible accessibilityLabel="고정된 공지">
-                      <PushPinIcon size={20} color={colors.textMuted} weight="fill" />
-                    </View>
+                    <PushPinIcon size={20} color={colors.textMuted} weight="fill" />
                   ) : null}
-                </FadeInItem>
+                </PressCard>
               ))}
+              <Button
+                label="공지 모두 보기"
+                variant="text"
+                onPress={() => router.push('/notices')}
+              />
             </View>
           )
         }
@@ -46,4 +58,4 @@ export function RecentNotices() {
   );
 }
 
-const styles = StyleSheet.create({ row: { flexDirection: 'row' }, fill: { flex: 1 } });
+const styles = StyleSheet.create({ fill: { flex: 1 } });

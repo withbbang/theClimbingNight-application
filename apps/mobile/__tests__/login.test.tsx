@@ -291,3 +291,21 @@ describe('when the social app never answers', () => {
     expect(server.count('/auth/login')).toBe(0);
   });
 });
+
+it.each([
+  ['이용약관', '/legal/terms'],
+  ['개인정보처리방침', '/legal/privacy'],
+])('opens %s and comes back', async (label, path) => {
+  const app = await renderApp('/login');
+  await press(label);
+  expect(app.getPathname()).toBe(path);
+  await press('뒤로');
+  expect(app.getPathname()).toBe('/login');
+});
+
+it('keeps the legal links closed while logging in', async () => {
+  kakaoSignIn.mockReturnValue(new Promise(() => {}));
+  await renderApp('/login');
+  await press('카카오 로그인');
+  expect(button('이용약관')).toBeDisabled();
+});

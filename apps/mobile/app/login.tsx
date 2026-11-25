@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
+import { LegalLinks } from '@/components/auth/LegalLinks';
 import { RouteHolds } from '@/components/auth/RouteHolds';
 import { SocialButtons } from '@/components/auth/SocialButtons';
 import { AppText } from '@/components/ui/AppText';
@@ -57,6 +58,7 @@ export default function LoginScreen() {
           description="소셜 로그인 키를 넣고 앱을 다시 빌드해 주세요."
         />
       )}
+      <LegalLinks index={6} disabled={pending !== null} />
     </Screen>
   );
 }

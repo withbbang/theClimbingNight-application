@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Redirect, useRouter } from 'expo-router';
 
+import { LegalLinks } from '@/components/auth/LegalLinks';
 import { AppText } from '@/components/ui/AppText';
 import { Button } from '@/components/ui/Button';
 import { FadeInItem } from '@/components/ui/FadeInItem';
@@ -61,6 +62,7 @@ export default function SignupScreen() {
       <FadeInItem index={3} style={{ marginTop: space(6) }}>
         <Button label="가입하기" loading={submitting} onPress={() => void submit()} />
       </FadeInItem>
+      <LegalLinks index={4} disabled={submitting} />
     </Screen>
   );
 }

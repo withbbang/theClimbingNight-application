@@ -159,3 +159,41 @@ it('does not stay loading when signed out while notices load', async () => {
   await flush();
   expect(screen.getByText('11월 정기총회')).toBeOnTheScreen();
 });
+
+it('opens a notice from home', async () => {
+  mockServer({ [NOTICES]: notices });
+  const app = await renderApp('/');
+  await press('고정된 공지, 11월 정기총회');
+  expect(app.getPathname()).toBe('/notices/1');
+});
+
+it('opens all notices from home', async () => {
+  mockServer({ [NOTICES]: notices });
+  const app = await renderApp('/');
+  await press('공지 모두 보기');
+  expect(app.getPathname()).toBe('/notices');
+});
+
+it('hides all notices when there are none', async () => {
+  mockServer({
+    [NOTICES]: ok({ items: [], page: 0, size: 3, totalElements: 0, totalPages: 0 }),
+  });
+  await renderApp('/');
+  expect(screen.getByText('아직 공지가 없어요')).toBeOnTheScreen();
+  expect(button('공지 모두 보기')).toBeNull();
+});
+
+it.each([
+  [null, true],
+  ['USER', true],
+  ['MEMBER', false],
+] as const)('introduces the club to %p: %p', async (role, shown) => {
+  await startAs(role);
+  mockServer({ '/app-settings': settings(null) });
+  const app = await renderApp('/');
+  expect(button('동호회 소개') !== null).toBe(shown);
+  if (shown) {
+    await press('동호회 소개');
+    expect(app.getPathname()).toBe('/about');
+  }
+});

@@ -37,7 +37,13 @@ const COMMON_MENUS: Menu[] = [
   { label: '문의', href: '/inquiries' },
   { label: '알림 설정', href: '/settings/notifications' },
   { label: '닉네임 변경', href: '/settings/nickname' },
-  { label: '탈퇴', href: '/settings/withdraw' },
+];
+const WITHDRAW_MENU: Menu = { label: '탈퇴', href: '/settings/withdraw' };
+
+const INFO_MENUS: Menu[] = [
+  { label: '동호회 소개', href: '/about' },
+  { label: '이용약관', href: '/legal/terms' },
+  { label: '개인정보처리방침', href: '/legal/privacy' },
 ];
 
 export default function MyScreen() {
@@ -55,6 +61,11 @@ export default function MyScreen() {
           actionLabel="로그인하기"
           onAction={() => router.push('/login')}
         />
+        <View style={{ marginTop: space(6) }}>
+          {INFO_MENUS.map(({ label, href }, i) => (
+            <MenuRow key={label} label={label} index={i + 4} onPress={() => router.push(href)} />
+          ))}
+        </View>
       </Screen>
     );
   }
@@ -63,6 +74,8 @@ export default function MyScreen() {
     ...(role === 'ADMIN' ? ADMIN_MENUS : []),
     ...(role === 'USER' ? USER_MENUS : MEMBER_MENUS),
     ...COMMON_MENUS,
+    ...INFO_MENUS,
+    WITHDRAW_MENU,
   ];
   return (
     <Screen scroll bottomInset={false}>
