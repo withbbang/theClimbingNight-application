@@ -6,6 +6,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 
 import { Notice } from '@/components/ui/Notice';
 import { PulseHolds } from '@/components/ui/PulseHolds';
+import { SlowHint } from '@/components/ui/SlowHint';
 import { buttonClass } from '@/components/ui/styles';
 import { errorMessage } from '@/lib/error-message';
 
@@ -32,5 +33,10 @@ export function QueryState<T>({ query, children }: QueryStateProps<T>) {
       />
     );
   }
-  return <PulseHolds />;
+  return (
+    <>
+      <PulseHolds />
+      <SlowHint />
+    </>
+  );
 }

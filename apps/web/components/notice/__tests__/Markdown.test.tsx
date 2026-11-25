@@ -63,3 +63,44 @@ it('keeps tilde ranges as text', () => {
   expect(container).toHaveTextContent('토 10~12시, 일 14~16시에 열어요. 취소');
   expect(container.querySelectorAll('del')).toHaveLength(1);
 });
+
+it('shows HTML as text instead of dropping its words', () => {
+  render(<Markdown>{'<div>중요한 안내</div>'}</Markdown>);
+
+  expect(screen.getByText(/중요한 안내/)).toBeInTheDocument();
+});
+
+it.each([
+  ['https://open.kakao.com/o/abc로 오세요', 'https://open.kakao.com/o/abc'],
+  ['https://example.com에서 봐요', 'https://example.com/'],
+  ['www.example.com으로 오세요', 'http://www.example.com/'],
+  ['https://example.com/a에서는 안 돼요', 'https://example.com/a'],
+])('leaves Korean particles out of the link: %s', (text, href) => {
+  const { container } = render(<Markdown>{text}</Markdown>);
+
+  expect((screen.getByRole('link') as HTMLAnchorElement).href).toBe(href);
+  expect(container).toHaveTextContent(text);
+});
+
+it('keeps Korean words that belong to the address', () => {
+  render(<Markdown>{'https://namu.wiki/w/클라이밍 참고'}</Markdown>);
+
+  expect(screen.getByRole('link')).toHaveTextContent('https://namu.wiki/w/클라이밍');
+});
+
+it('bolds a phrase that ends with punctuation before a particle', () => {
+  const { container } = render(<Markdown>{'**벙(정기)**은 토요일'}</Markdown>);
+
+  expect(container.querySelector('strong')).toHaveTextContent('벙(정기)');
+});
+
+it('links footnotes both ways', () => {
+  const { container } = render(<Markdown>{'본문[^1]\n\n[^1]: 각주 내용'}</Markdown>);
+
+  const [down, up] = screen.getAllByRole('link');
+  for (const link of [down, up]) {
+    const target = link?.getAttribute('href')?.slice(1) ?? '';
+    expect(container.querySelector(`[id="${target}"]`)).not.toBeNull();
+  }
+  expect(screen.getByRole('heading', { name: '각주' })).toBeInTheDocument();
+});

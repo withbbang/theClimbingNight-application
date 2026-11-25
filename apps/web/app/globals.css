@@ -111,6 +111,11 @@
     transform: none;
   }
 
+  /* 10초 뒤에 나타난다. 동작을 줄여도 안내는 필요해 시간만 늦춘다. */
+  .slow-hint {
+    animation: slow-hint 1ms 10s backwards;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .press,
     .notice-hold::after {
@@ -172,6 +177,12 @@
     .sway {
       animation: sway 3.6s ease-in-out infinite;
     }
+  }
+}
+
+@keyframes slow-hint {
+  from {
+    visibility: hidden;
   }
 }
 

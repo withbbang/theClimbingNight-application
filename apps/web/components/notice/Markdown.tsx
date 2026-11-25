@@ -2,18 +2,25 @@ import type { ComponentPropsWithoutRef } from 'react';
 
 import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
+import remarkCjkFriendly from 'remark-cjk-friendly';
 import remarkGfm from 'remark-gfm';
 
 import { ExternalLink } from '@/components/ui/ExternalLink';
+import { remarkTrimParticles } from '@/lib/remark-trim-particles';
 
+const FOOTNOTE = /^#user-content-fn/;
 const LINK = /^(https?:|mailto:|tel:)/i;
 
 function Heading2({ children }: ComponentPropsWithoutRef<'h2'>) {
   return <h2 className="mt-8 text-xl font-extrabold first:mt-0">{children}</h2>;
 }
 
-function Heading3({ children }: ComponentPropsWithoutRef<'h3'>) {
-  return <h3 className="mt-6 text-lg font-bold first:mt-0">{children}</h3>;
+function Heading3({ children, id }: ComponentPropsWithoutRef<'h3'>) {
+  return (
+    <h3 id={id} className="mt-6 text-lg font-bold first:mt-0">
+      {children}
+    </h3>
+  );
 }
 
 function Heading4({ children }: ComponentPropsWithoutRef<'h4'>) {
@@ -35,7 +42,11 @@ const components: Components = {
       {children}
     </ol>
   ),
-  li: ({ children }) => <li className="mt-1">{children}</li>,
+  li: ({ children, id }) => (
+    <li id={id} className="mt-1">
+      {children}
+    </li>
+  ),
   blockquote: ({ children }) => (
     <blockquote className="mt-4 border-l-4 border-accent pl-4 text-muted">{children}</blockquote>
   ),
@@ -53,8 +64,12 @@ const components: Components = {
     <th className="border-b-2 border-border min-w-20 px-3 py-2 font-bold">{children}</th>
   ),
   td: ({ children }) => <td className="min-w-20 border-b border-hold-off px-3 py-2">{children}</td>,
-  a: ({ href, children }) =>
-    href && LINK.test(href) ? (
+  a: ({ href, id, children }) =>
+    href && FOOTNOTE.test(href) ? (
+      <a id={id} href={href} className="px-1 font-semibold underline">
+        {children}
+      </a>
+    ) : href && LINK.test(href) ? (
       <ExternalLink
         href={href}
         className="font-semibold underline decoration-accent decoration-2 underline-offset-4"
@@ -74,16 +89,23 @@ const components: Components = {
     ),
 };
 
+const FOOTNOTES = { footnoteLabel: '각주', footnoteBackLabel: '본문으로 돌아가기' };
+
 function transformUrl(url: string) {
   return /^tel:/i.test(url) ? url : defaultUrlTransform(url);
 }
 
-/** 운영진이 쓴 마크다운. HTML은 그리지 않는다. */
+/** 운영진이 쓴 마크다운. HTML은 그리지 않고 글자로 보인다. */
 export function Markdown({ children }: { children: string }) {
   return (
     <ReactMarkdown
-      remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkBreaks]}
-      skipHtml
+      remarkPlugins={[
+        [remarkGfm, { singleTilde: false }],
+        remarkCjkFriendly,
+        remarkBreaks,
+        remarkTrimParticles,
+      ]}
+      remarkRehypeOptions={FOOTNOTES}
       urlTransform={transformUrl}
       components={components}
     >

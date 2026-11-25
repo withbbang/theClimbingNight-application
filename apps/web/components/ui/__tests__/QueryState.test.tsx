@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { renderToString } from 'react-dom/server';
+
 import { QueryState } from '@/components/ui/QueryState';
 import { apiFetch } from '@/lib/api';
 import { fail, mockServer, ok, renderWithQuery, type Reply } from '@/test-utils/server';
@@ -43,4 +45,18 @@ it('keeps data when a refetch fails', async () => {
 
   await waitFor(() => expect(client.getQueryState(['x'])?.status).toBe('error'));
   expect(screen.getByText('공지')).toBeInTheDocument();
+});
+
+// JS를 받지 못해도 서버가 그린 HTML에 다시 열 길이 있어야 한다.
+it('has a way to reopen the page in the server HTML', () => {
+  const html = renderToString(
+    <QueryState
+      query={{ data: undefined, isError: false, error: null, refetch: (() => {}) as never }}
+    >
+      {() => null}
+    </QueryState>,
+  );
+
+  expect(html).toContain('<a href=""');
+  expect(html).toContain('다시 열기');
 });
