@@ -211,3 +211,34 @@ it.each(['onContentProcessDidTerminate', 'onRenderProcessGone'] as const)(
     expect(ours()).toHaveLength(0);
   },
 );
+
+// Android는 JS가 제때 답하지 않으면 주소를 그대로 연다.
+it.each(['onLoadStart', 'onError'] as const)(
+  'starts over when another site slips in: %s',
+  async (name) => {
+    await open();
+    await emit('onLoadEnd');
+
+    await emit(name, { url: 'https://evil.test/' });
+
+    expect(webView.mounts).toBe(2);
+  },
+);
+
+it('asks to retry instead of looping when the first page goes elsewhere', async () => {
+  await open();
+
+  await emit('onLoadStart', { url: 'https://login.test/' });
+
+  expect(await screen.findByText('불러오지 못했어요')).toBeOnTheScreen();
+  expect(webView.mounts).toBe(1);
+});
+
+it('keeps our own pages while they load', async () => {
+  await open();
+
+  await emit('onLoadStart', { url: URL });
+  await emit('onLoadStart', { url: 'about:blank' });
+
+  expect(webView.mounts).toBe(1);
+});

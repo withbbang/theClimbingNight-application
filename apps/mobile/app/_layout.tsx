@@ -9,6 +9,7 @@ import { useReducedMotion } from 'react-native-reanimated';
 
 import { usePush } from '@/hooks/use-push';
 import { useSession } from '@/hooks/use-session';
+import { useSyncColorScheme } from '@/hooks/use-sync-color-scheme';
 import { useSyncMe } from '@/hooks/use-sync-me';
 import { useTheme } from '@/hooks/use-theme';
 import { setSessionExpiredHandler } from '@/lib/api';
@@ -26,6 +27,7 @@ function Navigation() {
   const theme = useTheme();
   const reduced = useReducedMotion();
   useSyncMe();
+  useSyncColorScheme();
   usePush();
 
   useEffect(() => {

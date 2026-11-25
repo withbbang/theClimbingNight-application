@@ -76,6 +76,20 @@ function Viewer({ path, tab, onFail, onGone }: ViewerProps) {
     return decision === 'inside';
   }
 
+  /** Android는 JS가 바쁘면 판정을 기다리지 않고 연다. 이미 열리기 시작했으면 처음 페이지로 되돌린다. */
+  function strayed(url: string | undefined) {
+    return Boolean(url) && !url?.startsWith('about:') && decideLink(url ?? '') !== 'inside';
+  }
+
+  function startOver() {
+    // 첫 페이지부터 벗어나면 다시 만들어도 같으니 안내를 보인다.
+    if (loaded) {
+      onGone();
+    } else {
+      onFail();
+    }
+  }
+
   return (
     <View style={styles.fill}>
       {!tab || canGoBack ? (
@@ -98,7 +112,12 @@ function Viewer({ path, tab, onFail, onGone }: ViewerProps) {
           onShouldStartLoadWithRequest={shouldStart}
           onNavigationStateChange={(state: WebViewNavigation) => setCanGoBack(state.canGoBack)}
           onLoadEnd={() => setLoaded(true)}
-          onError={onFail}
+          onLoadStart={({ nativeEvent }) => {
+            if (strayed(nativeEvent.url)) {
+              startOver();
+            }
+          }}
+          onError={({ nativeEvent }) => (strayed(nativeEvent.url) ? startOver() : onFail())}
           onHttpError={({ nativeEvent }) => {
             if (nativeEvent.statusCode >= 500) {
               onFail();
