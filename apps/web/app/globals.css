@@ -84,7 +84,47 @@
     transform: scale(0.97);
   }
 
+  /* 누르거나 가리키면 꺼진 홀드가 켜진다. */
+  .notice-hold {
+    position: relative;
+    background: var(--hold-off);
+    border-radius: 50% 32% 55% 42%;
+  }
+
+  .notice-hold::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--accent);
+    opacity: 0;
+    transform: scale(0.3) rotate(-30deg);
+    transition:
+      opacity 180ms,
+      transform 320ms cubic-bezier(0.2, 0.9, 0.3, 1.5);
+  }
+
+  .notice-row:is(:hover, :focus-visible, :active) .notice-hold::after {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .press,
+    .notice-hold::after {
+      transition: none;
+    }
+
+    .press:active {
+      transform: none;
+    }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
+    .pin {
+      animation: pin-drop 620ms 240ms cubic-bezier(0.2, 0.9, 0.3, 1.5) backwards;
+    }
+
     .reveal {
       animation: reveal 520ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
     }
@@ -115,5 +155,12 @@
 @keyframes sway {
   50% {
     transform: translateY(-4px) rotate(-8deg);
+  }
+}
+
+@keyframes pin-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) rotate(24deg);
   }
 }
