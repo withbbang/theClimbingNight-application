@@ -15,6 +15,7 @@ import { FloatingIcon } from '@/components/ui/FloatingIcon';
 import { Notice } from '@/components/ui/Notice';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { QueryState } from '@/components/ui/QueryState';
+import { useApplicationActions } from '@/hooks/use-application-actions';
 import { useApplications } from '@/hooks/use-applications';
 import { useMeetup } from '@/hooks/use-meetups';
 import { useNow } from '@/hooks/use-now';
@@ -52,6 +53,7 @@ interface ApplicationsProps {
 function Applications({ meetup, applications, onRefresh }: ApplicationsProps) {
   const { space } = useTheme();
   const [error, setError] = useState<Error | null>(null);
+  const { sending, send } = useApplicationActions(meetup.id, setError);
   const now = useNow(phaseBoundaries(meetup));
   const phase = meetupPhase(meetup, new Date(now));
 
@@ -75,14 +77,14 @@ function Applications({ meetup, applications, onRefresh }: ApplicationsProps) {
                 {item}
               </AppText>
             ) : (
-              // 칸이 재사용돼도 열린 확인과 보내는 중인 요청이 다른 사람에게 옮지 않게 한다.
+              // 칸이 재사용돼도 열린 확인이 다른 사람에게 옮지 않게 한다.
               <ApplicationRow
                 key={item.id}
-                meetupId={meetup.id}
                 application={item}
                 phase={phase}
                 index={Math.min(index, MAX_STAGGER)}
-                onError={setError}
+                sending={sending[item.id]}
+                onSend={(action) => send(item.id, action)}
               />
             )
           }

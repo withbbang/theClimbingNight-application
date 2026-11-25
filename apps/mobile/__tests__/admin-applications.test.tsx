@@ -1,5 +1,6 @@
 import { act, fireEvent, screen } from 'expo-router/testing-library';
 
+import { queryClient } from '@/lib/query-client';
 import { fail, flush, mockServer, ok, renderApp, type Reply } from '@/test-utils/app';
 import { detail } from '@/test-utils/meetups';
 import { button, press } from '@/test-utils/screen';
@@ -257,4 +258,47 @@ it.each([
   await press(`별이 ${confirm}`);
   expect(sent).toBe(true);
   expect(button(`별이 ${label}`)).toBeNull();
+});
+
+it('keeps the sending state when the row is mounted again', async () => {
+  // given
+  let finish = (_: Reply) => {};
+  let shown = true;
+  const server = mockServer({
+    '/meetups/1': ok(detail()),
+    [LIST]: () => ok(shown ? [row()] : []),
+    'POST /meetup-applications/11/remove': () => new Promise<Reply>((r) => (finish = r)),
+  });
+  await renderApp(PATH);
+  await press('별이 내보내기');
+  await press('별이 내보내기 확정');
+  // when
+  for (const next of [false, true]) {
+    shown = next;
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ['meetups', 'applications'] });
+    });
+    await flush();
+  }
+  // then
+  expect(button('별이 내보내기')).toBeDisabled();
+  await act(async () => finish({ status: 204 }));
+  await flush();
+  expect(server.count('POST /meetup-applications/11/remove')).toBe(1);
+});
+
+it('keeps the NO_SHOW confirmation while sending', async () => {
+  let finish = (_: Reply) => {};
+  mockServer({
+    '/meetups/1': ok(detail({ meetup: ENDED })),
+    [LIST]: ok([recorded()]),
+    'PUT /attendances/51': () => new Promise<Reply>((r) => (finish = r)),
+  });
+  await renderApp(PATH);
+  await fireEvent.press(tab('별이 노쇼'));
+  await press('별이 노쇼 확정');
+  expect(button('별이 노쇼 확정')).toBeDisabled();
+  await act(async () => finish(ok({ id: 51, result: 'NO_SHOW' })));
+  await flush();
+  expect(button('별이 노쇼 확정')).toBeNull();
 });

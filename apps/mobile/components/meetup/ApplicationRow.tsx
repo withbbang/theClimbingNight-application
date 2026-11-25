@@ -7,44 +7,33 @@ import { AppText } from '@/components/ui/AppText';
 import { Button } from '@/components/ui/Button';
 import { ConfirmAction } from '@/components/ui/ConfirmAction';
 import { FadeInItem } from '@/components/ui/FadeInItem';
-import {
-  useAddLateCancelPenalty,
-  useCorrectAttendance,
-  useRemoveApplication,
-} from '@/hooks/use-applications';
+import type { ApplicationAction } from '@/hooks/use-application-actions';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateTime } from '@/lib/kst';
 import type { MeetupPhase } from '@/lib/meetup-status';
 import type { MeetupApplicationAdminResponse } from '@/types/api/meetup';
 
 interface ApplicationRowProps {
-  meetupId: number;
   application: MeetupApplicationAdminResponse;
   phase: MeetupPhase;
   index: number;
-  /** 화면 단위 오류. 보내기 시작하면 null로 지운다. */
-  onError: (error: Error | null) => void;
+  /** 이 신청자에게 보내는 중인 동작. */
+  sending: ApplicationAction | undefined;
+  /** 성공하면 true. */
+  onSend: (action: ApplicationAction) => Promise<boolean>;
 }
 
 export function ApplicationRow({
-  meetupId,
   application,
   phase,
   index,
-  onError,
+  sending,
+  onSend,
 }: ApplicationRowProps) {
   const router = useRouter();
   const { colors, radius, space } = useTheme();
-  const remove = useRemoveApplication(meetupId, onError);
-  const penalize = useAddLateCancelPenalty(meetupId, onError);
-  const correct = useCorrectAttendance(meetupId, onError);
-  const { id, somoimNickname: name, status, attendanceId, attendanceResult } = application;
+  const { somoimNickname: name, status, attendanceId, attendanceResult } = application;
   const active = status === 'CONFIRMED' || status === 'WAITLISTED';
-
-  async function run(send: () => Promise<unknown>) {
-    onError(null);
-    return (await send()) !== undefined;
-  }
 
   return (
     <FadeInItem
@@ -81,11 +70,9 @@ export function ApplicationRow({
       {attendanceId !== null && attendanceResult !== null ? (
         <AttendanceSwitch
           target={name}
-          value={
-            correct.isPending && correct.variables ? correct.variables.result : attendanceResult
-          }
-          loading={correct.isPending}
-          onChange={(result) => run(() => correct.submit({ id: attendanceId, result }))}
+          value={sending?.type === 'correct' ? sending.result : attendanceResult}
+          loading={sending?.type === 'correct'}
+          onChange={(result) => onSend({ type: 'correct', attendanceId, result })}
         />
       ) : phase === 'ENDED' && status === 'CONFIRMED' ? (
         <AppText tone="muted">참석 기록을 준비하고 있어요</AppText>
@@ -96,8 +83,10 @@ export function ApplicationRow({
           label="블랙리스트에 기록"
           confirmLabel="기록 확정"
           message="늦은 취소로 블랙리스트에 1회 기록돼요."
-          loading={penalize.isPending}
-          onConfirm={() => run(() => penalize.submit(id))}
+          loading={sending?.type === 'penalize'}
+          locked={sending !== undefined}
+          disabled={sending !== undefined}
+          onConfirm={() => onSend({ type: 'penalize' })}
         />
       ) : null}
       {active && phase === 'UPCOMING' ? (
@@ -106,8 +95,10 @@ export function ApplicationRow({
           label="내보내기"
           confirmLabel="내보내기 확정"
           message="내보내면 이 벙에 다시 신청할 수 없어요."
-          loading={remove.isPending}
-          onConfirm={() => run(() => remove.submit(id))}
+          loading={sending?.type === 'remove'}
+          locked={sending !== undefined}
+          disabled={sending !== undefined}
+          onConfirm={() => onSend({ type: 'remove' })}
         />
       ) : null}
       <Button

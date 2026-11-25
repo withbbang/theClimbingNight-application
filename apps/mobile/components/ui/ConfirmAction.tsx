@@ -1,11 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  LinearTransition,
-  useReducedMotion,
-} from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, useReducedMotion } from 'react-native-reanimated';
 
 import { AppText } from '@/components/ui/AppText';
 import { Button } from '@/components/ui/Button';
@@ -65,7 +60,6 @@ export function ConfirmPanel({
           ? undefined
           : FadeInDown.springify().damping(motion.spring.damping).stiffness(motion.spring.stiffness)
       }
-      layout={reduced ? undefined : LinearTransition.springify().damping(motion.spring.damping)}
       style={{
         gap: space(3),
         padding: space(4),

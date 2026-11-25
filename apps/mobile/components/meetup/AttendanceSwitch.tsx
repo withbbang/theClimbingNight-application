@@ -74,7 +74,7 @@ export function AttendanceSwitch({ target, value, loading, onChange }: Attendanc
           );
         })}
       </View>
-      {asking && value !== 'NO_SHOW' ? (
+      {asking && (loading || value !== 'NO_SHOW') ? (
         <ConfirmPanel
           target={target}
           confirmLabel="노쇼 확정"
