@@ -150,3 +150,24 @@ it('cannot delete while saving', async () => {
   await flush();
   expect(button('공지 삭제 확정')).toBeEnabled();
 });
+
+it('does not delete when pressed right after saving', async () => {
+  let finish = (_: Reply) => {};
+  const server = mockServer({
+    '/notices/1': ok(notice()),
+    'PUT /notices/1': () => new Promise<Reply>((resolve) => (finish = resolve)),
+    'DELETE /notices/1': { status: 204 },
+  });
+  await renderApp('/admin/notices/1');
+  await press('공지 삭제');
+  const save = button('저장')!.props.onClick;
+  const remove = button('공지 삭제 확정')!.props.onClick;
+  await act(async () => {
+    save({ stopPropagation() {} });
+    remove({ stopPropagation() {} });
+  });
+  await act(async () => finish(fail(500, 'COMMON_INTERNAL_ERROR', '서버 오류')));
+  await flush();
+  expect(server.count('DELETE /notices/1')).toBe(0);
+  expect(screen.getByText('서버 오류')).toBeOnTheScreen();
+});

@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { View } from 'react-native';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -25,8 +26,23 @@ function EditNotice({ notice }: { notice: NoticeResponse }) {
   const save = useSaveNotice(notice.id);
   const remove = useDeleteNotice(notice.id);
 
+  const busy = useRef(false);
+
+  /** 저장과 삭제는 다시 그려지기 전에 잇달아 눌러도 하나만 보낸다. */
+  async function exclusive<T>(send: () => Promise<T | undefined>) {
+    if (busy.current) {
+      return undefined;
+    }
+    busy.current = true;
+    try {
+      return await send();
+    } finally {
+      busy.current = false;
+    }
+  }
+
   async function confirm() {
-    const removed = (await remove.submit()) !== undefined;
+    const removed = (await exclusive(() => remove.submit())) !== undefined;
     if (removed && !left.current) {
       router.dismissTo('/admin/notices');
     }
@@ -35,7 +51,11 @@ function EditNotice({ notice }: { notice: NoticeResponse }) {
 
   return (
     <View style={{ gap: space(4) }}>
-      <NoticeForm notice={notice} save={save} locked={remove.isPending || remove.isSuccess} />
+      <NoticeForm
+        notice={notice}
+        save={{ ...save, submit: (body) => exclusive(() => save.submit(body)) }}
+        locked={remove.isPending || remove.isSuccess}
+      />
       <ConfirmAction
         label="공지 삭제"
         confirmLabel="공지 삭제 확정"
