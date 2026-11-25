@@ -6,6 +6,7 @@ import { AdminScreen } from '@/components/admin/AdminScreen';
 import { MeetupForm } from '@/components/meetup/MeetupForm';
 import { useLeft } from '@/hooks/use-left';
 import { useCreateMeetup } from '@/hooks/use-meetup-admin';
+import { createErrorMessage } from '@/lib/error-message';
 import { todayKst } from '@/lib/kst';
 import type { MeetupFormValues } from '@/lib/meetup-form';
 import type { MeetupWriteRequest } from '@/types/api/meetup';
@@ -40,7 +41,7 @@ function NewMeetup() {
       initial={initial}
       submitLabel="벙 열기"
       pending={create.isPending}
-      error={create.error}
+      error={create.error ? createErrorMessage(create.error) : null}
       onSubmit={(body) => void submit(body)}
     />
   );

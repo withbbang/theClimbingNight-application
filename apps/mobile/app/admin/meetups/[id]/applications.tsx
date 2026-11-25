@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useLocalSearchParams } from 'expo-router';
@@ -52,15 +51,19 @@ interface ApplicationsProps {
 
 function Applications({ meetup, applications, onRefresh }: ApplicationsProps) {
   const { space } = useTheme();
-  const [error, setError] = useState<Error | null>(null);
-  const { sending, send } = useApplicationActions(meetup.id, setError);
+  const { sending, errors, clearErrors, send } = useApplicationActions(meetup.id);
   const now = useNow(phaseBoundaries(meetup));
   const phase = meetupPhase(meetup, new Date(now));
 
   return (
     <View style={[styles.fill, { gap: space(4) }]}>
       <AppText tone="muted">{`${meetup.title}, ${formatDateTime(meetup.startsAt)}`}</AppText>
-      {error ? <ErrorBanner message={errorMessage(error)} /> : null}
+      {applications.map(({ id, somoimNickname }) => {
+        const error = errors[id];
+        return error ? (
+          <ErrorBanner key={id} message={`${somoimNickname}: ${errorMessage(error)}`} />
+        ) : null;
+      })}
       <View style={styles.fill}>
         <FlashList
           accessibilityLabel="신청자 목록"
@@ -96,7 +99,14 @@ function Applications({ meetup, applications, onRefresh }: ApplicationsProps) {
             />
           }
           showsVerticalScrollIndicator={false}
-          refreshControl={<PullToRefresh onRefresh={onRefresh} />}
+          refreshControl={
+            <PullToRefresh
+              onRefresh={() => {
+                clearErrors();
+                return onRefresh();
+              }}
+            />
+          }
         />
       </View>
     </View>

@@ -12,7 +12,7 @@ import { Toggle } from '@/components/ui/Toggle';
 import { useLeft } from '@/hooks/use-left';
 import type { useSaveNotice } from '@/hooks/use-notice-admin';
 import { useTheme } from '@/hooks/use-theme';
-import { errorMessage } from '@/lib/error-message';
+import { createErrorMessage, errorMessage } from '@/lib/error-message';
 import type { NoticeResponse } from '@/types/api/notice';
 
 interface NoticeFormProps {
@@ -72,7 +72,9 @@ export function NoticeForm({ notice, save, locked = false }: NoticeFormProps) {
       <FadeInItem index={4}>
         <Toggle label="맨 위에 고정" value={pinned} disabled={!editable} onChange={setPinned} />
       </FadeInItem>
-      {save.error ? <ErrorBanner message={errorMessage(save.error)} /> : null}
+      {save.error ? (
+        <ErrorBanner message={(notice ? errorMessage : createErrorMessage)(save.error)} />
+      ) : null}
       <FadeInItem index={5}>
         <Button
           label={notice ? '저장' : '올리기'}

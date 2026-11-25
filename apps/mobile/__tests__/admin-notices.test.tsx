@@ -171,3 +171,14 @@ it('does not delete when pressed right after saving', async () => {
   expect(server.count('DELETE /notices/1')).toBe(0);
   expect(screen.getByText('서버 오류')).toBeOnTheScreen();
 });
+
+it('says it may be saved already when creating gets no readable answer', async () => {
+  mockServer({ 'POST /notices': { status: 502 } });
+  await renderApp('/admin/notices/new');
+  await type('제목', '제목');
+  await type('본문 (마크다운)', '본문');
+  await press('올리기');
+  expect(
+    screen.getByText('이미 올라갔을 수 있어요. 목록을 확인한 뒤 다시 시도해 주세요.'),
+  ).toBeOnTheScreen();
+});

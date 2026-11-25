@@ -8,6 +8,7 @@ import { useLeft } from '@/hooks/use-left';
 import { useUpdateMeetup } from '@/hooks/use-meetup-admin';
 import { useMeetup } from '@/hooks/use-meetups';
 import { isNotFound } from '@/lib/api-error';
+import { errorMessage } from '@/lib/error-message';
 import { toSchedule, type MeetupFormValues } from '@/lib/meetup-form';
 import { parseId } from '@/lib/parse-id';
 import type { MeetupResponse, MeetupWriteRequest } from '@/types/api/meetup';
@@ -38,7 +39,7 @@ function EditMeetup({ meetup }: { meetup: MeetupResponse }) {
       initial={toValues(meetup)}
       submitLabel="저장"
       pending={update.isPending}
-      error={update.error}
+      error={update.error ? errorMessage(update.error) : null}
       onSubmit={(body) => void submit(body)}
     />
   );

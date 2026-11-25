@@ -301,3 +301,26 @@ it('keeps the choice and the reason when the card is mounted again', async () =>
   await press('앱별이 거절');
   expect(screen.getByLabelText('거절 사유').props.value).toBe('확인 중');
 });
+
+it('asks again when the candidates change under an untouched card', async () => {
+  // given
+  let linked = false;
+  const server = mockServer({
+    [LIST]: () =>
+      list([request({ candidates: linked ? [] : [candidate(3)], bulkApprovable: false })]),
+    [APPROVE]: ok({ id: 1 }),
+  });
+  await renderApp('/admin/requests');
+  // when
+  linked = true;
+  await act(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['membership-requests'] });
+  });
+  await flush();
+  // then
+  expect(choice('앱별이 새 명부 항목')).not.toBeChecked();
+  expect(button('앱별이 승인')).toBeDisabled();
+  await fireEvent.press(choice('앱별이 새 명부 항목'));
+  await press('앱별이 승인');
+  expect(body(server)).toEqual({ createNew: true });
+});

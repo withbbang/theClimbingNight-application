@@ -16,7 +16,7 @@ import type {
 } from '@/types/api/membership';
 import type { RosterCandidateResponse } from '@/types/api/roster';
 
-type Choice = RosterCandidateResponse | 'NEW' | null;
+export type Choice = RosterCandidateResponse | 'NEW' | null;
 
 /** 아직 보내지 않은 심사. 카드가 화면 밖으로 나가도 남도록 화면이 들고 있는다. */
 export interface RequestDraft {
@@ -29,7 +29,7 @@ const isContested = ({ candidates, bulkApprovable }: MembershipReviewItemRespons
   candidates.length === 1 && !bulkApprovable;
 
 /** 후보가 하나면 그 명부, 없으면 새 항목. 여럿이면 운영진이 고른다. */
-function defaultChoice(request: MembershipReviewItemResponse): Choice {
+export function defaultChoice(request: MembershipReviewItemResponse): Choice {
   const { candidates } = request;
   if (candidates.length === 0) {
     return 'NEW';
@@ -37,10 +37,14 @@ function defaultChoice(request: MembershipReviewItemResponse): Choice {
   return candidates.length === 1 && !isContested(request) ? candidates[0] : null;
 }
 
+const idOf = (choice: Choice) => (choice === null || choice === 'NEW' ? choice : choice.id);
+
 interface RequestCardProps {
   request: MembershipReviewItemResponse;
   index: number;
   draft: RequestDraft | undefined;
+  /** 이 신청을 처음 봤을 때 미리 고른 값. 지금과 다르면 운영진이 다시 고른다. */
+  firstChoice: Choice;
   onDraft: (change: Partial<RequestDraft>) => void;
   /** 이 신청을 보내는 중인 동작. */
   sending: 'approve' | 'reject' | null;
@@ -54,6 +58,7 @@ export function RequestCard({
   request,
   index,
   draft,
+  firstChoice,
   onDraft,
   sending,
   locked,
@@ -63,7 +68,8 @@ export function RequestCard({
   const { colors, radius, space } = useTheme();
   const [searching, setSearching] = useState(false);
   const reason = draft?.reason ?? '';
-  const choice = draft?.chosen ?? defaultChoice(request);
+  const preset = defaultChoice(request);
+  const choice = draft?.chosen ?? (idOf(preset) === idOf(firstChoice) ? preset : null);
   const choiceId = choice !== null && choice !== 'NEW' ? choice.id : null;
   const isCandidate = request.candidates.some((roster) => roster.id === choiceId);
   // 검색으로 고른 명부는 검색어가 바뀌어도 보이게 카드에 함께 둔다.

@@ -8,7 +8,6 @@ import { FadeInItem } from '@/components/ui/FadeInItem';
 import { TextField } from '@/components/ui/TextField';
 import { Toggle } from '@/components/ui/Toggle';
 import { useTheme } from '@/hooks/use-theme';
-import { errorMessage } from '@/lib/error-message';
 import { validateMeetup, type MeetupFormValues } from '@/lib/meetup-form';
 import type { MeetupWriteRequest } from '@/types/api/meetup';
 
@@ -16,7 +15,7 @@ interface MeetupFormProps {
   initial: MeetupFormValues;
   submitLabel: string;
   pending: boolean;
-  error: Error | null;
+  error: string | null;
   onSubmit: (body: MeetupWriteRequest) => void;
 }
 
@@ -102,7 +101,7 @@ export function MeetupForm({ initial, submitLabel, pending, error, onSubmit }: M
           editable={editable}
         />
       </FadeInItem>
-      {error ? <ErrorBanner message={errorMessage(error)} /> : null}
+      {error ? <ErrorBanner message={error} /> : null}
       <FadeInItem index={8}>
         <Button label={submitLabel} loading={pending} onPress={submit} />
       </FadeInItem>

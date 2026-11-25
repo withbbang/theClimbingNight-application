@@ -5,7 +5,12 @@ import { IdentificationCardIcon } from 'phosphor-react-native/src/icons/Identifi
 import Animated, { useReducedMotion, ZoomIn } from 'react-native-reanimated';
 
 import { AdminScreen } from '@/components/admin/AdminScreen';
-import { RequestCard, type RequestDraft } from '@/components/membership/RequestCard';
+import {
+  defaultChoice,
+  RequestCard,
+  type Choice,
+  type RequestDraft,
+} from '@/components/membership/RequestCard';
 import { AppText } from '@/components/ui/AppText';
 import { ConfirmAction } from '@/components/ui/ConfirmAction';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
@@ -19,16 +24,14 @@ import {
   useRejectRequest,
 } from '@/hooks/use-membership-admin';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError } from '@/lib/api-error';
-import { errorMessage } from '@/lib/error-message';
+import { errorMessage, mayBeDone } from '@/lib/error-message';
 
 const MAX_STAGGER = 8;
 const EMPTY_DRAFT: RequestDraft = { chosen: null, reason: '' };
 
 /** 수백 건이면 응답을 기다리다 끊겨도 서버는 계속 처리한다. */
 function bulkErrorMessage(error: Error) {
-  return error instanceof ApiError &&
-    (error.code === 'CLIENT_TIMEOUT' || error.code === 'CLIENT_BAD_RESPONSE')
+  return mayBeDone(error)
     ? '처리 중일 수 있어요. 잠시 뒤 목록을 새로고침해 주세요.'
     : errorMessage(error);
 }
@@ -42,6 +45,15 @@ function Requests() {
   const bulk = useBulkApprove();
   const [message, setMessage] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<number, RequestDraft>>({});
+  // 다시 받은 후보가 달라져도 손대지 않은 선택이 몰래 바뀌지 않게 처음 값을 기억한다.
+  const [firstChoices, setFirstChoices] = useState<Record<number, Choice>>({});
+  const unseen = (query.data ?? []).filter((request) => !(request.id in firstChoices));
+  if (unseen.length > 0) {
+    setFirstChoices({
+      ...firstChoices,
+      ...Object.fromEntries(unseen.map((request) => [request.id, defaultChoice(request)])),
+    });
+  }
   const busy = useRef(false);
 
   const sending = approve.isPending || reject.isPending || bulk.isPending;
@@ -125,6 +137,7 @@ function Requests() {
             }
             locked={locked}
             draft={drafts[request.id]}
+            firstChoice={firstChoices[request.id] ?? null}
             onDraft={(change) => changeDraft(request.id, change)}
             onApprove={(body) => void run(() => approve.submit({ id: request.id, body }))}
             onReject={(reason) => run(() => reject.submit({ id: request.id, reason }))}

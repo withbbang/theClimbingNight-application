@@ -16,7 +16,7 @@ import { useCopyMeetup } from '@/hooks/use-meetup-admin';
 import { useMeetup } from '@/hooks/use-meetups';
 import { useTheme } from '@/hooks/use-theme';
 import { isNotFound } from '@/lib/api-error';
-import { errorMessage } from '@/lib/error-message';
+import { createErrorMessage } from '@/lib/error-message';
 import { addDays, todayKst } from '@/lib/kst';
 import { scheduleErrors, scheduleToIso, toSchedule, type Schedule } from '@/lib/meetup-form';
 import { parseId } from '@/lib/parse-id';
@@ -61,7 +61,7 @@ function CopyMeetup({ meetup }: { meetup: MeetupResponse }) {
           editable={!copy.isPending}
         />
       </FadeInItem>
-      {copy.error ? <ErrorBanner message={errorMessage(copy.error)} /> : null}
+      {copy.error ? <ErrorBanner message={createErrorMessage(copy.error)} /> : null}
       <FadeInItem index={3}>
         <Button label="이 날짜로 열기" loading={copy.isPending} onPress={() => void submit()} />
       </FadeInItem>

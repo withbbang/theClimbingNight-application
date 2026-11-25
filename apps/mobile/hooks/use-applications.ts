@@ -9,8 +9,6 @@ import type { MeetupApplicationAdminResponse } from '@/types/api/meetup';
 
 const keyOf = (meetupId: number | null) => ['meetups', 'applications', meetupId];
 
-type OnError = (error: Error) => void;
-
 /** 다시 받는 동안 끝난 동작을 또 누르지 않게 줄을 먼저 고친다. */
 function usePatchRow(meetupId: number) {
   const client = useQueryClient();
@@ -32,7 +30,7 @@ export function useApplications(meetupId: number | null) {
   });
 }
 
-export function useRemoveApplication(meetupId: number, onError: OnError) {
+export function useRemoveApplication(meetupId: number) {
   const patch = usePatchRow(meetupId);
   return useAdminMutation(
     // 204라 값이 없으므로 성공을 true로 알린다.
@@ -40,20 +38,18 @@ export function useRemoveApplication(meetupId: number, onError: OnError) {
     [['meetups']],
     {
       success: (_, id) => patch((row) => row.id === id, { status: 'REMOVED' }),
-      error: onError,
     },
   );
 }
 
-export function useAddLateCancelPenalty(meetupId: number, onError: OnError) {
+export function useAddLateCancelPenalty(meetupId: number) {
   const patch = usePatchRow(meetupId);
   return useAdminMutation(meetupApi.addLateCancelPenalty, [['meetups'], ['penalties']], {
     success: (_, id) => patch((row) => row.id === id, { lateCancelPenalized: true }),
-    error: onError,
   });
 }
 
-export function useCorrectAttendance(meetupId: number, onError: OnError) {
+export function useCorrectAttendance(meetupId: number) {
   const patch = usePatchRow(meetupId);
   return useAdminMutation(
     ({ id, result }: { id: number; result: AttendanceResult }) => attendanceApi.correct(id, result),
@@ -61,7 +57,6 @@ export function useCorrectAttendance(meetupId: number, onError: OnError) {
     {
       success: (saved, { id }) =>
         patch((row) => row.attendanceId === id, { attendanceResult: saved.result }),
-      error: onError,
     },
   );
 }

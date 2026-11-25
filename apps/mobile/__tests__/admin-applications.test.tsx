@@ -223,7 +223,7 @@ it('keeps the server message and refetches when stale', async () => {
   await press('별이 내보내기');
   await press('별이 내보내기 확정');
   expect(screen.getByText('취소·내보냄 1')).toBeOnTheScreen();
-  expect(screen.getByText('이미 취소되었거나 내보낸 신청입니다.')).toBeOnTheScreen();
+  expect(screen.getByText('별이: 이미 취소되었거나 내보낸 신청입니다.')).toBeOnTheScreen();
 });
 
 it('opens the penalties of the applicant', async () => {
@@ -301,4 +301,25 @@ it('keeps the NO_SHOW confirmation while sending', async () => {
   await act(async () => finish(ok({ id: 51, result: 'NO_SHOW' })));
   await flush();
   expect(button('별이 노쇼 확정')).toBeNull();
+});
+
+it('keeps the failure of one person while sending another', async () => {
+  // given
+  mockServer({
+    '/meetups/1': ok(detail({ meetup: ENDED })),
+    [LIST]: ok([
+      recorded(),
+      recorded({ id: 12, rosterMemberId: 102, somoimNickname: '달이', attendanceId: 52 }),
+    ]),
+    'PUT /attendances/51': fail(500, 'COMMON_INTERNAL_ERROR', '서버 오류'),
+    'PUT /attendances/52': ok({ id: 52, result: 'EXCUSED' }),
+  });
+  await renderApp(PATH);
+  // when
+  await fireEvent.press(tab('별이 불참'));
+  await flush();
+  await fireEvent.press(tab('달이 불참'));
+  await flush();
+  // then
+  expect(screen.getByText('별이: 서버 오류')).toBeOnTheScreen();
 });
