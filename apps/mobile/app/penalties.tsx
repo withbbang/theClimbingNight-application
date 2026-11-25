@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { HandPalmIcon } from 'phosphor-react-native/src/icons/HandPalm';
 
 import { RoleGate } from '@/components/auth/RoleGate';
+import { PenaltyRow } from '@/components/penalty/PenaltyRow';
 import { AppText } from '@/components/ui/AppText';
 import { BackButton } from '@/components/ui/BackButton';
 import { FadeInItem } from '@/components/ui/FadeInItem';
@@ -12,9 +13,7 @@ import { QueryState } from '@/components/ui/QueryState';
 import { Screen } from '@/components/ui/Screen';
 import { useMyPenalties } from '@/hooks/use-my-penalties';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDateTime } from '@/lib/kst';
 
-const TYPES = { LATE_CANCEL: '늦은 취소', NO_SHOW: '노쇼' } as const;
 const MAX_STAGGER = 10;
 
 function Penalties() {
@@ -38,23 +37,8 @@ function Penalties() {
               <AppText variant="title">{`${penalties.filter((p) => p.active).length}건`}</AppText>
             </FadeInItem>
             {penalties.map((penalty, i) => (
-              <FadeInItem
-                key={penalty.id}
-                index={Math.min(i + 1, MAX_STAGGER)}
-                style={{ gap: space(1) }}
-              >
-                <AppText variant="label" tone={penalty.active ? 'default' : 'muted'}>
-                  {TYPES[penalty.type]}
-                </AppText>
-                <AppText>{penalty.meetupTitle}</AppText>
-                <AppText variant="caption" tone="muted">
-                  {formatDateTime(penalty.meetupStartsAt)}
-                </AppText>
-                {penalty.active ? null : (
-                  <AppText variant="caption">
-                    {penalty.revokeReason ? `취소됨: ${penalty.revokeReason}` : '취소됨'}
-                  </AppText>
-                )}
+              <FadeInItem key={penalty.id} index={Math.min(i + 1, MAX_STAGGER)}>
+                <PenaltyRow penalty={penalty} />
               </FadeInItem>
             ))}
           </View>
