@@ -14,6 +14,8 @@ paths:
 - 세션은 `lib/session-store.ts`로만 읽고 쓴다. 로그아웃은 `lib/sign-out.ts`의 `signOut`을 부른다.
 - 날짜·시각 계산과 표시는 `lib/kst.ts`로만 한다 (서울 기준, 기기 시간대와 `Intl`을 쓰지 않음).
 - 역할별 화면 감추기는 `RoleGate`, 첫 로딩·실패 표시는 `QueryState`, 쓰기 요청은 `useSubmit`(중복 전송 방지)으로 한다.
+- 운영진 화면은 `app/admin/`에 두고 `AdminScreen`으로 감싼다. 쓰기는 `useAdminMutation`, 되돌리기 어려운 동작은 `ConfirmAction`, 무한 스크롤 목록은 `usePagedQuery` + `PagedList`로 한다. FlashList 줄에 상태가 있으면 항목 ID를 `key`로 준다.
+- 전체를 덮어쓰는 수정 폼은 `refetchOnMount: 'always'` 조회와 `FreshQuery`로 새 값을 한 번만 채운다.
 - 소셜 로그인 SDK는 `lib/social/`에서만 import한다.
 - 색은 `useTheme`로만 쓴다 (제공자 로그인 버튼의 브랜드 색은 예외). 아이콘은 `phosphor-react-native/src/icons/<이름>`에서 하나씩 import한다 (전체 import는 아이콘을 모두 번들에 넣음).
 - 애니메이션은 Reanimated로 `transform`·`opacity`만 움직이고, `useReducedMotion`이면 끝 상태로 둔다.
