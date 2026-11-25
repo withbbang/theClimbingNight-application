@@ -46,13 +46,13 @@ const components: Components = {
   code: ({ children }) => <code className="rounded bg-surface px-1 text-[0.9em]">{children}</code>,
   table: ({ children }) => (
     <div className="mt-4 overflow-x-auto">
-      <table className="w-full min-w-max border-collapse text-left">{children}</table>
+      <table className="w-full border-collapse text-left">{children}</table>
     </div>
   ),
   th: ({ children }) => (
-    <th className="border-b-2 border-border px-3 py-2 font-bold">{children}</th>
+    <th className="border-b-2 border-border min-w-20 px-3 py-2 font-bold">{children}</th>
   ),
-  td: ({ children }) => <td className="border-b border-hold-off px-3 py-2">{children}</td>,
+  td: ({ children }) => <td className="min-w-20 border-b border-hold-off px-3 py-2">{children}</td>,
   a: ({ href, children }) =>
     href && LINK.test(href) ? (
       <ExternalLink

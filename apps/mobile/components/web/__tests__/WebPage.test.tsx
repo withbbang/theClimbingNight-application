@@ -1,4 +1,4 @@
-import { BackHandler, Linking, Text } from 'react-native';
+import { BackHandler, Linking, StyleSheet, Text } from 'react-native';
 
 import { router, Stack, type Href } from 'expo-router';
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
@@ -152,6 +152,17 @@ it('has no back button in a tab until the page has history', async () => {
   await navigated(true);
   await pressBack();
   expect(webView.goBack).toHaveBeenCalledTimes(1);
+});
+
+it('never hides the web view behind its own opacity', async () => {
+  // iOS는 투명한 채로 받은 페이지를 나중에 그리지 않는다.
+  await open();
+  let node = screen.getByLabelText(LABEL).parent;
+  while (node) {
+    const { opacity } = StyleSheet.flatten(node.props.style ?? {}) as { opacity?: number };
+    expect(opacity ?? 1).toBe(1);
+    node = node.parent;
+  }
 });
 
 it('shows loading until the page arrives', async () => {

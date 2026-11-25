@@ -7,7 +7,7 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
@@ -35,25 +35,23 @@ interface ViewerProps {
 }
 
 function Viewer({ path, tab, onFail, onGone }: ViewerProps) {
-  const { colors, motion, space } = useTheme();
+  const { colors, space } = useTheme();
   const reduced = useReducedMotion();
   const insets = useSafeAreaInsets();
   const view = useRef<WebView<object>>(null);
   const [loaded, setLoaded] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
   const [linkFailed, setLinkFailed] = useState(false);
-  const shown = useSharedValue(0);
+  const cover = useSharedValue(1);
 
   useEffect(() => {
     if (loaded) {
-      shown.set(reduced ? 1 : withSpring(1, motion.spring));
+      cover.set(reduced ? 0 : withTiming(0, { duration: 260 }));
     }
-  }, [loaded, motion.spring, reduced, shown]);
+  }, [cover, loaded, reduced]);
 
-  const animated = useAnimatedStyle(() => ({
-    opacity: Math.min(1, Math.max(0, shown.get())),
-    transform: [{ translateY: reduced ? 0 : 16 * (1 - shown.get()) }],
-  }));
+  // 웹뷰를 투명하게 두면 iOS가 페이지를 그리지 않는다. 위를 덮었다가 걷는다.
+  const covering = useAnimatedStyle(() => ({ opacity: cover.get() }));
 
   useFocusEffect(
     useCallback(() => {
@@ -91,40 +89,40 @@ function Viewer({ path, tab, onFail, onGone }: ViewerProps) {
         </View>
       ) : null}
       <View style={[styles.fill, { paddingBottom: tab ? 0 : insets.bottom }]}>
-        <Animated.View style={[styles.fill, animated]}>
-          <WebView<object>
-            ref={view}
-            source={{ uri: webUrl(path) }}
-            style={{ backgroundColor: colors.background }}
-            // 라이브러리가 다른 앱을 열지 않게 하고 직접 판정한다.
-            originWhitelist={['*']}
-            onShouldStartLoadWithRequest={shouldStart}
-            onNavigationStateChange={(state: WebViewNavigation) => setCanGoBack(state.canGoBack)}
-            onLoadEnd={() => setLoaded(true)}
-            onError={onFail}
-            onHttpError={({ nativeEvent }) => {
-              if (nativeEvent.statusCode >= 500) {
-                onFail();
-              }
-            }}
-            onContentProcessDidTerminate={onGone}
-            onRenderProcessGone={onGone}
-            setSupportMultipleWindows={false}
-            javaScriptCanOpenWindowsAutomatically={false}
-            allowFileAccess={false}
-            sharedCookiesEnabled={false}
-          />
+        <WebView<object>
+          ref={view}
+          source={{ uri: webUrl(path) }}
+          style={{ backgroundColor: colors.background }}
+          // 라이브러리가 다른 앱을 열지 않게 하고 직접 판정한다.
+          originWhitelist={['*']}
+          onShouldStartLoadWithRequest={shouldStart}
+          onNavigationStateChange={(state: WebViewNavigation) => setCanGoBack(state.canGoBack)}
+          onLoadEnd={() => setLoaded(true)}
+          onError={onFail}
+          onHttpError={({ nativeEvent }) => {
+            if (nativeEvent.statusCode >= 500) {
+              onFail();
+            }
+          }}
+          onContentProcessDidTerminate={onGone}
+          onRenderProcessGone={onGone}
+          setSupportMultipleWindows={false}
+          javaScriptCanOpenWindowsAutomatically={false}
+          allowFileAccess={false}
+          sharedCookiesEnabled={false}
+        />
+        <Animated.View
+          pointerEvents="none"
+          accessible={!loaded}
+          accessibilityLabel={loaded ? undefined : '불러오는 중'}
+          style={[
+            StyleSheet.absoluteFill,
+            { padding: space(6), backgroundColor: colors.background },
+            covering,
+          ]}
+        >
+          {loaded ? null : <PulseHolds color={colors.accent} />}
         </Animated.View>
-        {loaded ? null : (
-          <View
-            accessible
-            accessibilityLabel="불러오는 중"
-            pointerEvents="none"
-            style={[StyleSheet.absoluteFill, { padding: space(6) }]}
-          >
-            <PulseHolds color={colors.accent} />
-          </View>
-        )}
       </View>
     </View>
   );

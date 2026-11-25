@@ -24,6 +24,8 @@
 }
 
 @theme inline {
+  /* 글자를 크게 해도 여백은 커지지 않게 px로 둔다. */
+  --spacing: 4px;
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-text: var(--text);
