@@ -27,7 +27,8 @@ const EMPTY_DRAFT: RequestDraft = { chosen: null, reason: '' };
 
 /** 수백 건이면 응답을 기다리다 끊겨도 서버는 계속 처리한다. */
 function bulkErrorMessage(error: Error) {
-  return error instanceof ApiError && error.code.startsWith('CLIENT_')
+  return error instanceof ApiError &&
+    (error.code === 'CLIENT_TIMEOUT' || error.code === 'CLIENT_BAD_RESPONSE')
     ? '처리 중일 수 있어요. 잠시 뒤 목록을 새로고침해 주세요.'
     : errorMessage(error);
 }

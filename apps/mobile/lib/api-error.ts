@@ -21,6 +21,10 @@ export function networkError() {
   return new ApiError('CLIENT_NETWORK', '네트워크 연결을 확인한 뒤 다시 시도해 주세요.', 0);
 }
 
+export function timeoutError() {
+  return new ApiError('CLIENT_TIMEOUT', '응답이 늦어지고 있습니다. 잠시 후 다시 확인해 주세요.', 0);
+}
+
 export function badResponseError(status: number) {
   return new ApiError(
     'CLIENT_BAD_RESPONSE',

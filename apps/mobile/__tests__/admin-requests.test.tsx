@@ -135,12 +135,32 @@ it('bulk-approves after confirming and shows the result', async () => {
 it('says it may still be running when bulk approval times out', async () => {
   const server = mockServer({ [LIST]: list([request()]) });
   await renderApp('/admin/requests');
+  const answer = globalThis.fetch;
+  globalThis.fetch = jest.fn((url: string, init: RequestInit) =>
+    url.endsWith('/bulk-approve')
+      ? new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        })
+      : answer(url, init),
+  ) as unknown as typeof fetch;
   await press('일괄 승인');
   await press('일괄 승인 확정');
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(15_000);
+  });
+  await flush();
   expect(
     screen.getByText('처리 중일 수 있어요. 잠시 뒤 목록을 새로고침해 주세요.'),
   ).toBeOnTheScreen();
   expect(server.count(LIST)).toBe(2);
+});
+
+it('says the network is down when bulk approval cannot be sent', async () => {
+  mockServer({ [LIST]: list([request()]) });
+  await renderApp('/admin/requests');
+  await press('일괄 승인');
+  await press('일괄 승인 확정');
+  expect(screen.getByText('네트워크 연결을 확인한 뒤 다시 시도해 주세요.')).toBeOnTheScreen();
 });
 
 it.each([

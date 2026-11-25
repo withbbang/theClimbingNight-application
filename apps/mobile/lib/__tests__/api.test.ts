@@ -219,7 +219,7 @@ it('does not retry more than once when the retried call is also 401', async () =
   expect(calls).toHaveLength(3);
 });
 
-it('times out after 15 seconds with CLIENT_NETWORK', async () => {
+it('times out after 15 seconds with CLIENT_TIMEOUT', async () => {
   jest.useFakeTimers();
   try {
     globalThis.fetch = jest.fn(
@@ -236,9 +236,9 @@ it('times out after 15 seconds with CLIENT_NETWORK', async () => {
     expect(settled).toBe(false);
     await jest.advanceTimersByTimeAsync(1);
     expect(await pending).toMatchObject({
-      code: 'CLIENT_NETWORK',
+      code: 'CLIENT_TIMEOUT',
       status: 0,
-      message: '네트워크 연결을 확인한 뒤 다시 시도해 주세요.',
+      message: '응답이 늦어지고 있습니다. 잠시 후 다시 확인해 주세요.',
     });
   } finally {
     jest.useRealTimers();

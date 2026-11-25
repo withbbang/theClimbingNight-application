@@ -1,4 +1,10 @@
-import { ApiError, badResponseError, networkError, type FieldError } from '@/lib/api-error';
+import {
+  ApiError,
+  badResponseError,
+  networkError,
+  timeoutError,
+  type FieldError,
+} from '@/lib/api-error';
 import { config } from '@/lib/config';
 import { sessionStore } from '@/lib/session-store';
 import type { TokenResponse } from '@/types/api/auth';
@@ -51,7 +57,7 @@ async function request<T>(path: string, options: RequestOptions, token?: string)
     status = response.status;
     text = await response.text();
   } catch {
-    throw networkError();
+    throw controller.signal.aborted ? timeoutError() : networkError();
   } finally {
     clearTimeout(timer);
   }
