@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -27,4 +28,9 @@ public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
 
 	@Query("select i from Inquiry i join fetch i.user where i.id = :id")
 	Optional<Inquiry> findWithUserById(@Param("id") long id);
+
+	/** 탈퇴 리스너가 쓴다. 영속성 컨텍스트를 비우지 않는 벌크 삭제. */
+	@Modifying
+	@Query("delete from Inquiry i where i.user.id = :userId")
+	int deleteAllByUserId(@Param("userId") long userId);
 }

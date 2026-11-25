@@ -12,6 +12,7 @@ import com.theclimbingnight.common.BusinessException;
 import com.theclimbingnight.common.ErrorCode;
 import com.theclimbingnight.inquiry.dto.InquiryAdminResponse;
 import com.theclimbingnight.inquiry.dto.InquiryAnswerRequest;
+import com.theclimbingnight.inquiry.dto.InquiryCreateRequest;
 import com.theclimbingnight.inquiry.dto.InquiryResponse;
 import com.theclimbingnight.inquiry.entity.Inquiry;
 import com.theclimbingnight.inquiry.entity.InquiryStatus;
@@ -62,11 +63,24 @@ class InquiryServiceTest {
 		ReflectionTestUtils.setField(admin, "id", ADMIN_ID);
 		inquiry = Inquiry.create(owner, "제목", "본문");
 		ReflectionTestUtils.setField(inquiry, "id", 5L);
-		given(userRepository.findById(OWNER_ID)).willReturn(Optional.of(owner));
+		given(userRepository.findByIdForUpdate(OWNER_ID)).willReturn(Optional.of(owner));
 		given(userRepository.findByIdForUpdate(ADMIN_ID)).willReturn(Optional.of(admin));
 		given(inquiryRepository.findById(5L)).willReturn(Optional.of(inquiry));
 		given(inquiryRepository.findByIdForUpdate(5L)).willReturn(Optional.of(inquiry));
 		given(inquiryRepository.findWithUserById(5L)).willReturn(Optional.of(inquiry));
+	}
+
+	@Test
+	void 탈퇴한_회원은_문의를_남길_수_없다() {
+		// given: 요청이 들어온 뒤 탈퇴가 먼저 끝났다.
+		owner.withdraw(NOW);
+		given(userRepository.findByIdForUpdate(OWNER_ID)).willReturn(Optional.of(owner));
+
+		// when, then
+		assertThatThrownBy(() -> service.create(OWNER_ID, new InquiryCreateRequest("제목", "본문")))
+				.isInstanceOfSatisfying(BusinessException.class,
+						e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_REQUIRED));
+		verify(inquiryRepository, Mockito.never()).saveAndFlush(any());
 	}
 
 	@Test

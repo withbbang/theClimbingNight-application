@@ -1,8 +1,10 @@
 package com.theclimbingnight.push.service;
 
 import com.theclimbingnight.push.repository.NotificationSettingRepository;
+import com.theclimbingnight.push.repository.PushTicketRepository;
 import com.theclimbingnight.push.repository.PushTokenRepository;
 import com.theclimbingnight.user.service.UserWithdrawnEvent;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
@@ -19,11 +21,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class PushWithdrawalListener {
 
 	private final PushTokenRepository pushTokenRepository;
+	private final PushTicketRepository pushTicketRepository;
 	private final NotificationSettingRepository notificationSettingRepository;
 
 	public PushWithdrawalListener(PushTokenRepository pushTokenRepository,
-			NotificationSettingRepository notificationSettingRepository) {
+			PushTicketRepository pushTicketRepository, NotificationSettingRepository notificationSettingRepository) {
 		this.pushTokenRepository = pushTokenRepository;
+		this.pushTicketRepository = pushTicketRepository;
 		this.notificationSettingRepository = notificationSettingRepository;
 	}
 
@@ -31,10 +35,18 @@ public class PushWithdrawalListener {
 	@Order(Ordered.LOWEST_PRECEDENCE)
 	@Transactional
 	public void on(UserWithdrawnEvent event) {
+		List<String> deleted = new ArrayList<>();
 		for (String token : pushTokenRepository.findTokensOwnedBy(event.userId())) {
 			pushTokenRepository.findByExpoPushTokenForUpdate(token)
 					.filter(locked -> locked.getUserId() == event.userId())
-					.ifPresent(locked -> pushTokenRepository.deleteAllByIdInBatch(List.of(locked.getId())));
+					.ifPresent(locked -> {
+						pushTokenRepository.deleteAllByIdInBatch(List.of(locked.getId()));
+						deleted.add(token);
+					});
+		}
+		List<Long> ticketIds = deleted.isEmpty() ? List.of() : pushTicketRepository.findIdsByTokens(deleted);
+		if (!ticketIds.isEmpty()) {
+			pushTicketRepository.deleteAllByIdInBatch(ticketIds);
 		}
 		notificationSettingRepository.deleteAllByUserId(event.userId());
 	}

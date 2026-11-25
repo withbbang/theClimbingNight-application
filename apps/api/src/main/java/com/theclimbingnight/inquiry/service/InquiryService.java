@@ -40,7 +40,9 @@ public class InquiryService {
 
 	@Transactional
 	public InquiryResponse create(long userId, InquiryCreateRequest request) {
-		User user = userRepository.findById(userId)
+		// 탈퇴와 겹치면 지운 뒤에 문의가 남으므로 사용자 행을 잠그고 다시 확인한다.
+		User user = userRepository.findByIdForUpdate(userId)
+				.filter(User::isActive)
 				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 		Inquiry inquiry = inquiryRepository.saveAndFlush(Inquiry.create(user, request.title(), request.body()));
 		return InquiryResponse.from(inquiry);

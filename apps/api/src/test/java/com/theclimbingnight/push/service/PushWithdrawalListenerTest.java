@@ -25,6 +25,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class PushWithdrawalListenerTest {
 
 	@Mock PushTokenRepository pushTokenRepository;
+	@Mock com.theclimbingnight.push.repository.PushTicketRepository pushTicketRepository;
 	@Mock NotificationSettingRepository notificationSettingRepository;
 	@InjectMocks PushWithdrawalListener listener;
 
@@ -40,16 +41,18 @@ class PushWithdrawalListenerTest {
 		given(pushTokenRepository.findTokensOwnedBy(7L)).willReturn(List.of("A", "B"));
 		given(pushTokenRepository.findByExpoPushTokenForUpdate("A")).willReturn(Optional.of(token(1L, 7L, "A")));
 		given(pushTokenRepository.findByExpoPushTokenForUpdate("B")).willReturn(Optional.of(token(2L, 7L, "B")));
+		given(pushTicketRepository.findIdsByTokens(List.of("A", "B"))).willReturn(List.of(11L, 12L));
 
 		// when
 		listener.on(new UserWithdrawnEvent(7L));
 
 		// then
-		InOrder order = inOrder(pushTokenRepository, notificationSettingRepository);
+		InOrder order = inOrder(pushTokenRepository, pushTicketRepository, notificationSettingRepository);
 		order.verify(pushTokenRepository).findByExpoPushTokenForUpdate("A");
 		order.verify(pushTokenRepository).deleteAllByIdInBatch(List.of(1L));
 		order.verify(pushTokenRepository).findByExpoPushTokenForUpdate("B");
 		order.verify(pushTokenRepository).deleteAllByIdInBatch(List.of(2L));
+		order.verify(pushTicketRepository).deleteAllByIdInBatch(List.of(11L, 12L));
 		order.verify(notificationSettingRepository).deleteAllByUserId(7L);
 	}
 
@@ -65,6 +68,7 @@ class PushWithdrawalListenerTest {
 
 		// then
 		verify(pushTokenRepository, never()).deleteAllByIdInBatch(org.mockito.ArgumentMatchers.any());
+		org.mockito.Mockito.verifyNoInteractions(pushTicketRepository);
 		verify(notificationSettingRepository).deleteAllByUserId(7L);
 	}
 }

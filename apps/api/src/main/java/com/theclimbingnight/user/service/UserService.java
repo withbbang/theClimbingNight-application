@@ -71,7 +71,7 @@ public class UserService {
 				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 		user.withdraw(clock.instant());
 		authIdentityRepository.deleteByUserId(userId);
-		refreshTokenRepository.revokeAllActiveByUserId(userId, clock.instant());
+		refreshTokenRepository.deleteAllByUserId(userId);
 		eventPublisher.publishEvent(new UserWithdrawnEvent(userId));
 	}
 

@@ -137,7 +137,7 @@ class UserServiceTest {
 		assertThat(user.getStatus()).isEqualTo(UserStatus.WITHDRAWN);
 		assertThat(user.getNickname()).isNull();
 		verify(authIdentityRepository).deleteByUserId(7L);
-		verify(refreshTokenRepository).revokeAllActiveByUserId(7L, NOW);
+		verify(refreshTokenRepository).deleteAllByUserId(7L);
 		verify(eventPublisher).publishEvent(new UserWithdrawnEvent(7L));
 	}
 
