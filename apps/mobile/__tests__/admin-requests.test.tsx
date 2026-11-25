@@ -155,12 +155,14 @@ it('says it may still be running when bulk approval times out', async () => {
   expect(server.count(LIST)).toBe(2);
 });
 
-it('says the network is down when bulk approval cannot be sent', async () => {
+it('does not claim a result when the connection of bulk approval is lost', async () => {
   mockServer({ [LIST]: list([request()]) });
   await renderApp('/admin/requests');
   await press('일괄 승인');
   await press('일괄 승인 확정');
-  expect(screen.getByText('네트워크 연결을 확인한 뒤 다시 시도해 주세요.')).toBeOnTheScreen();
+  expect(
+    screen.getByText('처리됐는지 확인하지 못했어요. 연결을 확인하고 목록을 새로고침해 주세요.'),
+  ).toBeOnTheScreen();
 });
 
 it.each([
@@ -323,4 +325,31 @@ it('asks again when the candidates change under an untouched card', async () => 
   await fireEvent.press(choice('앱별이 새 명부 항목'));
   await press('앱별이 승인');
   expect(body(server)).toEqual({ createNew: true });
+});
+
+it.each([
+  ['승인', APPROVE],
+  ['거절', REJECT],
+])('drops the card after %s even when the list cannot be refetched', async (label, path) => {
+  // given
+  let done = false;
+  const other = request({ id: 2, user: { id: 22, nickname: '달이', role: 'USER' } });
+  mockServer({
+    [LIST]: () =>
+      done ? fail(500, 'COMMON_INTERNAL_ERROR', '서버 오류') : list([request(), other]),
+    [path]: () => {
+      done = true;
+      return ok({ id: 1 });
+    },
+  });
+  await renderApp('/admin/requests');
+  // when
+  await press(`앱별이 ${label}`);
+  if (label === '거절') {
+    await type('거절 사유', '사유');
+    await press('앱별이 거절 확정');
+  }
+  // then
+  expect(screen.queryByText('앱별이')).toBeNull();
+  expect(screen.getByText('달이')).toBeOnTheScreen();
 });

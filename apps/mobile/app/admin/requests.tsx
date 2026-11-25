@@ -24,13 +24,16 @@ import {
   useRejectRequest,
 } from '@/hooks/use-membership-admin';
 import { useTheme } from '@/hooks/use-theme';
-import { errorMessage, mayBeDone } from '@/lib/error-message';
+import { errorMessage, isDisconnected, mayBeDone } from '@/lib/error-message';
 
 const MAX_STAGGER = 8;
 const EMPTY_DRAFT: RequestDraft = { chosen: null, reason: '' };
 
 /** 수백 건이면 응답을 기다리다 끊겨도 서버는 계속 처리한다. */
 function bulkErrorMessage(error: Error) {
+  if (isDisconnected(error)) {
+    return '처리됐는지 확인하지 못했어요. 연결을 확인하고 목록을 새로고침해 주세요.';
+  }
   return mayBeDone(error)
     ? '처리 중일 수 있어요. 잠시 뒤 목록을 새로고침해 주세요.'
     : errorMessage(error);

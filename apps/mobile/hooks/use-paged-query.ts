@@ -1,4 +1,9 @@
-import { useInfiniteQuery, type QueryKey } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useQueryClient,
+  type InfiniteData,
+  type QueryKey,
+} from '@tanstack/react-query';
 
 import type { PageResponse } from '@/types/api/common';
 
@@ -21,4 +26,21 @@ export function usePagedQuery<T>(
     ],
     enabled,
   });
+}
+
+/** 처리한 항목을 목록에서 바로 뺀다. 다시 받지 못해도 또 누르지 않게 한다. */
+export function useDropFromPages<T>(queryKey: QueryKey, idOf: (item: T) => number) {
+  const client = useQueryClient();
+  return (id: number) =>
+    client.setQueriesData<InfiniteData<PageResponse<T>>>(
+      { queryKey },
+      (old) =>
+        old && {
+          ...old,
+          pages: old.pages.map((page) => ({
+            ...page,
+            items: page.items.filter((item) => idOf(item) !== id),
+          })),
+        },
+    );
 }

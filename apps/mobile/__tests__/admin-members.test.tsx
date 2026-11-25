@@ -141,3 +141,22 @@ it('turns to the blocked notice after a 403', async () => {
   await flush();
   expect(screen.getByText('운영진만 볼 수 있어요')).toBeOnTheScreen();
 });
+
+it('drops the revoked member even when the list cannot be refetched', async () => {
+  let revoked = false;
+  mockServer({
+    [ALL]: () =>
+      revoked
+        ? fail(500, 'COMMON_INTERNAL_ERROR', '서버 오류')
+        : list([member(), member({ userId: 22, nickname: '앱달이' })]),
+    'DELETE /members/21': () => {
+      revoked = true;
+      return { status: 204 };
+    },
+  });
+  await renderApp('/admin/members');
+  await press('앱별이 자격 해제');
+  await press('앱별이 자격 해제 확정');
+  expect(screen.queryByText('앱별이')).toBeNull();
+  expect(screen.getByText('앱달이')).toBeOnTheScreen();
+});
