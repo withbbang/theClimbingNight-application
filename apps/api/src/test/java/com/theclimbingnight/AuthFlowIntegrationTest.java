@@ -158,6 +158,20 @@ class AuthFlowIntegrationTest {
 	}
 
 	@Test
+	void 탈퇴_요청에_appleAuthorizationCode를_실어도_카카오_사용자는_탈퇴된다() throws Exception {
+		// given
+		JsonNode first = json(login("u4"));
+		String access = signup(first.at("/data/signupToken").asText(), "본문탈퇴").at("/data/accessToken").asText();
+
+		// when, then
+		mockMvc.perform(delete("/api/v1/users/me").header("Authorization", "Bearer " + access)
+						.contentType(MediaType.APPLICATION_JSON).content("{\"appleAuthorizationCode\":\"c1\"}"))
+				.andExpect(status().isNoContent());
+		mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + access))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
 	void 소셜_검증은_DB_트랜잭션_밖에서_호출된다() throws Exception {
 		// given
 		TX_ACTIVE_DURING_VERIFY.set(true);

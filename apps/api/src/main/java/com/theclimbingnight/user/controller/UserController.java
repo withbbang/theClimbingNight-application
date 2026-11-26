@@ -5,6 +5,8 @@ import com.theclimbingnight.auth.web.CurrentUser;
 import com.theclimbingnight.common.ApiResponse;
 import com.theclimbingnight.user.dto.NicknameUpdateRequest;
 import com.theclimbingnight.user.dto.UserResponse;
+import com.theclimbingnight.user.dto.WithdrawRequest;
+import com.theclimbingnight.user.service.AccountWithdrawalService;
 import com.theclimbingnight.user.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -21,9 +23,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
 	private final UserService userService;
+	private final AccountWithdrawalService accountWithdrawalService;
 
-	public UserController(UserService userService) {
+	public UserController(UserService userService, AccountWithdrawalService accountWithdrawalService) {
 		this.userService = userService;
+		this.accountWithdrawalService = accountWithdrawalService;
 	}
 
 	@GetMapping
@@ -39,8 +43,9 @@ public class UserController {
 
 	@DeleteMapping
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void withdraw(@CurrentUser AuthenticatedUser user) {
-		userService.withdraw(user.id());
+	public void withdraw(@CurrentUser AuthenticatedUser user,
+			@RequestBody(required = false) WithdrawRequest request) {
+		accountWithdrawalService.withdraw(user.id(), request == null ? null : request.appleAuthorizationCode());
 	}
 
 }

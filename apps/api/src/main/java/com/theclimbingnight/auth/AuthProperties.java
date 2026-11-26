@@ -25,7 +25,20 @@ public record AuthProperties(
 	public record Google(List<String> clientIds, String jwksUrl) {
 	}
 
-	public record Apple(List<String> audiences, String jwksUrl) {
+	/**
+	 * clientId·teamId·keyId·privateKey는 탈퇴 때 Apple 토큰을 폐기하는 데 쓴다.
+	 * privateKey는 Apple Developer에서 받은 .p8(PKCS#8 PEM) 본문. 셋 중 하나라도 비면 폐기를 하지 않는다.
+	 */
+	public record Apple(List<String> audiences, String jwksUrl, String baseUrl, String clientId, String teamId,
+			String keyId, String privateKey) {
+
+		public boolean revokeConfigured() {
+			return hasText(teamId) && hasText(keyId) && hasText(privateKey);
+		}
+
+		private static boolean hasText(String value) {
+			return value != null && !value.isBlank();
+		}
 	}
 
 }

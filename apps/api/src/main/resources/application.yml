@@ -40,6 +40,12 @@ app:
     apple:
       audiences: ${APPLE_AUDIENCES:}
       jwks-url: https://appleid.apple.com/auth/keys
+      # 탈퇴할 때 Apple 토큰 폐기에 쓴다. 키가 비면 폐기하지 않는다 (스토어 제출 전 반드시 채운다).
+      base-url: https://appleid.apple.com
+      client-id: ${APPLE_CLIENT_ID:com.theclimbingnight.app}
+      team-id: ${APPLE_TEAM_ID:}
+      key-id: ${APPLE_KEY_ID:}
+      private-key: ${APPLE_PRIVATE_KEY:}
   push:
     enabled: false
     base-url: https://exp.host
