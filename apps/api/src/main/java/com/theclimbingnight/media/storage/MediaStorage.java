@@ -35,6 +35,9 @@ public interface MediaStorage {
 
 	void deleteQuarantine(String publicKey);
 
+	/** 공개 버킷에 key가 있는지 HEAD로 본다. */
+	boolean publicExists(String key);
+
 	/** quarantine/{publicKey}가 있는지 HEAD로 본다. */
 	boolean quarantineExists(String publicKey);
 

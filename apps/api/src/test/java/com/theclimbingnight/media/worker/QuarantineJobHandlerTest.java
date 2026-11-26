@@ -1,6 +1,7 @@
 package com.theclimbingnight.media.worker;
 
 import static com.theclimbingnight.media.worker.WorkerFixtures.POST_ID;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
@@ -83,7 +84,7 @@ class QuarantineJobHandlerTest {
 	}
 
 	@Test
-	void 처리_전에_숨긴_사진이면_아무것도_안_한다() throws Exception {
+	void 처리_전에_숨긴_사진이면_공개본이_없으니_아무것도_안_한다() throws Exception {
 		// given
 		givenTarget(PostStatus.HIDDEN_PENDING, PostMediaStatus.PROCESSING);
 
@@ -91,7 +92,34 @@ class QuarantineJobHandlerTest {
 		handler.handle(WorkerFixtures.job(MediaJobKind.QUARANTINE, 11L, 0));
 
 		// then
-		verifyNoInteractions(storage, purger);
+		verify(storage, never()).copyPublicToQuarantine(anyString());
+		verify(storage, never()).deletePublic(anyString());
+		verifyNoInteractions(purger);
+	}
+
+	@Test
+	void 복원하고_공개_작업_전에_다시_숨기면_남은_예전_공개본을_격리한다() throws Exception {
+		// given: 숨긴 뒤 격리 작업이 돌기 전에 복원했다(사진은 PROCESSING으로 돌아감). RELEASE 전에 다시 숨겼다
+		PostMedia media = givenTarget(PostStatus.HIDDEN_PENDING, PostMediaStatus.READY);
+		com.theclimbingnight.feed.entity.Post post = WorkerFixtures.post(PostStatus.HIDDEN_PENDING);
+		given(mediaRepository.findAllByPostIdOrderBySortOrder(POST_ID)).willReturn(List.of(media));
+		new com.theclimbingnight.media.job.MediaJobScheduler(
+				org.mockito.Mockito.mock(com.theclimbingnight.media.job.MediaJobRepository.class), mediaRepository,
+				java.time.Clock.systemUTC()).onPostRestored(post);
+		given(storage.publicExists(anyString())).willReturn(true);
+
+		// when: 첫 숨김과 두 번째 숨김의 격리 작업이 차례로 돈다
+		handler.handle(WorkerFixtures.job(MediaJobKind.QUARANTINE, 11L, 0));
+		given(storage.publicExists(anyString())).willReturn(false);
+		handler.handle(WorkerFixtures.job(MediaJobKind.QUARANTINE, 11L, 0));
+
+		// then: 한 번만 복사하고, 예전 공개본을 지우고 캐시를 비운다
+		assertThat(media.getStatus()).isEqualTo(PostMediaStatus.PROCESSING);
+		verify(storage).copyPublicToQuarantine("p/k11/d.webp");
+		verify(storage).copyPublicToQuarantine("p/k11/t.webp");
+		verify(storage).deletePublic("p/k11/d.webp");
+		verify(storage).deletePublic("p/k11/t.webp");
+		verify(purger).purge(List.of("https://m.example/p/k11/d.webp", "https://m.example/p/k11/t.webp"));
 	}
 
 	@Test

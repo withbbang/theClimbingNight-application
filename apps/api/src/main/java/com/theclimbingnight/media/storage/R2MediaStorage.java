@@ -58,6 +58,11 @@ public class R2MediaStorage implements MediaStorage {
 	}
 
 	@Override
+	public boolean publicExists(String key) {
+		return headSize(publicBucket, key).isPresent();
+	}
+
+	@Override
 	public boolean quarantineExists(String publicKey) {
 		return headSize(incomingBucket, QUARANTINE_PREFIX + publicKey).isPresent();
 	}
