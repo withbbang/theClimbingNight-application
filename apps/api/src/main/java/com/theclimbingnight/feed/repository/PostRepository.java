@@ -48,4 +48,11 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select p from Post p where p.id = :id")
 	Optional<Post> findByIdForUpdate(@Param("id") long id);
+
+	/** 만든 지 오래된(createdAt이 before보다 이른) 초안 id. before와 같으면 남긴다. */
+	@Query("""
+			select p.id from Post p
+			where p.status = com.theclimbingnight.feed.entity.PostStatus.DRAFT and p.createdAt < :before
+			""")
+	List<Long> findDraftIdsCreatedBefore(@Param("before") Instant before);
 }

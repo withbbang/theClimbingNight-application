@@ -41,7 +41,10 @@ public enum ErrorCode {
 	PENALTY_NOT_LATE_CANCEL(HttpStatus.CONFLICT, "늦은 취소로 표시된 신청이 아닙니다."),
 	PENALTY_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 블랙리스트에 기록된 건입니다."),
 	PENALTY_ALREADY_REVOKED(HttpStatus.CONFLICT, "이미 취소된 블랙리스트 기록입니다."),
-	MEDIA_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "사진 올리기를 잠시 쓸 수 없습니다. 잠시 후 다시 시도해 주세요.");
+	MEDIA_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "사진 올리기를 잠시 쓸 수 없습니다. 잠시 후 다시 시도해 주세요."),
+	POST_UPLOAD_INCOMPLETE(HttpStatus.CONFLICT, "아직 올라가지 않은 사진이 있습니다. 다시 올려 주세요."),
+	POST_NOT_DRAFT(HttpStatus.CONFLICT, "이미 게시한 글입니다."),
+	POST_NOT_EDITABLE(HttpStatus.CONFLICT, "숨겨지거나 삭제된 글은 고칠 수 없습니다.");
 
 	private final HttpStatus status;
 	private final String message;

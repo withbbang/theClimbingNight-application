@@ -68,6 +68,13 @@ public class PostMedia extends BaseTimeEntity {
 		return media;
 	}
 
+	/** 업로드 전에 앱이 알린 크기. 게시할 때 실제 업로드 크기와 맞춰 본다. */
+	public void declare(int width, int height, long byteSize) {
+		this.width = width;
+		this.height = height;
+		this.byteSize = byteSize;
+	}
+
 	public String displayKey() {
 		return publicKey + DISPLAY_SUFFIX;
 	}
