@@ -35,15 +35,12 @@ public class AuthInterceptor implements HandlerInterceptor {
 		RequireRole requireRole = findAnnotation(handlerMethod, RequireRole.class);
 		// @RequireRole은 @PublicApi보다 우선한다: 역할이 필요하면 항상 유효한 사용자를 요구한다.
 		boolean anonymousAllowed = findAnnotation(handlerMethod, PublicApi.class) != null && requireRole == null;
-		AuthenticatedUser user;
-		try {
-			user = authenticate(request);
-		} catch (BusinessException e) {
-			if (anonymousAllowed) {
-				return true;
-			}
-			throw e;
+		// 헤더가 아예 없을 때만 비로그인으로 통과한다. 헤더가 있는데 유효하지 않으면(만료 포함) 401이다.
+		// 앱이 401을 받아야 토큰을 갱신한다.
+		if (anonymousAllowed && request.getHeader(HttpHeaders.AUTHORIZATION) == null) {
+			return true;
 		}
+		AuthenticatedUser user = authenticate(request);
 		if (requireRole != null && !user.role().atLeast(requireRole.value())) {
 			throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
 		}

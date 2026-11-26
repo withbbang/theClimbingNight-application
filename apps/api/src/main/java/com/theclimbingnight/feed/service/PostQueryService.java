@@ -65,14 +65,18 @@ public class PostQueryService {
 	}
 
 	public PostResponse detail(Long viewerId, long id) {
-		Post post = posts.findById(id).filter(p -> p.getDeletedAt() == null)
-				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 		if (viewerId == null) {
+			// 존재 여부를 흘리지 않도록 최신 3개 밖이면(없는 글·삭제 글 포함) 항상 401이다.
 			if (!posts.findLatestVisibleIds(ANONYMOUS_LIMIT).contains(id)) {
 				throw new BusinessException(ErrorCode.AUTH_REQUIRED);
 			}
 		}
-		else if (post.getAuthorId().equals(viewerId)) {
+		Post post = posts.findById(id).filter(p -> p.getDeletedAt() == null)
+				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
+		if (viewerId == null) {
+			return toResponses(List.of(post), null).get(0);
+		}
+		if (post.getAuthorId().equals(viewerId)) {
 			// 초안은 아직 글이 아니다. 그 밖의 상태는 작성자 본인에게 보인다.
 			if (post.getStatus() == PostStatus.DRAFT) {
 				throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);

@@ -158,9 +158,19 @@ class AuthInterceptorTest {
 	}
 
 	@Test
-	void 공개_API에_잘못된_토큰을_보내도_200이고_사용자는_null이다() throws Exception {
+	void 헤더가_있는데_토큰이_잘못되면_공개_API도_401이다() throws Exception {
 		// given, when, then
 		mockMvc.perform(get("/api/probe/public").header("Authorization", "Bearer garbage"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+		mockMvc.perform(get("/api/probe/public").header("Authorization", "Basic abc"))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void 헤더가_없으면_공개_API는_비로그인으로_통과한다() throws Exception {
+		// given, when, then
+		mockMvc.perform(get("/api/probe/public"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.anonymous").value(true));
 	}

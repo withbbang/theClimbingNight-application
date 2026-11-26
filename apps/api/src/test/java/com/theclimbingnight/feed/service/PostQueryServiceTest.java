@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -140,12 +141,42 @@ class PostQueryServiceTest {
 	@Test
 	void 비로그인은_최신_3개_밖의_상세를_못_본다() {
 		// given
-		given(posts.findById(5L)).willReturn(Optional.of(post(5, OTHER, PostStatus.VISIBLE)));
 		given(posts.findLatestVisibleIds(3)).willReturn(List.of(9L, 8L, 7L));
 
 		// when / then
 		assertThatThrownBy(() -> service.detail(null, 5L)).isInstanceOfSatisfying(BusinessException.class,
 				e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_REQUIRED));
+		verify(posts, never()).findById(anyLong());
+	}
+
+	@Test
+	void 비로그인이_없는_글_상세를_부르면_401이다() {
+		// given
+		given(posts.findLatestVisibleIds(3)).willReturn(List.of(9L, 8L, 7L));
+
+		// when / then
+		assertThatThrownBy(() -> service.detail(null, 12345L)).isInstanceOfSatisfying(BusinessException.class,
+				e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_REQUIRED));
+		verify(posts, never()).findById(anyLong());
+	}
+
+	@Test
+	void 비로그인이_최신_3개_안의_글_상세는_본다() {
+		// given
+		given(posts.findLatestVisibleIds(3)).willReturn(List.of(9L, 8L, 7L));
+		given(posts.findById(8L)).willReturn(Optional.of(post(8, OTHER, PostStatus.VISIBLE)));
+		given(mediaRepository.findAllByPostIdInOrderBySortOrder(anyCollection()))
+				.willReturn(List.of(media(9, 8, PostMediaStatus.READY)));
+		given(users.findAllById(anyCollection())).willReturn(List.of(user(OTHER, "남")));
+
+		// when
+		PostResponse response = service.detail(null, 8L);
+
+		// then
+		assertThat(response.id()).isEqualTo(8L);
+		assertThat(response.mine()).isFalse();
+		assertThat(response.status()).isNull();
+		assertThat(response.media().get(0).url()).isEqualTo("https://m.example/p/k9/d.webp");
 	}
 
 	@Test
