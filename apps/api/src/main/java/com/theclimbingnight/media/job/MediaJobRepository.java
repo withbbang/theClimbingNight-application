@@ -46,13 +46,23 @@ public interface MediaJobRepository extends JpaRepository<MediaJob, Long> {
 			""")
 	int cancelQueued(@Param("mediaIds") Collection<Long> mediaIds, @Param("kind") MediaJobKind kind);
 
-	/** postIds 중 격리·삭제 작업이 FAILED로 끝난 사진이 있는 게시물 id. 운영진 신고 목록의 cleanupFailed 표시용. */
+	/**
+	 * postIds 중 격리·삭제 작업이 FAILED로 끝났고, 그 뒤로 같은 사진에 정리 관련 작업(QUARANTINE·DELETE_MEDIA·RELEASE)이
+	 * 새로 생기지 않은 사진이 있는 게시물 id. 즉 사진마다 가장 최근 정리 작업이 실패한 경우만 센다.
+	 * 운영진 신고 목록의 cleanupFailed 표시용.
+	 */
 	@Query("""
 			select distinct m.postId from MediaJob j, com.theclimbingnight.feed.entity.PostMedia m
 			where j.targetId = m.id and m.postId in :postIds
 			  and j.status = com.theclimbingnight.media.job.MediaJobStatus.FAILED
 			  and j.kind in (com.theclimbingnight.media.job.MediaJobKind.QUARANTINE,
 			                 com.theclimbingnight.media.job.MediaJobKind.DELETE_MEDIA)
+			  and not exists (
+			      select 1 from MediaJob later
+			      where later.targetId = j.targetId and later.id > j.id
+			        and later.kind in (com.theclimbingnight.media.job.MediaJobKind.QUARANTINE,
+			                           com.theclimbingnight.media.job.MediaJobKind.DELETE_MEDIA,
+			                           com.theclimbingnight.media.job.MediaJobKind.RELEASE))
 			""")
 	List<Long> findPostIdsWithFailedCleanup(@Param("postIds") Collection<Long> postIds);
 }

@@ -11,6 +11,7 @@ import com.theclimbingnight.feed.entity.PostStatus;
 import com.theclimbingnight.feed.repository.PostMediaRepository;
 import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.feed.service.PostResponseMapper;
+import com.theclimbingnight.media.MediaUrls;
 import com.theclimbingnight.media.job.MediaJobRepository;
 import com.theclimbingnight.media.job.MediaJobScheduler;
 import com.theclimbingnight.media.storage.MediaStorage;
@@ -35,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -59,11 +61,12 @@ public class ModerationService {
 	private final MediaJobScheduler scheduler;
 	private final MediaStorage storage;
 	private final PostResponseMapper mapper;
+	private final MediaUrls urls;
 	private final Clock clock;
 
 	public ModerationService(ReportRepository reports, PostRepository posts, PostMediaRepository mediaRepository,
 			UserRepository users, MediaJobRepository jobs, MediaJobScheduler scheduler, MediaStorage storage,
-			PostResponseMapper mapper, Clock clock) {
+			PostResponseMapper mapper, MediaUrls urls, Clock clock) {
 		this.reports = reports;
 		this.posts = posts;
 		this.mediaRepository = mediaRepository;
@@ -72,6 +75,7 @@ public class ModerationService {
 		this.scheduler = scheduler;
 		this.storage = storage;
 		this.mapper = mapper;
+		this.urls = urls;
 		this.clock = clock;
 	}
 
@@ -178,10 +182,27 @@ public class ModerationService {
 		User author = userById.get(post.getAuthorId());
 		PostResponse body = mapper.toResponse(post, author == null ? null : author.getNickname(), media, null);
 		List<String> quarantineUrls = isHidden(post) ? media.stream()
-				.filter(m -> m.getStatus() == PostMediaStatus.READY)
-				.map(m -> storage.presignQuarantineGet(m.displayKey(), QUARANTINE_URL_TTL).toString())
+				.filter(m -> m.getStatus() != PostMediaStatus.UPLOADING)
+				.map(this::reviewUrl)
+				.flatMap(Optional::stream)
 				.toList() : List.of();
 		return response(s, targetReports, post.getStatus().name(), body, quarantineUrls, null, cleanupFailed);
+	}
+
+	/**
+	 * 숨긴 글의 사진을 운영진이 볼 주소. 사진 상태로는 격리 여부를 알 수 없어(복원 직후 다시 숨긴 PROCESSING 사진도 격리돼 있고,
+	 * 숨긴 직후의 READY 사진은 아직 격리 전이다) 저장소를 HEAD로 본다. 격리본이 있으면 격리본 presigned GET, 격리 전이라
+	 * 공개본이 있으면 공개 주소, 둘 다 없으면 뺀다. 사진마다 HEAD 1~2번.
+	 */
+	private Optional<String> reviewUrl(PostMedia media) {
+		String key = media.displayKey();
+		if (storage.quarantineExists(key)) {
+			return Optional.of(storage.presignQuarantineGet(key, QUARANTINE_URL_TTL).toString());
+		}
+		if (storage.publicExists(key)) {
+			return Optional.of(urls.publicUrl(key));
+		}
+		return Optional.empty();
 	}
 
 	private ReportTargetResponse userTarget(ReportTargetSummary s, List<Report> targetReports, User user) {

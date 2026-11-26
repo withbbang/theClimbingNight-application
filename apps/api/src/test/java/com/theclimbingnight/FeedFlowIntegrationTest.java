@@ -157,7 +157,7 @@ class FeedFlowIntegrationTest {
 		// when : 다른 회원이 초상권으로 신고
 		mockMvc.perform(post("/api/v1/reports").header("Authorization", bearer(reporter)).contentType(JSON)
 				.content("{\"targetType\":\"POST\",\"targetId\":" + postId + ",\"reason\":\"PORTRAIT_PRIVACY\"}"))
-				.andExpect(status().is2xxSuccessful());
+				.andExpect(status().isNoContent());
 
 		// then : 피드에서 빠지고 격리 작업이 생긴다
 		assertThat(feedContains(postId)).isFalse();
@@ -166,7 +166,7 @@ class FeedFlowIntegrationTest {
 
 		// when : 운영진이 복원
 		mockMvc.perform(post("/api/v1/report-targets/POST/" + postId + "/actions").header("Authorization", bearer(admin))
-				.contentType(JSON).content("{\"action\":\"RESTORE\"}")).andExpect(status().is2xxSuccessful());
+				.contentType(JSON).content("{\"action\":\"RESTORE\"}")).andExpect(status().isNoContent());
 
 		// then : 사진을 다시 올릴 때까지 PENDING이고 RELEASE 작업이 생긴다
 		assertThat(postRepository.findById(postId).orElseThrow().getStatus()).isEqualTo(PostStatus.PENDING);

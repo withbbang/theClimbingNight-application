@@ -182,4 +182,45 @@ class MediaJobRepositoryTest {
 		assertThat(failed).containsExactlyInAnyOrder(quarantinedPost, deletedPost);
 		assertThat(failed).doesNotContain(otherPost);
 	}
+
+	@Test
+	void 정리가_실패한_뒤_나중_정리_작업이_성공하면_경고하지_않는다() {
+		// given: 격리 실패 → 복원(RELEASE) 성공 → 다시 격리 성공한 사진, 격리 실패 → 복원만 성공한 사진
+		long author = users.saveAndFlush(User.create("작성자")).getId();
+		long[] requarantined = new long[1];
+		long[] released = new long[1];
+		long[] processedAfter = new long[1];
+		long requarantinedPost = postWithMedia(author, requarantined);
+		long releasedPost = postWithMedia(author, released);
+		long processedAfterPost = postWithMedia(author, processedAfter);
+		MediaJob q1 = queue(MediaJobKind.QUARANTINE, requarantined[0], NOW);
+		q1.markFailed("R2 503");
+		jobs.saveAndFlush(q1);
+		MediaJob r1 = queue(MediaJobKind.RELEASE, requarantined[0], NOW);
+		r1.markDone();
+		jobs.saveAndFlush(r1);
+		MediaJob q2 = queue(MediaJobKind.QUARANTINE, requarantined[0], NOW);
+		q2.markDone();
+		jobs.saveAndFlush(q2);
+		MediaJob q3 = queue(MediaJobKind.QUARANTINE, released[0], NOW);
+		q3.markFailed("R2 503");
+		jobs.saveAndFlush(q3);
+		MediaJob r2 = queue(MediaJobKind.RELEASE, released[0], NOW);
+		r2.markDone();
+		jobs.saveAndFlush(r2);
+		// 정리와 무관한 작업은 실패를 덮지 않는다
+		MediaJob q4 = queue(MediaJobKind.QUARANTINE, processedAfter[0], NOW);
+		q4.markFailed("R2 503");
+		jobs.saveAndFlush(q4);
+		MediaJob p = queue(MediaJobKind.PROCESS, processedAfter[0], NOW);
+		p.markDone();
+		jobs.saveAndFlush(p);
+
+		// when
+		List<Long> failed = jobs.findPostIdsWithFailedCleanup(
+				List.of(requarantinedPost, releasedPost, processedAfterPost));
+
+		// then
+		assertThat(failed).containsExactly(processedAfterPost);
+	}
 }

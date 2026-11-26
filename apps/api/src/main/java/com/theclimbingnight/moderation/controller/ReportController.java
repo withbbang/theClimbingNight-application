@@ -39,7 +39,7 @@ public class ReportController {
 
 	@RequireRole(Role.USER)
 	@PostMapping("/reports")
-	@ResponseStatus(HttpStatus.CREATED)
+	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void report(@CurrentUser AuthenticatedUser user, @Valid @RequestBody ReportCreateRequest request) {
 		reportService.submit(user.id(), request);
 	}

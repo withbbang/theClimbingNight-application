@@ -110,7 +110,7 @@
 - DB에는 R2 키만 저장하고, URL은 응답할 때 `MEDIA_PUBLIC_BASE_URL` + 키로 만든다. 도메인을 바꿔도 데이터 이전이 없다 (제안).
 - 운영에는 `media.<도메인>` 커스텀 도메인이 필요하다(`r2.dev` 주소는 요청 제한이 있는 개발용). 도메인 구매·연결은 1번 작업 출시의 선행 조건이며 `deploy/README.md` 8장의 도메인 항목과 같이 처리한다. 개발 중에는 `r2.dev` 주소를 쓴다.
 - 키에는 추측 가능한 ID 대신 무작위 값(UUID)을 쓴다.
-- **숨기면 URL로도 바로 막는다 (결정)**: 자동 임시조치(`HIDDEN_PENDING`), 운영진 숨김(`HIDDEN`)은 `QUARANTINE` 작업을, 삭제는 `DELETE_MEDIA` 작업을 즉시 만든다. 워커는 `media-public`의 공개본을 비공개 버킷 `media-incoming`의 `quarantine/{공개 키}`로 옮기고(복사 후 삭제) Cloudflare API로 그 URL들의 캐시를 비운다(URL 단위 purge, 무료 플랜 가능). 처음 설계는 공개본을 지우고 복원 때 NAS 원본에서 다시 만드는 것이었으나, 그러면 운영진이 신고된 사진을 볼 방법이 없어 격리로 바꿨다. 운영진은 신고 목록에서 5분짜리 presigned GET으로 격리된 사진을 보고 숨김·복원·기각을 판단한다.
+- **숨기면 URL로도 바로 막는다 (결정)**: 자동 임시조치(`HIDDEN_PENDING`), 운영진 숨김(`HIDDEN`)은 `QUARANTINE` 작업을, 삭제는 `DELETE_MEDIA` 작업을 즉시 만든다. 워커는 `media-public`의 공개본을 비공개 버킷 `media-incoming`의 `quarantine/{공개 키}`로 옮기고(복사 후 삭제) Cloudflare API로 그 URL들의 캐시를 비운다(URL 단위 purge, 무료 플랜 가능). 처음 설계는 공개본을 지우고 복원 때 NAS 원본에서 다시 만드는 것이었으나, 그러면 운영진이 신고된 사진을 볼 방법이 없어 격리로 바꿨다. 운영진은 신고 목록에서 5분짜리 presigned GET으로 격리된 사진을 보고 숨김·복원·기각을 판단한다. 아직 격리 전이면 공개 주소를 주고, 둘 다 없는 사진은 뺀다(사진마다 HEAD 1~2번).
 - **복원**: 운영진이 복원하거나 자동 숨김 글의 신고를 기각하면 `RELEASE` 작업이 격리본을 **새 키**로 공개 버킷에 복사하고 예전 공개본을 지운다. 새 키를 쓰므로 예전 URL은 되살아나지 않는다. 격리본이 없으면(처리 전에 숨겨진 사진) NAS 원본에서, 그것도 없으면 `uploads/`의 업로드 객체에서 다시 변환한다. 셋 다 없으면 사진과 게시물이 `FAILED`가 된다.
 - 기각(`DISMISS`)은 자동 숨김(`HIDDEN_PENDING`) 글을 복원한다(숨길 이유가 없다는 뜻). 운영진이 확정 숨김한 `HIDDEN` 글은 신고만 닫고 숨김은 유지한다. 이미 숨겨졌거나 `FAILED`인 글을 신고하면 API는 404를 주고, 앱은 접수된 것처럼 안내한다.
 - **작업 종류와 우선순위**: `QUARANTINE`·`DELETE_MEDIA`(0) > `RELEASE`(1) > `PROCESS`(2) > `PURGE_ORIGINAL`(3). 숨김·삭제는 아직 `QUEUED`인 `PROCESS`를 취소한다. `PURGE_ORIGINAL`은 삭제 30일 뒤 NAS 원본을 지운다.

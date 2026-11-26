@@ -3,6 +3,9 @@
 spring:
   main:
     web-application-type: none
+  lifecycle:
+    # 종료 때 MediaWorkerLoop가 진행 중 작업을 최대 80초 기다린다. 그보다 길고 compose stop_grace_period(90s)보다 짧게.
+    timeout-per-shutdown-phase: 85s
   flyway:
     enabled: false
 

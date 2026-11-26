@@ -30,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional(readOnly = true)
 public class PostCommandService {
 
 	static final Duration UPLOAD_TTL = Duration.ofMinutes(15);

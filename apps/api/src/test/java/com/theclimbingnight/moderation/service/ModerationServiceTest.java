@@ -79,7 +79,7 @@ class ModerationServiceTest {
 		MediaUrls urls = new MediaUrls(new MediaProperties(true, "a", "k", "s", "in", "pub", "https://m.example", null));
 		MediaJobScheduler scheduler = new MediaJobScheduler(jobs, mediaRepository, clock);
 		service = new ModerationService(reports, posts, mediaRepository, users, jobs, scheduler, storage,
-				new PostResponseMapper(urls), clock);
+				new PostResponseMapper(urls), urls, clock);
 	}
 
 	private Post givenPost(PostStatus status) {
@@ -350,6 +350,7 @@ class ModerationServiceTest {
 		PostMedia processing = media(12L, 1);
 		given(mediaRepository.findAllByPostIdInOrderBySortOrder(List.of(POST_ID))).willReturn(List.of(ready, processing));
 		given(users.findAllById(anyCollection())).willReturn(List.of(user(AUTHOR, "작성자"), user(9L, "대상")));
+		given(storage.quarantineExists("p/k11/d.webp")).willReturn(true);
 		given(storage.presignQuarantineGet(eq("p/k11/d.webp"), eq(Duration.ofMinutes(5))))
 				.willReturn(URI.create("https://in.example/quarantine/p/k11/d.webp?sig"));
 
@@ -403,6 +404,37 @@ class ModerationServiceTest {
 		assertThat(target.post().media().get(0).url()).isEqualTo("https://m.example/p/k11/d.webp");
 		assertThat(target.cleanupFailed()).isFalse();
 		verifyNoInteractions(storage);
+	}
+
+	@Test
+	void 숨긴_글의_사진은_격리본이_있으면_격리본을_격리_전이면_공개본을_주고_둘_다_없으면_뺀다() {
+		// given: 복원 직후 다시 숨겨 PROCESSING인데 격리된 사진, 아직 격리 전인 READY 사진, 아무 데도 없는 사진
+		given(reports.findOpenTargets(PageRequest.of(0, 20))).willReturn(new PageImpl<>(
+				List.of(new ReportTargetSummary(ReportTargetType.POST, POST_ID, 1L, NOW)), PageRequest.of(0, 20), 1));
+		Post post = Post.draft(AUTHOR);
+		ReflectionTestUtils.setField(post, "id", POST_ID);
+		ReflectionTestUtils.setField(post, "status", PostStatus.HIDDEN);
+		given(posts.findAllById(List.of(POST_ID))).willReturn(List.of(post));
+		PostMedia requarantined = media(11L, 0);
+		requarantined.markProcessing();
+		PostMedia notYet = media(12L, 1);
+		notYet.markReady("2026/11/12.jpg", 800, 600, 1000L);
+		PostMedia gone = media(13L, 2);
+		gone.markReady("2026/11/13.jpg", 800, 600, 1000L);
+		given(mediaRepository.findAllByPostIdInOrderBySortOrder(List.of(POST_ID)))
+				.willReturn(List.of(requarantined, notYet, gone));
+		given(users.findAllById(anyCollection())).willReturn(List.of(user(AUTHOR, "작성자")));
+		given(storage.quarantineExists("p/k11/d.webp")).willReturn(true);
+		given(storage.presignQuarantineGet(eq("p/k11/d.webp"), eq(Duration.ofMinutes(5))))
+				.willReturn(URI.create("https://in.example/quarantine/p/k11/d.webp?sig"));
+		given(storage.publicExists("p/k12/d.webp")).willReturn(true);
+
+		// when
+		ReportTargetResponse target = service.list(0, 20).items().get(0);
+
+		// then
+		assertThat(target.quarantineUrls()).containsExactly("https://in.example/quarantine/p/k11/d.webp?sig",
+				"https://m.example/p/k12/d.webp");
 	}
 
 	@Test

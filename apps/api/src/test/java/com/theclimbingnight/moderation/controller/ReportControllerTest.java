@@ -69,13 +69,13 @@ class ReportControllerTest {
 	}
 
 	@Test
-	void 신고하면_201이다() throws Exception {
+	void 신고하면_본문_없이_204다() throws Exception {
 		// given
 		String bearer = bearer(3L, Role.USER);
 
 		// when / then
 		report(bearer, "{\"targetType\":\"POST\",\"targetId\":50,\"reason\":\"PORTRAIT_PRIVACY\"}")
-				.andExpect(status().isCreated());
+				.andExpect(status().isNoContent());
 		verify(reportService).submit(3L,
 				new ReportCreateRequest(ReportTargetType.POST, 50L, ReportReason.PORTRAIT_PRIVACY, null));
 	}
@@ -93,7 +93,7 @@ class ReportControllerTest {
 				.andExpect(status().isBadRequest());
 		verify(reportService, never()).submit(anyLong(), any());
 		report(bearer, "{\"targetType\":\"POST\",\"targetId\":50,\"reason\":\"OTHER\",\"detail\":\"사유\"}")
-				.andExpect(status().isCreated());
+				.andExpect(status().isNoContent());
 	}
 
 	@Test
@@ -103,7 +103,7 @@ class ReportControllerTest {
 		String body = "{\"targetType\":\"USER\",\"targetId\":9,\"reason\":\"SPAM\",\"detail\":\"%s\"}";
 
 		// when / then
-		report(bearer, body.formatted("가".repeat(500))).andExpect(status().isCreated());
+		report(bearer, body.formatted("가".repeat(500))).andExpect(status().isNoContent());
 		report(bearer, body.formatted("가".repeat(501))).andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.error.fields[0].field").value("detail"));
 	}
