@@ -86,3 +86,25 @@ it('creates the open url method itself when naver is used without kakao', () => 
     './plugins/with-open-url',
   );
 });
+
+it('sets the store icon and splash image', () => {
+  const config = load({});
+  expect(config.icon).toBe('./assets/icon.png');
+  expect(config.android?.adaptiveIcon).toEqual({
+    foregroundImage: './assets/adaptive-icon.png',
+    backgroundColor: '#101A2E',
+  });
+  expect(pluginOptions(config, 'expo-splash-screen')).toMatchObject({
+    image: './assets/splash-icon.png',
+    imageWidth: 200,
+  });
+});
+
+it('ships the icon files the config points to', () => {
+  // 파일이 없으면 require가 실패한다.
+  expect(() => [
+    require('../assets/icon.png'),
+    require('../assets/adaptive-icon.png'),
+    require('../assets/splash-icon.png'),
+  ]).not.toThrow();
+});

@@ -48,6 +48,7 @@ export default function createConfig(): ExpoConfig {
     version: '1.0.0',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
+    icon: './assets/icon.png',
     ios: {
       bundleIdentifier: APP_ID,
       usesAppleSignIn: true,
@@ -55,6 +56,7 @@ export default function createConfig(): ExpoConfig {
     },
     android: {
       package: APP_ID,
+      adaptiveIcon: { foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#101A2E' },
       ...(env.GOOGLE_SERVICES_JSON ? { googleServicesFile: env.GOOGLE_SERVICES_JSON } : {}),
     },
     plugins: [
@@ -79,7 +81,15 @@ export default function createConfig(): ExpoConfig {
           ),
         },
       ],
-      ['expo-splash-screen', { backgroundColor: '#EEF2F8', dark: { backgroundColor: '#101A2E' } }],
+      [
+        'expo-splash-screen',
+        {
+          image: './assets/splash-icon.png',
+          imageWidth: 200,
+          backgroundColor: '#EEF2F8',
+          dark: { image: './assets/splash-icon.png', backgroundColor: '#101A2E' },
+        },
+      ],
       ...socialPlugins(env),
     ],
     experiments: { typedRoutes: true, reactCompiler: true },
