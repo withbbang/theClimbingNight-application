@@ -35,5 +35,8 @@ public interface MediaStorage {
 
 	void deleteQuarantine(String publicKey);
 
+	/** quarantine/{publicKey}가 있는지 HEAD로 본다. */
+	boolean quarantineExists(String publicKey);
+
 	URI presignQuarantineGet(String publicKey, Duration ttl);
 }

@@ -59,3 +59,8 @@ app:
     public-bucket: ${R2_MEDIA_PUBLIC_BUCKET:}
     public-base-url: ${MEDIA_PUBLIC_BASE_URL:}
     originals-dir: ${MEDIA_ORIGINALS_DIR:/media/originals}
+  # 워커 루프는 worker 프로필에서만 켠다(application-worker.yml). 캐시 비우기 토큰이나 zone이 비면 숨긴 사진의 CDN 캐시를 비우지 않는다.
+  worker:
+    enabled: false
+    cloudflare-zone-id: ${CLOUDFLARE_ZONE_ID:}
+    cloudflare-cache-purge-token: ${CLOUDFLARE_CACHE_PURGE_TOKEN:}

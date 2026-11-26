@@ -57,6 +57,11 @@ public class DisabledMediaStorage implements MediaStorage {
 	}
 
 	@Override
+	public boolean quarantineExists(String publicKey) {
+		throw unavailable();
+	}
+
+	@Override
 	public URI presignQuarantineGet(String publicKey, Duration ttl) {
 		throw unavailable();
 	}

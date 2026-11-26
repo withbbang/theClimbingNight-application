@@ -2,6 +2,12 @@ package com.theclimbingnight.media.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.theclimbingnight.feed.entity.Post;
+import com.theclimbingnight.feed.entity.PostMedia;
+import com.theclimbingnight.feed.repository.PostMediaRepository;
+import com.theclimbingnight.feed.repository.PostRepository;
+import com.theclimbingnight.user.entity.User;
+import com.theclimbingnight.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -19,6 +25,9 @@ class MediaJobRepositoryTest {
 	private static final Instant NOW = Instant.parse("2026-11-26T12:00:00Z");
 
 	@Autowired MediaJobRepository jobs;
+	@Autowired PostRepository posts;
+	@Autowired PostMediaRepository mediaRepository;
+	@Autowired UserRepository users;
 
 	private MediaJob queue(MediaJobKind kind, long target, Instant runAt) {
 		return jobs.saveAndFlush(MediaJob.queue(kind, target, runAt));
@@ -130,5 +139,47 @@ class MediaJobRepositoryTest {
 
 		// then
 		assertThat(reload(job).getLastError()).hasSize(500);
+	}
+
+	private long postWithMedia(long authorId, long[] mediaIds) {
+		Post post = posts.saveAndFlush(
+				Post.draft(authorId));
+		for (int i = 0; i < mediaIds.length; i++) {
+			mediaIds[i] = mediaRepository.saveAndFlush(PostMedia.image(post.getId(), i,
+					"uploads/" + post.getId() + "-" + i + ".jpg", "p/" + post.getId() + "-" + i)).getId();
+		}
+		return post.getId();
+	}
+
+	@Test
+	void 격리나_삭제_작업이_실패로_끝난_게시물만_고른다() {
+		// given
+		long author = users.saveAndFlush(User.create("작성자")).getId();
+		long[] quarantined = new long[2];
+		long[] deleted = new long[1];
+		long[] processFailed = new long[1];
+		long[] fine = new long[1];
+		long quarantinedPost = postWithMedia(author, quarantined);
+		long deletedPost = postWithMedia(author, deleted);
+		long processFailedPost = postWithMedia(author, processFailed);
+		long finePost = postWithMedia(author, fine);
+		long otherPost = postWithMedia(author, new long[1]);
+		MediaJob q = queue(MediaJobKind.QUARANTINE, quarantined[1], NOW);
+		q.markFailed("R2 503");
+		MediaJob d = queue(MediaJobKind.DELETE_MEDIA, deleted[0], NOW);
+		d.markFailed("R2 503");
+		MediaJob p = queue(MediaJobKind.PROCESS, processFailed[0], NOW);
+		p.markFailed("ffmpeg");
+		MediaJob ok = queue(MediaJobKind.QUARANTINE, fine[0], NOW);
+		ok.markDone();
+		jobs.saveAllAndFlush(List.of(q, d, p, ok));
+
+		// when
+		List<Long> failed = jobs.findPostIdsWithFailedCleanup(
+				List.of(quarantinedPost, deletedPost, processFailedPost, finePost));
+
+		// then
+		assertThat(failed).containsExactlyInAnyOrder(quarantinedPost, deletedPost);
+		assertThat(failed).doesNotContain(otherPost);
 	}
 }

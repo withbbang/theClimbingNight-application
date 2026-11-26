@@ -78,7 +78,7 @@ class ModerationServiceTest {
 	void setUp() {
 		MediaUrls urls = new MediaUrls(new MediaProperties(true, "a", "k", "s", "in", "pub", "https://m.example", null));
 		MediaJobScheduler scheduler = new MediaJobScheduler(jobs, mediaRepository, clock);
-		service = new ModerationService(reports, posts, mediaRepository, users, scheduler, storage,
+		service = new ModerationService(reports, posts, mediaRepository, users, jobs, scheduler, storage,
 				new PostResponseMapper(urls), clock);
 	}
 
@@ -375,6 +375,7 @@ class ModerationServiceTest {
 		assertThat(userTarget.userNickname()).isEqualTo("대상");
 		assertThat(userTarget.post()).isNull();
 		assertThat(userTarget.quarantineUrls()).isEmpty();
+		assertThat(userTarget.cleanupFailed()).isFalse();
 	}
 
 	@Test
@@ -400,7 +401,27 @@ class ModerationServiceTest {
 		// then
 		assertThat(target.quarantineUrls()).isEmpty();
 		assertThat(target.post().media().get(0).url()).isEqualTo("https://m.example/p/k11/d.webp");
+		assertThat(target.cleanupFailed()).isFalse();
 		verifyNoInteractions(storage);
+	}
+
+	@Test
+	void 사진_정리가_실패로_끝난_글은_지웠어도_cleanupFailed다() {
+		// given
+		given(reports.findOpenTargets(PageRequest.of(0, 20))).willReturn(new PageImpl<>(
+				List.of(new ReportTargetSummary(ReportTargetType.POST, POST_ID, 1L, NOW)), PageRequest.of(0, 20), 1));
+		Post post = Post.draft(AUTHOR);
+		ReflectionTestUtils.setField(post, "id", POST_ID);
+		post.softDelete(NOW);
+		given(posts.findAllById(List.of(POST_ID))).willReturn(List.of(post));
+		given(jobs.findPostIdsWithFailedCleanup(List.of(POST_ID))).willReturn(List.of(POST_ID));
+
+		// when
+		ReportTargetResponse target = service.list(0, 20).items().get(0);
+
+		// then
+		assertThat(target.targetStatus()).isEqualTo("DELETED");
+		assertThat(target.cleanupFailed()).isTrue();
 	}
 
 	private static Report report(long id, long reporter, ReportTargetType type, long targetId, ReportReason reason,

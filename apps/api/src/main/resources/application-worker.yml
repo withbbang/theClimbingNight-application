@@ -1,0 +1,17 @@
+# 워커 컨테이너 전용(SPRING_PROFILES_ACTIVE=prod,worker). 웹 서버를 띄우지 않고, Flyway는 api가 돌리며,
+# 기존 @Scheduled 작업(벙 리마인드 등)은 api만 돌린다. 작업 루프는 MediaWorkerLoop 스레드 하나로 돈다.
+spring:
+  main:
+    web-application-type: none
+  flyway:
+    enabled: false
+
+app:
+  scheduling:
+    enabled: false
+  worker:
+    enabled: true
+    poll-interval: 2s
+    # 작업이 없으면 쉬는 시간을 두 배씩 늘려 이 값까지 간다.
+    idle-max-interval: 30s
+    ffmpeg-timeout: 30s

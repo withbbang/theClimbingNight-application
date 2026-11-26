@@ -11,6 +11,7 @@ import com.theclimbingnight.feed.entity.PostStatus;
 import com.theclimbingnight.feed.repository.PostMediaRepository;
 import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.feed.service.PostResponseMapper;
+import com.theclimbingnight.media.job.MediaJobRepository;
 import com.theclimbingnight.media.job.MediaJobScheduler;
 import com.theclimbingnight.media.storage.MediaStorage;
 import com.theclimbingnight.moderation.dto.ReportTargetActionRequest.Action;
@@ -54,18 +55,20 @@ public class ModerationService {
 	private final PostRepository posts;
 	private final PostMediaRepository mediaRepository;
 	private final UserRepository users;
+	private final MediaJobRepository jobs;
 	private final MediaJobScheduler scheduler;
 	private final MediaStorage storage;
 	private final PostResponseMapper mapper;
 	private final Clock clock;
 
 	public ModerationService(ReportRepository reports, PostRepository posts, PostMediaRepository mediaRepository,
-			UserRepository users, MediaJobScheduler scheduler, MediaStorage storage, PostResponseMapper mapper,
-			Clock clock) {
+			UserRepository users, MediaJobRepository jobs, MediaJobScheduler scheduler, MediaStorage storage,
+			PostResponseMapper mapper, Clock clock) {
 		this.reports = reports;
 		this.posts = posts;
 		this.mediaRepository = mediaRepository;
 		this.users = users;
+		this.jobs = jobs;
 		this.scheduler = scheduler;
 		this.storage = storage;
 		this.mapper = mapper;
@@ -85,6 +88,7 @@ public class ModerationService {
 		Map<Long, List<PostMedia>> mediaByPost = postIds.isEmpty() ? Map.of()
 				: mediaRepository.findAllByPostIdInOrderBySortOrder(postIds).stream()
 						.collect(Collectors.groupingBy(PostMedia::getPostId));
+		Set<Long> cleanupFailed = postIds.isEmpty() ? Set.of() : Set.copyOf(jobs.findPostIdsWithFailedCleanup(postIds));
 		Set<Long> wantedUsers = new HashSet<>(userIds);
 		postById.values().forEach(p -> wantedUsers.add(p.getAuthorId()));
 		Map<Long, User> userById = wantedUsers.isEmpty() ? Map.of()
@@ -92,7 +96,8 @@ public class ModerationService {
 		return PageResponse.from(summaries, s -> {
 			List<Report> targetReports = open.get(s.targetType()).getOrDefault(s.targetId(), List.of());
 			return s.targetType() == ReportTargetType.POST
-					? postTarget(s, targetReports, postById.get(s.targetId()), mediaByPost, userById)
+					? postTarget(s, targetReports, postById.get(s.targetId()), mediaByPost, userById,
+							cleanupFailed.contains(s.targetId()))
 					: userTarget(s, targetReports, userById.get(s.targetId()));
 		});
 	}
@@ -165,9 +170,9 @@ public class ModerationService {
 	}
 
 	private ReportTargetResponse postTarget(ReportTargetSummary s, List<Report> targetReports, Post post,
-			Map<Long, List<PostMedia>> mediaByPost, Map<Long, User> userById) {
+			Map<Long, List<PostMedia>> mediaByPost, Map<Long, User> userById, boolean cleanupFailed) {
 		if (post == null || post.getDeletedAt() != null) {
-			return response(s, targetReports, DELETED, null, List.of(), null);
+			return response(s, targetReports, DELETED, null, List.of(), null, cleanupFailed);
 		}
 		List<PostMedia> media = mediaByPost.getOrDefault(post.getId(), List.of());
 		User author = userById.get(post.getAuthorId());
@@ -176,16 +181,17 @@ public class ModerationService {
 				.filter(m -> m.getStatus() == PostMediaStatus.READY)
 				.map(m -> storage.presignQuarantineGet(m.displayKey(), QUARANTINE_URL_TTL).toString())
 				.toList() : List.of();
-		return response(s, targetReports, post.getStatus().name(), body, quarantineUrls, null);
+		return response(s, targetReports, post.getStatus().name(), body, quarantineUrls, null, cleanupFailed);
 	}
 
 	private ReportTargetResponse userTarget(ReportTargetSummary s, List<Report> targetReports, User user) {
 		return response(s, targetReports, user == null ? DELETED : user.getStatus().name(), null, List.of(),
-				user == null ? null : user.getNickname());
+				user == null ? null : user.getNickname(), false);
 	}
 
 	private static ReportTargetResponse response(ReportTargetSummary s, List<Report> targetReports,
-			String targetStatus, PostResponse post, List<String> quarantineUrls, String userNickname) {
+			String targetStatus, PostResponse post, List<String> quarantineUrls, String userNickname,
+			boolean cleanupFailed) {
 		Map<ReportReason, Integer> counts = new EnumMap<>(ReportReason.class);
 		targetReports.forEach(r -> counts.merge(r.getReason(), 1, Integer::sum));
 		Map<String, Integer> reasons = new LinkedHashMap<>();
@@ -194,7 +200,7 @@ public class ModerationService {
 				.map(Report::getDetail).filter(Objects::nonNull).toList();
 		return new ReportTargetResponse(s.targetType().name(), s.targetId(), targetStatus,
 				s.reportCount().intValue(), reasons, details, s.lastReportedAt().atOffset(ZoneOffset.UTC), post,
-				quarantineUrls, userNickname);
+				quarantineUrls, userNickname, cleanupFailed);
 	}
 
 	private Map<Long, List<Report>> openReports(ReportTargetType type, List<Long> ids) {

@@ -98,4 +98,18 @@ public class PostMedia extends BaseTimeEntity {
 	public void markFailed() {
 		this.status = PostMediaStatus.FAILED;
 	}
+
+	/** 변환 전에 NAS 원본 위치를 남긴다. 처리 중에 숨겨져도 복원할 때 원본으로 다시 변환할 수 있다. */
+	public void recordOriginal(String originalPath) {
+		this.originalPath = originalPath;
+	}
+
+	/** 복원할 때 예전 공개 URL이 되살아나지 않게 새 폴더로 옮긴다. */
+	public void movePublicKey(String publicKey) {
+		this.publicKey = publicKey;
+	}
+
+	public void clearOriginal() {
+		this.originalPath = null;
+	}
 }

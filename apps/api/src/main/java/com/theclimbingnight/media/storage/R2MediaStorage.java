@@ -54,9 +54,18 @@ public class R2MediaStorage implements MediaStorage {
 
 	@Override
 	public OptionalLong uploadedSize(String key) {
+		return headSize(incomingBucket, key);
+	}
+
+	@Override
+	public boolean quarantineExists(String publicKey) {
+		return headSize(incomingBucket, QUARANTINE_PREFIX + publicKey).isPresent();
+	}
+
+	private OptionalLong headSize(String bucket, String key) {
 		try {
 			return OptionalLong.of(s3.headObject(HeadObjectRequest.builder()
-					.bucket(incomingBucket).key(key).build()).contentLength());
+					.bucket(bucket).key(key).build()).contentLength());
 		} catch (NoSuchKeyException e) {
 			return OptionalLong.empty();
 		} catch (software.amazon.awssdk.services.s3.model.S3Exception e) {
