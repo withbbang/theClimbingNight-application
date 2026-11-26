@@ -37,6 +37,7 @@ const COMMON_MENUS: Menu[] = [
   { label: '문의', href: '/inquiries' },
   { label: '알림 설정', href: '/settings/notifications' },
   { label: '닉네임 변경', href: '/settings/nickname' },
+  { label: '차단 목록', href: '/settings/blocks' },
 ];
 const WITHDRAW_MENU: Menu = { label: '탈퇴', href: '/settings/withdraw' };
 

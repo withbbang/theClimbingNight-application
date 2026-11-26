@@ -12,6 +12,7 @@ const MENUS: { label: string; href: Href }[] = [
   { label: '블랙리스트', href: '/admin/penalties' },
   { label: '공지 관리', href: '/admin/notices' },
   { label: '문의 답변', href: '/admin/inquiries' },
+  { label: '신고 목록', href: '/admin/reports' },
 ];
 
 export default function AdminMenuScreen() {

@@ -244,6 +244,8 @@ k-drinker와 같은 패턴: `master` 푸시 → GitHub Actions가 이미지 빌�
 | 굿즈 (소개 + 스마트스토어로 이동) | 웹뷰 | 전체 | 1 |
 | 이용약관, 개인정보처리방침 | 웹뷰 | 전체 | 1 |
 | 피드(`/feed` 탭), 게시물 상세(`/posts/{id}`), 게시물 작성(`/posts/new`)·편집(`/posts/{id}/edit`), 댓글, 신고·차단 | 네이티브 | USER 이상 (보기는 비로그인도 최근 3개까지) | 2 |
+| 차단 목록 (`/settings/blocks`, 마이 탭) | 네이티브 | USER 이상 | 2 |
+| [운영진] 신고 목록 (`/admin/reports`, 숨김·복원·기각) | 네이티브 | ADMIN | 2 |
 | DM | 네이티브 | USER 이상 | 3 |
 | 관리자 웹 | 웹 (`apps/web/app/admin`) | ADMIN | 3 |
 

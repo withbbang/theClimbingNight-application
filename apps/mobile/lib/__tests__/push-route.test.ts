@@ -14,6 +14,7 @@ it.each([
   [{ type: 'NOTICE_PUBLISHED', noticeId: 2 }, '/notices/2'],
   [{ type: 'NOTICE_PUBLISHED', noticeId: '../my' }, '/notices'],
   [{ type: 'NOTICE_PUBLISHED' }, '/notices'],
+  [{ type: 'REPORT_SUBMITTED' }, '/admin/reports'],
 ])('routes %p to %s', (data, route) => {
   expect(routeForPush(data)).toBe(route);
 });
@@ -24,6 +25,7 @@ it.each([
   ['MEMBERSHIP_REJECTED', [['users', 'me'], ['membership-requests']]],
   ['INQUIRY_ANSWERED', [['inquiries']]],
   ['NOTICE_PUBLISHED', [['notices']]],
+  ['REPORT_SUBMITTED', [['report-targets']]],
 ])('refetches for %s', (type, keys) => {
   expect(queryKeysForPush({ type })).toEqual(keys);
 });

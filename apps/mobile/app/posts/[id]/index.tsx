@@ -26,6 +26,7 @@ const HIDDEN = ['HIDDEN', 'HIDDEN_PENDING'];
 
 function Detail({ post, onRefresh }: { post: PostResponse; onRefresh: () => Promise<unknown> }) {
   const { space } = useTheme();
+  const router = useRouter();
   const hidden = post.status !== null && HIDDEN.includes(post.status);
   return (
     <ScrollView
@@ -35,7 +36,13 @@ function Detail({ post, onRefresh }: { post: PostResponse; onRefresh: () => Prom
     >
       {hidden ? <PostHiddenNotice /> : null}
       <FadeInItem index={hidden ? 1 : 0}>
-        <PostCard post={post} hideMedia={hidden} />
+        <PostCard
+          post={post}
+          hideMedia={hidden}
+          menu
+          // 지우거나 차단하거나 숨긴 글은 더 볼 수 없으니 들어온 곳으로 돌아간다.
+          onGone={() => (router.canGoBack() ? router.back() : router.dismissTo('/feed'))}
+        />
       </FadeInItem>
     </ScrollView>
   );

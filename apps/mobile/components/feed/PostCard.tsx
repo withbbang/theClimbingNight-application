@@ -1,13 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { useRouter } from 'expo-router';
+
 import { ChatCircleIcon } from 'phosphor-react-native/src/icons/ChatCircle';
+import { DotsThreeIcon } from 'phosphor-react-native/src/icons/DotsThree';
 import { HeartIcon } from 'phosphor-react-native/src/icons/Heart';
-import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 
 import { MediaCarousel } from '@/components/feed/MediaCarousel';
+import { PostMenu } from '@/components/feed/PostMenu';
 import { AppText } from '@/components/ui/AppText';
 import { usePressScale } from '@/hooks/use-press-scale';
+import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
 import { formatRelative } from '@/lib/kst';
 import type { PostResponse } from '@/types/api/post';
@@ -74,21 +86,75 @@ function PostBody({ body }: { body: string }) {
   );
 }
 
+/** ⋯ 버튼. 펼치면 점이 세로로 돈다. 비로그인은 로그인 화면으로 보낸다. */
+function MenuButton({
+  nickname,
+  open,
+  onToggle,
+}: {
+  nickname: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const router = useRouter();
+  const { colors, motion } = useTheme();
+  const reduced = useReducedMotion();
+  const signedIn = useSession().status === 'authenticated';
+  const press = usePressScale(0.85);
+  const turn = useSharedValue(open ? 1 : 0);
+
+  useEffect(() => {
+    const target = open ? 1 : 0;
+    turn.set(reduced ? target : withSpring(target, motion.spring));
+  }, [motion.spring, open, reduced, turn]);
+
+  const spin = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.get() * 90}deg` }] }));
+
+  return (
+    <Animated.View style={press.style}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${nickname}의 게시물 메뉴`}
+        accessibilityState={{ expanded: open }}
+        hitSlop={8}
+        onPress={() => (signedIn ? onToggle() : router.push('/login'))}
+        {...press.handlers}
+        style={styles.menuButton}
+      >
+        <Animated.View style={spin}>
+          <DotsThreeIcon size={24} color={colors.text} weight="bold" />
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 interface PostCardProps {
   post: PostResponse;
   /** 주면 작성자 줄과 사진을 눌러 상세로 간다. */
   onOpen?: () => void;
   /** 숨겨진 글처럼 사진을 보여 줄 수 없을 때. */
   hideMedia?: boolean;
+  /** ⋯ 메뉴(수정·삭제, 신고·차단·숨기기)를 붙인다. */
+  menu?: boolean;
+  /** 메뉴로 지우거나 차단하거나 숨겨서 이 글을 더 볼 수 없게 됐을 때. */
+  onGone?: () => void;
 }
 
-export function PostCard({ post, onOpen, hideMedia = false }: PostCardProps) {
-  const { colors, radius, space } = useTheme();
+export function PostCard({ post, onOpen, hideMedia = false, menu = false, onGone }: PostCardProps) {
+  const { colors, motion, radius, space } = useTheme();
+  const reduced = useReducedMotion();
   const press = usePressScale(0.98);
+  const [menuOpen, setMenuOpen] = useState(false);
   const showMedia = !hideMedia && post.media.length > 0;
 
   const header = (
-    <View style={[styles.row, { gap: space(3), padding: space(4) }]}>
+    <View
+      style={[
+        styles.row,
+        { gap: space(3), padding: space(4), paddingRight: menu ? space(14) : space(4) },
+      ]}
+    >
       <Avatar nickname={post.author.nickname} />
       <View style={styles.fill}>
         <AppText variant="label" numberOfLines={1}>
@@ -102,6 +168,16 @@ export function PostCard({ post, onOpen, hideMedia = false }: PostCardProps) {
       </View>
     </View>
   );
+
+  const menuButton = menu ? (
+    <View style={[styles.menuSlot, { top: space(4), right: space(3) }]}>
+      <MenuButton
+        nickname={post.author.nickname}
+        open={menuOpen}
+        onToggle={() => setMenuOpen((open) => !open)}
+      />
+    </View>
+  ) : null;
 
   return (
     <View
@@ -124,6 +200,21 @@ export function PostCard({ post, onOpen, hideMedia = false }: PostCardProps) {
       ) : (
         header
       )}
+      {menuButton}
+      {menuOpen ? (
+        <Animated.View
+          entering={
+            reduced
+              ? undefined
+              : FadeInDown.springify()
+                  .damping(motion.spring.damping)
+                  .stiffness(motion.spring.stiffness)
+          }
+          style={{ paddingHorizontal: space(4), paddingBottom: space(4) }}
+        >
+          <PostMenu post={post} onClose={() => setMenuOpen(false)} onGone={onGone} />
+        </Animated.View>
+      ) : null}
       {showMedia ? <MediaCarousel media={post.media} onPress={onOpen} /> : null}
       <View style={{ gap: space(2), paddingHorizontal: space(4), paddingTop: space(3) }}>
         <View
@@ -165,5 +256,7 @@ const styles = StyleSheet.create({
   initial: { fontFamily: 'Pretendard-ExtraBold' },
   measure: { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0 },
   more: { alignSelf: 'flex-start' },
+  menuSlot: { position: 'absolute' },
+  menuButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   moreText: { fontFamily: 'Pretendard-SemiBold' },
 });

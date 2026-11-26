@@ -18,6 +18,7 @@ it.each([
   ['블랙리스트', '/admin/penalties'],
   ['공지 관리', '/admin/notices'],
   ['문의 답변', '/admin/inquiries'],
+  ['신고 목록', '/admin/reports'],
 ])('opens %s', async (label, path) => {
   await startAs('ADMIN');
   mockServer({});

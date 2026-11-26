@@ -97,7 +97,7 @@ export default function FeedScreen() {
               index={index < STAGGERED ? index : 0}
               style={{ marginBottom: space(4) }}
             >
-              <PostCard post={post} onOpen={() => router.push(`/posts/${post.id}`)} />
+              <PostCard post={post} menu onOpen={() => router.push(`/posts/${post.id}`)} />
             </FadeInItem>
           )}
           footer={preview ? <LoginToSeeMore /> : null}

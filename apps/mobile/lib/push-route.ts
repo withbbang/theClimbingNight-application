@@ -41,6 +41,7 @@ const RULES = new Map<unknown, PushRule>([
       keys: [['inquiries']],
     },
   ],
+  ['REPORT_SUBMITTED', { route: () => '/admin/reports', keys: [['report-targets']] }],
   [
     'NOTICE_PUBLISHED',
     {
