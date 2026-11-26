@@ -22,8 +22,8 @@ public class PostResponseMapper {
 		this.mediaUrls = mediaUrls;
 	}
 
-	public PostResponse toResponse(Post post, String authorNickname, List<PostMedia> media, long viewerId) {
-		boolean mine = post.getAuthorId() == viewerId;
+	public PostResponse toResponse(Post post, String authorNickname, List<PostMedia> media, Long viewerId) {
+		boolean mine = viewerId != null && post.getAuthorId().equals(viewerId);
 		boolean hidden = post.getStatus() == PostStatus.HIDDEN || post.getStatus() == PostStatus.HIDDEN_PENDING;
 		return new PostResponse(post.getId(), new PostAuthorResponse(post.getAuthorId(), authorNickname),
 				post.getBody(), media.stream().map(m -> toMedia(m, hidden)).toList(), post.getLikeCount(),

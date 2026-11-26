@@ -49,6 +49,7 @@ class PostControllerTest {
 
 	@MockitoBean UserRepository userRepository;
 	@MockitoBean PostCommandService postCommandService;
+	@MockitoBean com.theclimbingnight.feed.service.PostQueryService postQueryService;
 
 	private String bearer(long id, Role role) {
 		User user = User.create("climber");

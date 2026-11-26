@@ -2,7 +2,9 @@ package com.theclimbingnight.feed.repository;
 
 import com.theclimbingnight.feed.entity.Post;
 import jakarta.persistence.LockModeType;
+import com.theclimbingnight.feed.entity.PostStatus;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -44,6 +46,10 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 			order by p.publishedAt desc, p.id desc
 			""")
 	List<Long> findLatestVisibleIds(Pageable limit);
+
+	/** 내 글 중 statuses에 해당하고 지워지지 않은 것, 최신순 10개. */
+	List<Post> findTop10ByAuthorIdAndStatusInAndDeletedAtIsNullOrderByIdDesc(Long authorId,
+			Collection<PostStatus> statuses);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select p from Post p where p.id = :id")

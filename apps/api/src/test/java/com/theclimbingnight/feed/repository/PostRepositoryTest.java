@@ -124,4 +124,49 @@ class PostRepositoryTest {
 		// then
 		assertThat(ids).containsExactly(p1.getId(), p2.getId(), p3.getId());
 	}
+
+	@Test
+	void 차단_관계는_어느_방향이든_찾는다() {
+		// given
+		long a = user("가");
+		long b = user("나");
+		long c = user("다");
+		blocks.saveAndFlush(UserBlock.of(a, b, T0));
+
+		// then
+		assertThat(blocks.existsBetween(a, b)).isTrue();
+		assertThat(blocks.existsBetween(b, a)).isTrue();
+		assertThat(blocks.existsBetween(a, c)).isFalse();
+	}
+
+	@Test
+	void 내_진행중_글은_PENDING과_FAILED만_최신순으로_준다() {
+		// given
+		long me = user("나");
+		long other = user("남");
+		Post pending = Post.draft(me);
+		pending.publish("대기");
+		posts.saveAndFlush(pending);
+		Post failed = Post.draft(me);
+		failed.publish("실패");
+		failed.markFailed();
+		posts.saveAndFlush(failed);
+		visible(me, T0);
+		posts.saveAndFlush(Post.draft(me));
+		Post othersPending = Post.draft(other);
+		othersPending.publish("남의 글");
+		posts.saveAndFlush(othersPending);
+		Post deleted = Post.draft(me);
+		deleted.publish("삭제");
+		deleted.softDelete(T0);
+		posts.saveAndFlush(deleted);
+
+		// when
+		List<Post> inProgress = posts.findTop10ByAuthorIdAndStatusInAndDeletedAtIsNullOrderByIdDesc(me,
+				List.of(com.theclimbingnight.feed.entity.PostStatus.PENDING,
+						com.theclimbingnight.feed.entity.PostStatus.FAILED));
+
+		// then
+		assertThat(inProgress).extracting(Post::getId).containsExactly(failed.getId(), pending.getId());
+	}
 }
