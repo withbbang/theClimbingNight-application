@@ -61,8 +61,7 @@ async function request<T>(path: string, options: RequestOptions, token?: string)
   } finally {
     clearTimeout(timer);
   }
-  // 201도 신고처럼 돌려줄 값 없이 오는 응답이 있다.
-  if (status === 204 || (status === 201 && text === '')) {
+  if (status === 204) {
     return undefined as T;
   }
   let envelope: Envelope | null;

@@ -32,7 +32,7 @@ const send = () => screen.getByRole('button', { name: '신고 보내기' });
 
 it('requires a detail when 기타 is chosen', async () => {
   // given
-  const server = mockServer({ [REPORT]: { status: 201 } });
+  const server = mockServer({ [REPORT]: { status: 204 } });
   await show();
 
   // when: 기타를 고르고 비워 둔다

@@ -99,3 +99,19 @@ it('offers only 기각 for a reported user', async () => {
   expect(screen.getByRole('button', { name: '달이 사용자 기각' })).toBeOnTheScreen();
   expect(screen.queryByRole('button', { name: /숨기기|복원/ })).toBeNull();
 });
+
+it.each([
+  ['FAILED', '처리 실패'],
+  ['DRAFT', '게시 전'],
+])('offers only 기각 for a %s post that cannot be hidden or restored', async (status, label) => {
+  // given: 서버가 숨김·복원을 404로 거절하는 상태
+  mockServer({ [LIST]: list([target({ targetStatus: status })]) });
+
+  // when
+  await renderApp('/admin/reports');
+
+  // then
+  expect(screen.getByText(label)).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: '달이의 게시물 기각' })).toBeOnTheScreen();
+  expect(screen.queryByRole('button', { name: /숨기기|복원/ })).toBeNull();
+});

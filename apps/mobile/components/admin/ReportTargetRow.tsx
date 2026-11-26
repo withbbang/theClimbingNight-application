@@ -17,8 +17,13 @@ const THUMB = 64;
 const SHOWN_DETAILS = 3;
 const HIDDEN = ['HIDDEN', 'HIDDEN_PENDING'];
 
+// 지운 글(DELETED) 말고도 서버가 숨김·복원을 404로 거절하는 상태(ModerationService.lockedPost). 기각만 할 수 있다.
+const LOCKED = ['DRAFT', 'FAILED'];
+
 const STATUS_LABELS: Record<string, string> = {
+  DRAFT: '게시 전',
   PENDING: '사진 정리 중',
+  FAILED: '처리 실패',
   VISIBLE: '공개 중',
   HIDDEN_PENDING: '자동으로 숨김',
   HIDDEN: '숨김',
@@ -54,6 +59,9 @@ function actionsOf(target: ReportTargetResponse): ActionSpec[] {
   }
   if (target.targetStatus === 'DELETED') {
     return [dismiss('이미 지워진 글이에요. 신고를 닫아요.')];
+  }
+  if (LOCKED.includes(target.targetStatus)) {
+    return [dismiss('숨기거나 복원할 수 없는 글이에요. 신고를 닫아요.')];
   }
   const autoHidden = target.targetStatus === 'HIDDEN_PENDING';
   const hidden = HIDDEN.includes(target.targetStatus);

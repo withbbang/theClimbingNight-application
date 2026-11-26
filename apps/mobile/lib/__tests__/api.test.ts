@@ -101,12 +101,6 @@ it('returns undefined for 204', async () => {
   await expect(apiFetch('/push-tokens', { method: 'PUT', body: {} })).resolves.toBeUndefined();
 });
 
-it('returns undefined for 201 without a body', async () => {
-  // 신고처럼 만들기만 하고 돌려줄 값이 없는 응답
-  handler = () => ({ status: 201 });
-  await expect(apiFetch('/reports', { method: 'POST', body: {} })).resolves.toBeUndefined();
-});
-
 it('refreshes once and retries on AUTH_REQUIRED', async () => {
   handler = expiring;
   await expect(apiFetch('/users/me')).resolves.toEqual({ path: '/users/me' });
