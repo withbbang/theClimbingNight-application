@@ -30,7 +30,7 @@ export const queryClient: QueryClient = new QueryClient({
 });
 
 /** 비로그인도 보지만 세션마다 내용이 다른 조회. 피드와 게시물 상세다. 내 글(['posts', 'mine', …])은 아니다. */
-function isFeed(queryKey: readonly unknown[]) {
+export function isFeed(queryKey: readonly unknown[]) {
   return queryKey[0] === 'posts' && queryKey[1] !== 'mine';
 }
 

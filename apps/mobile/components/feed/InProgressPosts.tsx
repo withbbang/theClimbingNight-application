@@ -55,7 +55,7 @@ function FailedRow({ post }: { post: PostResponse }) {
         message="이 글과 사진을 지워요."
         loading={remove.isPending}
         error={remove.error ? errorMessage(remove.error) : null}
-        onConfirm={async () => (await remove.submit(post.id)) !== undefined}
+        onConfirm={async () => (await remove.submit(post.id)) === true}
       />
     </View>
   );

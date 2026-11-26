@@ -1,9 +1,10 @@
-import { useMutation, useQuery, useQueryClient, type Query } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useRole } from '@/hooks/use-role';
 import { useSubmit } from '@/hooks/use-submit';
 import { notifyError, notifySuccess } from '@/lib/haptics';
 import { deletePost, fetchMyInProgress, fetchPost, updatePost } from '@/lib/post-api';
+import { isFeed } from '@/lib/query-client';
 import type { PostResponse } from '@/types/api/post';
 
 const IN_PROGRESS = ['posts', 'mine', 'in-progress'];
@@ -12,9 +13,6 @@ export const PENDING_POLL_MS = 10_000;
 
 export const hasPending = (posts: PostResponse[] | undefined) =>
   posts?.some((post) => post.status === 'PENDING') ?? false;
-
-/** 피드와 게시물 상세. 내 글 목록(['posts', 'mine', …])은 빼고 다시 받는다. */
-const isFeed = ({ queryKey }: Query) => queryKey[0] === 'posts' && queryKey[1] !== 'mine';
 
 /** 내가 올리는 중이거나 올리지 못한 글. 정리 중인 글이 있으면 10초마다 다시 묻는다. */
 export function useMyInProgress() {
@@ -27,16 +25,17 @@ export function useMyInProgress() {
   });
 }
 
-/** 정리가 끝난 글이 피드에 나오도록 피드와 상세를 다시 받는다. */
+/** 정리가 끝난 글이 피드에 나오도록 피드와 상세를 다시 받는다. 내 글 목록은 다시 받지 않는다. */
 export function useRefreshFeed() {
   const client = useQueryClient();
-  return () => client.invalidateQueries({ predicate: isFeed });
+  return () => client.invalidateQueries({ predicate: ({ queryKey }) => isFeed(queryKey) });
 }
 
 export function useDeleteMyPost() {
   const client = useQueryClient();
   const mutation = useMutation({
-    mutationFn: deletePost,
+    // 204라 값이 없으므로 성공을 true로 알린다.
+    mutationFn: (id: number) => deletePost(id).then(() => true),
     onSuccess: notifySuccess,
     onError: notifyError,
     onSettled: () => {

@@ -157,6 +157,8 @@ describe('my posts in progress', () => {
 
     // then
     expect(server.count('DELETE /posts/9')).toBe(1);
+    // 204로 끝나도 성공이라 확인 칸이 닫힌다. (다시 눌러 한 번 더 지우지 않는다)
+    expect(screen.queryByRole('button', { name: '올리지 못한 글 삭제 확정' })).toBeNull();
   });
 
   it('polls every 10 seconds while a post is pending and refreshes the feed when done', async () => {

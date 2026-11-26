@@ -147,6 +147,19 @@ describe('preparePhoto', () => {
       '사진이 너무 커서 올릴 수 없어요. 다른 사진을 골라 주세요.',
     );
   });
+
+  it('fails without saving again when the saved file is empty', async () => {
+    // given
+    mockFetch();
+    fakeManipulator(asset(2048, 2048), [0, 1000]);
+
+    // when / then: 크기 문제가 아니므로 0.7로 다시 저장하지 않는다.
+    await expect(preparePhoto(asset(2048, 2048))).rejects.toThrow(
+      '사진을 불러오지 못했어요. 다른 사진을 골라 주세요.',
+    );
+    const image = await manipulate.mock.results[0].value.renderAsync();
+    expect(image.saveAsync).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('uploadPhotos', () => {

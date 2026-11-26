@@ -84,7 +84,7 @@ function NewPostForm() {
         if (left.current) {
           return;
         }
-        setPhotos((current) => [...current, photo].slice(0, MAX_PHOTOS));
+        changePhotos((current) => [...current, photo].slice(0, MAX_PHOTOS));
       }
     } catch (error) {
       if (!left.current) {
@@ -101,17 +101,29 @@ function NewPostForm() {
     }
   }
 
+  function changePhotos(next: (current: PreparedPhoto[]) => PreparedPhoto[]) {
+    create.clearError();
+    setPhotos(next);
+  }
+
+  function changeBody(text: string) {
+    create.clearError();
+    setBody(text);
+  }
+
   async function submit() {
     if ((await create.submit(photos, body.trim())) && !left.current) {
       router.dismissTo('/feed');
     }
   }
 
-  const error = create.error
-    ? create.error instanceof PhotoError
-      ? create.error.message
-      : createErrorMessage(create.error)
-    : null;
+  const error = create.mayBePosted
+    ? '올라갔는지 확인하지 못했어요. 피드에서 먼저 확인해 주세요.'
+    : create.error
+      ? create.error instanceof PhotoError
+        ? create.error.message
+        : createErrorMessage(create.error)
+      : null;
 
   return (
     <View style={{ gap: space(5) }}>
@@ -128,22 +140,27 @@ function NewPostForm() {
           preparing={preparing}
           locked={locked}
           onPick={() => void pick()}
-          onRemove={(index) => setPhotos((current) => current.filter((_, i) => i !== index))}
+          onRemove={(index) => changePhotos((current) => current.filter((_, i) => i !== index))}
         />
       </FadeInItem>
       {pickError ? <ErrorBanner message={pickError} /> : null}
       <FadeInItem index={2}>
-        <BodyField value={body} onChangeText={setBody} editable={!locked} />
+        <BodyField value={body} onChangeText={changeBody} editable={!locked} />
       </FadeInItem>
       {create.progress ? <UploadHolds progress={create.progress} /> : null}
       {error ? <ErrorBanner message={error} /> : null}
       <FadeInItem index={3}>
-        <Button
-          label={error ? '다시 시도' : '올리기'}
-          loading={locked}
-          disabled={photos.length === 0 || preparing || isBodyTooLong(body)}
-          onPress={() => void submit()}
-        />
+        {create.mayBePosted ? (
+          // 다시 올리면 같은 글이 둘이 될 수 있으니 피드에서 먼저 보게 한다.
+          <Button label="피드에서 확인" onPress={() => router.dismissTo('/feed')} />
+        ) : (
+          <Button
+            label={error ? '다시 시도' : '올리기'}
+            loading={locked}
+            disabled={photos.length === 0 || preparing || isBodyTooLong(body)}
+            onPress={() => void submit()}
+          />
+        )}
       </FadeInItem>
     </View>
   );

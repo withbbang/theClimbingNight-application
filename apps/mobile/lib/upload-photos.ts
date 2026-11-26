@@ -38,7 +38,7 @@ async function readFile(uri: string): Promise<Blob> {
   return response.blob();
 }
 
-/** 긴 변 2048px 이하, JPEG 0.85로 저장한다. 15MB를 넘으면 0.7로 한 번 더 저장한다. */
+/** 긴 변 2048px 이하, JPEG 0.85로 저장한다. 15MB를 넘으면 0.7로 한 번 더 저장한다. 빈 파일이면 바로 멈춘다. */
 export async function preparePhoto(asset: ImagePickerAsset): Promise<PreparedPhoto> {
   // 디코딩할 때부터 줄여서 큰 원본을 메모리에 다 올리지 않는다. 방향(EXIF)도 네이티브가 맞춘다.
   const context = ImageManipulator.manipulate(asset.uri, {
@@ -51,7 +51,11 @@ export async function preparePhoto(asset: ImagePickerAsset): Promise<PreparedPho
       for (const compress of [QUALITY, FALLBACK_QUALITY]) {
         const saved = await image.saveAsync({ compress, format: SaveFormat.JPEG });
         const byteSize = (await readFile(saved.uri)).size;
-        if (byteSize > 0 && byteSize <= MAX_PHOTO_BYTES) {
+        if (byteSize === 0) {
+          // 크기 문제가 아니므로 다시 저장해도 소용없다.
+          throw new PhotoError('사진을 불러오지 못했어요. 다른 사진을 골라 주세요.');
+        }
+        if (byteSize <= MAX_PHOTO_BYTES) {
           return {
             uri: saved.uri,
             width: saved.width,

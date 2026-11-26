@@ -176,3 +176,54 @@ it('shows the error and lets me try again when an upload fails', async () => {
   // then
   expect(server.count(PUBLISH)).toBe(1);
 });
+
+it('clears the error when the body changes after a failure', async () => {
+  // given
+  mockServer({ [CREATE]: ok(draft) });
+  jest.mocked(uploadPhotos).mockRejectedValueOnce(
+    new (jest.requireActual('@/lib/upload-photos').PhotoError)(
+      '사진을 올리지 못했어요. 연결을 확인하고 다시 시도해 주세요.',
+    ),
+  );
+  pickReturns(1);
+  await renderApp('/posts/new');
+  await press('사진 고르기');
+  await press('올리기');
+  expect(button('다시 시도')).toBeOnTheScreen();
+
+  // when
+  await type('본문', '오늘 초록 완등');
+
+  // then
+  expect(
+    screen.queryByText('사진을 올리지 못했어요. 연결을 확인하고 다시 시도해 주세요.'),
+  ).toBeNull();
+  expect(upload()).toBeEnabled();
+});
+
+it('sends me to the feed instead of retrying when the post may already be up', async () => {
+  // given: 게시 응답을 읽지 못했다. 서버는 게시했을 수 있다.
+  const server = mockServer({
+    [CREATE]: ok(draft),
+    [PUBLISH]: { status: 502 },
+    '/posts?size=10': ok({ items: [], nextCursor: null }),
+    '/posts/mine/in-progress': ok([post({ id: 31, status: 'PENDING', mine: true })]),
+  });
+  pickReturns(1);
+  await renderApp('/posts/new');
+  await press('사진 고르기');
+  await press('올리기');
+
+  // then: 다시 올리지 않고 피드에서 확인하게 한다. 본문을 고쳐도 그대로다.
+  expect(screen.getByText('올라갔는지 확인하지 못했어요. 피드에서 먼저 확인해 주세요.')).toBeOnTheScreen();
+  await type('본문', '고친 본문');
+  expect(button('다시 시도')).toBeNull();
+  expect(upload()).toBeNull();
+
+  // when
+  await press('피드에서 확인');
+
+  // then
+  expect(server.count(CREATE)).toBe(1);
+  expect(screen.getByText('사진 정리 중…')).toBeOnTheScreen();
+});
