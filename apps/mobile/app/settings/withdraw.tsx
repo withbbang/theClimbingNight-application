@@ -16,7 +16,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { errorMessage } from '@/lib/error-message';
 
 const CONSEQUENCES = [
-  { title: '지워져요', body: '닉네임과 소셜 로그인 연결, 인증 신청, 문의와 답변, 알림 설정' },
+  { title: '지워져요', body: '닉네임과 소셜 로그인 연결, 인증 신청, 문의와 답변, 알림 설정. Apple로 가입했다면 Apple 로그인 연결도 끊어요.' },
   { title: '취소돼요', body: '다가오는 벙 신청' },
   { title: '남아요', body: '동호회 명부와 통계에 쓰는 활동 기록. 앱 계정과의 연결은 끊어요.' },
 ];

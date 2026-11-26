@@ -9,7 +9,7 @@ import NaverLogin from '@react-native-seoul/naver-login';
 
 import { config, type AppConfig } from '@/lib/config';
 import { availableAdapters, signOutSocial } from '@/lib/social';
-import { appleAdapter } from '@/lib/social/apple';
+import { appleAdapter, appleAuthorizationCode } from '@/lib/social/apple';
 import { googleAdapter } from '@/lib/social/google';
 import { kakaoAdapter } from '@/lib/social/kakao';
 import { naverAdapter } from '@/lib/social/naver';
@@ -180,6 +180,25 @@ describe('apple', () => {
   it('treats ERR_REQUEST_CANCELED as cancellation', async () => {
     appleSignIn.mockRejectedValue(coded('ERR_REQUEST_CANCELED'));
     await expect(appleAdapter.signIn()).resolves.toEqual({ type: 'cancelled' });
+  });
+
+  it('returns the authorization code for withdrawal', async () => {
+    appleSignIn.mockResolvedValue({
+      authorizationCode: 'code-1',
+    } as AppleAuthentication.AppleAuthenticationCredential);
+    await expect(appleAuthorizationCode()).resolves.toBe('code-1');
+  });
+
+  it('returns null when the user closes the Apple sheet', async () => {
+    appleSignIn.mockRejectedValue(coded('ERR_REQUEST_CANCELED'));
+    await expect(appleAuthorizationCode()).resolves.toBeNull();
+  });
+
+  it('throws when Apple gives no authorization code', async () => {
+    appleSignIn.mockResolvedValue({
+      authorizationCode: null,
+    } as AppleAuthentication.AppleAuthenticationCredential);
+    await expect(appleAuthorizationCode()).rejects.toThrow(SocialSignInError);
   });
 
   it('is unavailable on Android', () => {

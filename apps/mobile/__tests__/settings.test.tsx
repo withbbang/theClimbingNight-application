@@ -7,6 +7,7 @@ import * as SecureStore from 'expo-secure-store';
 import { act, fireEvent, screen } from 'expo-router/testing-library';
 
 import { registerPushToken } from '@/lib/push';
+import { appleAuthorizationCode } from '@/lib/social/apple';
 import { queryClient } from '@/lib/query-client';
 import { sessionStore } from '@/lib/session-store';
 import { fail, flush, mockServer, ok, renderApp, type Reply } from '@/test-utils/app';
@@ -20,6 +21,7 @@ jest.mock('expo-splash-screen', () => jest.requireActual('@/test-utils/native-mo
 jest.mock('expo-haptics', () => jest.requireActual('@/test-utils/native-mocks').hapticsMock());
 jest.mock('@/lib/social', () => jest.requireActual('@/test-utils/native-mocks').socialMock());
 
+jest.mock('@/lib/social/apple', () => ({ appleAuthorizationCode: jest.fn() }));
 jest.mock('@/lib/push', () => ({
   registerPushToken: jest.fn(async () => {}),
   getRegisteredPushToken: jest.fn(async () => null),
@@ -179,6 +181,38 @@ it('stays signed in when withdrawing fails', async () => {
   await press('탈퇴하기');
   expect(sessionStore.getState().status).toBe('authenticated');
   expect(screen.getByText('서버에 문제가 있습니다.')).toBeOnTheScreen();
+});
+
+const REAUTH = fail(400, 'AUTH_APPLE_REAUTH_REQUIRED', 'Apple 계정을 한 번 더 확인해야 탈퇴할 수 있어요.');
+
+it('retries withdrawal with an Apple code when the server asks', async () => {
+  let first = true;
+  const server = mockServer({
+    ['DELETE ' + ME]: () => {
+      const reply = first ? REAUTH : { status: 204 };
+      first = false;
+      return reply;
+    },
+  });
+  jest.mocked(appleAuthorizationCode).mockResolvedValue('code-1');
+  await renderApp('/settings/withdraw');
+  await flip('내용을 확인했어요');
+  await press('탈퇴하기');
+  const deletes = server.calls.filter((c) => c.method === 'DELETE');
+  expect(deletes.map((c) => c.body)).toEqual([undefined, { appleAuthorizationCode: 'code-1' }]);
+  expect(sessionStore.getState().status).toBe('guest');
+});
+
+it('stays on the screen without an error when Apple re-auth is cancelled', async () => {
+  const server = mockServer({ ['DELETE ' + ME]: REAUTH });
+  jest.mocked(appleAuthorizationCode).mockResolvedValue(null);
+  await renderApp('/settings/withdraw');
+  await flip('내용을 확인했어요');
+  await press('탈퇴하기');
+  expect(server.count('DELETE ' + ME)).toBe(1);
+  expect(sessionStore.getState().status).toBe('authenticated');
+  expect(screen.queryByText('Apple 계정을 한 번 더 확인해야 탈퇴할 수 있어요.')).toBeNull();
+  expect(button('탈퇴하기')).toBeOnTheScreen();
 });
 
 it('registers this device once notifications are allowed in the system settings', async () => {
