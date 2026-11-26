@@ -6,6 +6,7 @@ import com.theclimbingnight.common.BusinessException;
 import com.theclimbingnight.common.ErrorCode;
 import java.text.ParseException;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -26,6 +27,7 @@ import org.springframework.web.client.RestClientResponseException;
 public class AppleTokenRevoker {
 
 	private static final Logger log = LoggerFactory.getLogger(AppleTokenRevoker.class);
+	private static final Set<String> CONFIG_ERRORS = Set.of("invalid_client", "unauthorized_client");
 
 	private final RestClient restClient;
 	private final AuthProperties.Apple apple;
@@ -51,9 +53,7 @@ public class AppleTokenRevoker {
 		try {
 			body = post("/auth/token", form).body(Map.class);
 		} catch (RestClientResponseException e) {
-			throw new BusinessException(e.getStatusCode().is4xxClientError()
-					? ErrorCode.AUTH_APPLE_REAUTH_REQUIRED
-					: ErrorCode.AUTH_PROVIDER_UNAVAILABLE);
+			throw exchangeFailure(e);
 		} catch (RestClientException e) {
 			throw new BusinessException(ErrorCode.AUTH_PROVIDER_UNAVAILABLE);
 		}
@@ -64,6 +64,31 @@ public class AppleTokenRevoker {
 			throw new BusinessException(ErrorCode.AUTH_APPLE_REAUTH_REQUIRED);
 		}
 		return token;
+	}
+
+	/**
+	 * code 문제(invalid_grant 등)만 재인증으로 풀린다. 우리 키 설정이 틀린 invalid_client·unauthorized_client를
+	 * 재인증으로 돌려주면 앱이 같은 오류를 반복하므로 장애로 본다. Apple의 error 값만 남기고 토큰·code는 남기지 않는다.
+	 */
+	private BusinessException exchangeFailure(RestClientResponseException e) {
+		if (!e.getStatusCode().is4xxClientError()) {
+			return new BusinessException(ErrorCode.AUTH_PROVIDER_UNAVAILABLE);
+		}
+		String error = errorOf(e);
+		log.warn("Apple 토큰 교환 거절: status={}, error={}", e.getStatusCode().value(), error);
+		return CONFIG_ERRORS.contains(error)
+				? new BusinessException(ErrorCode.AUTH_PROVIDER_UNAVAILABLE)
+				: new BusinessException(ErrorCode.AUTH_APPLE_REAUTH_REQUIRED);
+	}
+
+	private static String errorOf(RestClientResponseException e) {
+		try {
+			Map<?, ?> body = e.getResponseBodyAs(Map.class);
+			Object error = body == null ? null : body.get("error");
+			return error instanceof String value && value.matches("[a-z_]{1,40}") ? value : "unknown";
+		} catch (RuntimeException parseFailure) {
+			return "unknown";
+		}
 	}
 
 	/** 실패해도 던지지 않는다. 탈퇴는 이미 끝났고, 사용자가 다시 할 수 있는 일이 없다. */

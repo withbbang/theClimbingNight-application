@@ -95,6 +95,20 @@ class AppleTokenRevokerTest {
 	}
 
 	@Test
+	void 우리_키_설정이_틀려_invalid_client면_재인증이_아니라_제공자_장애다() {
+		// given: 재인증을 요구하면 같은 오류가 반복되어 사용자가 탈퇴를 끝낼 수 없다
+		server.expect(requestTo(TOKEN_URL)).andRespond(withStatus(HttpStatus.BAD_REQUEST)
+				.contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"invalid_client\"}"));
+
+		// when
+		BusinessException e = catchThrowableOfType(BusinessException.class,
+				() -> revoker.exchange("c1", "apple-user"));
+
+		// then
+		assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_PROVIDER_UNAVAILABLE);
+	}
+
+	@Test
 	void Apple이_500이면_제공자_장애다() {
 		// given
 		server.expect(requestTo(TOKEN_URL)).andRespond(withServerError());
