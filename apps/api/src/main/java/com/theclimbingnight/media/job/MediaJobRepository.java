@@ -1,0 +1,48 @@
+package com.theclimbingnight.media.job;
+
+import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface MediaJobRepository extends JpaRepository<MediaJob, Long> {
+
+	/** 지금 실행할 수 있는 작업 id. 우선순위(작을수록 먼저)·id 순. */
+	@Query("""
+			select j.id from MediaJob j
+			where j.status = com.theclimbingnight.media.job.MediaJobStatus.QUEUED and j.nextRunAt <= :now
+			order by j.priority asc, j.id asc
+			""")
+	List<Long> findClaimable(@Param("now") Instant now, Pageable one);
+
+	/** QUEUED일 때만 RUNNING으로 바꾼다. 가져갔으면 1, 이미 누가 가져갔거나 취소됐으면 0. */
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("""
+			update MediaJob j set j.status = com.theclimbingnight.media.job.MediaJobStatus.RUNNING,
+			       j.lockedAt = :now, j.updatedAt = :now
+			where j.id = :id and j.status = com.theclimbingnight.media.job.MediaJobStatus.QUEUED
+			""")
+	int claim(@Param("id") long id, @Param("now") Instant now);
+
+	/** lockedBefore보다 먼저 잠긴 RUNNING 작업을 QUEUED로 되돌리고 시도 횟수를 늘린다. */
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("""
+			update MediaJob j set j.status = com.theclimbingnight.media.job.MediaJobStatus.QUEUED,
+			       j.attempts = j.attempts + 1, j.lockedAt = null
+			where j.status = com.theclimbingnight.media.job.MediaJobStatus.RUNNING and j.lockedAt < :lockedBefore
+			""")
+	int requeueStale(@Param("lockedBefore") Instant lockedBefore);
+
+	/** 아직 시작 안 한(QUEUED) 해당 종류 작업만 취소한다. */
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("""
+			update MediaJob j set j.status = com.theclimbingnight.media.job.MediaJobStatus.CANCELED
+			where j.targetId in :mediaIds and j.kind = :kind
+			  and j.status = com.theclimbingnight.media.job.MediaJobStatus.QUEUED
+			""")
+	int cancelQueued(@Param("mediaIds") Collection<Long> mediaIds, @Param("kind") MediaJobKind kind);
+}
