@@ -55,6 +55,7 @@ public class BlockService {
 		blocks.deleteBlock(blockerId, userId);
 	}
 
+	/** 탈퇴한 상대는 뺀다. 차단 행은 남겨 둔다. */
 	public List<BlockedUserResponse> list(long blockerId) {
 		List<UserBlock> mine = blocks.findAllByBlockerIdOrderByCreatedAtDesc(blockerId);
 		if (mine.isEmpty()) {
@@ -62,10 +63,10 @@ public class BlockService {
 		}
 		Map<Long, User> byId = users.findAllById(mine.stream().map(UserBlock::getBlockedId).toList()).stream()
 				.collect(Collectors.toMap(User::getId, Function.identity()));
-		return mine.stream().map(b -> {
+		return mine.stream().filter(b -> {
 			User user = byId.get(b.getBlockedId());
-			return new BlockedUserResponse(b.getBlockedId(), user == null ? null : user.getNickname(),
-					b.getCreatedAt().atOffset(ZoneOffset.UTC));
-		}).toList();
+			return user != null && user.isActive();
+		}).map(b -> new BlockedUserResponse(b.getBlockedId(), byId.get(b.getBlockedId()).getNickname(),
+				b.getCreatedAt().atOffset(ZoneOffset.UTC))).toList();
 	}
 }

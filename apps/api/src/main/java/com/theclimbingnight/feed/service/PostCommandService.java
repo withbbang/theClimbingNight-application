@@ -100,9 +100,10 @@ public class PostCommandService {
 		return toResponse(post, media, userId);
 	}
 
+	/** 행을 잠근 뒤 상태를 봐서, 동시에 숨김·복원이 와도 오래된 상태로 고치지 않는다. */
 	@Transactional
 	public PostResponse update(long userId, long postId, String body) {
-		Post post = visibleToAuthor(posts.findById(postId).orElse(null), userId);
+		Post post = visibleToAuthor(posts.findByIdForUpdate(postId).orElse(null), userId);
 		if (post.getStatus() == PostStatus.HIDDEN_PENDING || post.getStatus() == PostStatus.HIDDEN) {
 			throw new BusinessException(ErrorCode.POST_NOT_EDITABLE);
 		}
@@ -113,7 +114,7 @@ public class PostCommandService {
 	/** 작성자나 ADMIN이 지운다. 남의 글은 존재 여부를 흘리지 않으려고 404다. */
 	@Transactional
 	public void delete(long userId, Role role, long postId) {
-		Post post = posts.findById(postId).orElse(null);
+		Post post = posts.findByIdForUpdate(postId).orElse(null);
 		if (post == null || post.getDeletedAt() != null || (post.getAuthorId() != userId && role != Role.ADMIN)) {
 			throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
 		}

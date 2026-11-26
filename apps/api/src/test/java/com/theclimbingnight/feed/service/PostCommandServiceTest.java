@@ -259,7 +259,7 @@ class PostCommandServiceTest {
 	@Test
 	void 남의_게시물_수정은_404다() {
 		// given
-		given(posts.findById(1L)).willReturn(Optional.of(post(1L, 99L, PostStatus.VISIBLE)));
+		given(posts.findByIdForUpdate(1L)).willReturn(Optional.of(post(1L, 99L, PostStatus.VISIBLE)));
 
 		// when / then
 		assertThatThrownBy(() -> service.update(AUTHOR, 1L, "새 본문"))
@@ -270,8 +270,8 @@ class PostCommandServiceTest {
 	@Test
 	void 숨겨진_글은_수정할_수_없다() {
 		// given
-		given(posts.findById(1L)).willReturn(Optional.of(post(1L, AUTHOR, PostStatus.HIDDEN_PENDING)));
-		given(posts.findById(2L)).willReturn(Optional.of(post(2L, AUTHOR, PostStatus.HIDDEN)));
+		given(posts.findByIdForUpdate(1L)).willReturn(Optional.of(post(1L, AUTHOR, PostStatus.HIDDEN_PENDING)));
+		given(posts.findByIdForUpdate(2L)).willReturn(Optional.of(post(2L, AUTHOR, PostStatus.HIDDEN)));
 
 		// when / then
 		for (long id : new long[] {1L, 2L}) {
@@ -285,7 +285,7 @@ class PostCommandServiceTest {
 	void 작성자는_본문을_고친다() {
 		// given
 		Post visible = post(1L, AUTHOR, PostStatus.VISIBLE);
-		given(posts.findById(1L)).willReturn(Optional.of(visible));
+		given(posts.findByIdForUpdate(1L)).willReturn(Optional.of(visible));
 		given(mediaRepository.findAllByPostIdOrderBySortOrder(1L)).willReturn(List.of());
 		givenAuthor();
 
@@ -301,7 +301,7 @@ class PostCommandServiceTest {
 	void ADMIN은_남의_게시물을_지울_수_있다() {
 		// given
 		Post other = post(1L, 99L, PostStatus.VISIBLE);
-		given(posts.findById(1L)).willReturn(Optional.of(other));
+		given(posts.findByIdForUpdate(1L)).willReturn(Optional.of(other));
 
 		// when
 		service.delete(AUTHOR, Role.ADMIN, 1L);
@@ -314,7 +314,7 @@ class PostCommandServiceTest {
 	@Test
 	void 일반_회원은_남의_게시물을_못_지운다() {
 		// given
-		given(posts.findById(1L)).willReturn(Optional.of(post(1L, 99L, PostStatus.VISIBLE)));
+		given(posts.findByIdForUpdate(1L)).willReturn(Optional.of(post(1L, 99L, PostStatus.VISIBLE)));
 
 		// when / then
 		assertThatThrownBy(() -> service.delete(AUTHOR, Role.MEMBER, 1L))
@@ -331,7 +331,7 @@ class PostCommandServiceTest {
 		Post mine = post(1L, AUTHOR, PostStatus.VISIBLE);
 		PostMedia a = media(10, 1L, 0);
 		PostMedia b = media(11, 1L, 1);
-		given(posts.findById(1L)).willReturn(Optional.of(mine));
+		given(posts.findByIdForUpdate(1L)).willReturn(Optional.of(mine));
 		given(mediaRepository.findAllByPostIdOrderBySortOrder(1L)).willReturn(List.of(a, b));
 
 		// when

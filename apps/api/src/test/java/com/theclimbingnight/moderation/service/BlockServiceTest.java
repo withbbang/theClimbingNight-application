@@ -123,7 +123,7 @@ class BlockServiceTest {
 	}
 
 	@Test
-	void 차단_목록은_최근순이고_닉네임을_붙인다() {
+	void 차단_목록은_최근순이고_닉네임을_붙이며_탈퇴한_상대는_뺀다() {
 		// given
 		given(blocks.findAllByBlockerIdOrderByCreatedAtDesc(ME)).willReturn(List.of(
 				UserBlock.of(ME, TARGET, NOW), UserBlock.of(ME, 10L, NOW.minusSeconds(60))));
@@ -135,7 +135,6 @@ class BlockServiceTest {
 		List<BlockedUserResponse> list = service.list(ME);
 
 		// then
-		assertThat(list).containsExactly(new BlockedUserResponse(TARGET, "대상", NOW.atOffset(ZoneOffset.UTC)),
-				new BlockedUserResponse(10L, null, NOW.minusSeconds(60).atOffset(ZoneOffset.UTC)));
+		assertThat(list).containsExactly(new BlockedUserResponse(TARGET, "대상", NOW.atOffset(ZoneOffset.UTC)));
 	}
 }

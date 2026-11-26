@@ -4,8 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.theclimbingnight.auth.entity.RefreshToken;
 import com.theclimbingnight.auth.repository.RefreshTokenRepository;
+import com.theclimbingnight.feed.entity.Post;
+import com.theclimbingnight.feed.entity.PostMedia;
+import com.theclimbingnight.feed.repository.PostMediaRepository;
+import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.inquiry.entity.Inquiry;
 import com.theclimbingnight.inquiry.repository.InquiryRepository;
+import com.theclimbingnight.media.job.MediaJob;
+import com.theclimbingnight.media.job.MediaJobKind;
+import com.theclimbingnight.media.job.MediaJobRepository;
+import com.theclimbingnight.media.job.MediaJobStatus;
 import com.theclimbingnight.membership.entity.MembershipRequest;
 import com.theclimbingnight.membership.repository.MembershipRequestRepository;
 import com.theclimbingnight.push.entity.PushPlatform;
@@ -41,6 +49,9 @@ class WithdrawalDataIntegrationTest {
 	@Autowired RosterMemberRepository rosterMemberRepository;
 	@Autowired PushTokenRepository pushTokenRepository;
 	@Autowired PushTicketRepository pushTicketRepository;
+	@Autowired PostRepository postRepository;
+	@Autowired PostMediaRepository postMediaRepository;
+	@Autowired MediaJobRepository mediaJobRepository;
 
 	private User leaving;
 	private User staying;
@@ -59,6 +70,9 @@ class WithdrawalDataIntegrationTest {
 	}
 
 	private void clean() {
+		mediaJobRepository.deleteAllInBatch();
+		postMediaRepository.deleteAllInBatch();
+		postRepository.deleteAllInBatch();
 		pushTicketRepository.deleteAllInBatch();
 		pushTokenRepository.deleteAllInBatch();
 		inquiryRepository.deleteAllInBatch();
@@ -121,5 +135,33 @@ class WithdrawalDataIntegrationTest {
 		// then
 		assertThat(inquiryRepository.findAll()).hasSize(1);
 		assertThat(membershipRequestRepository.findAll()).hasSize(2);
+	}
+
+	@Test
+	void 탈퇴하면_게시물이_삭제되고_사진_삭제와_원본_정리_작업이_생긴다() {
+		// given
+		Post mine = postRepository.save(Post.draft(leaving.getId()));
+		PostMedia a = postMediaRepository.save(PostMedia.image(mine.getId(), 0, "uploads/a.jpg", "p/a"));
+		PostMedia b = postMediaRepository.save(PostMedia.image(mine.getId(), 1, "uploads/b.jpg", "p/b"));
+		Post alreadyDeleted = Post.draft(leaving.getId());
+		alreadyDeleted.softDelete(NOW);
+		alreadyDeleted = postRepository.save(alreadyDeleted);
+		Post others = postRepository.save(Post.draft(staying.getId()));
+		PostMedia otherMedia = postMediaRepository.save(PostMedia.image(others.getId(), 0, "uploads/c.jpg", "p/c"));
+
+		// when
+		userService.withdraw(leaving.getId());
+
+		// then
+		assertThat(postRepository.findById(mine.getId()).orElseThrow().getDeletedAt()).isNotNull();
+		assertThat(postRepository.findById(alreadyDeleted.getId()).orElseThrow().getDeletedAt()).isEqualTo(NOW);
+		assertThat(postRepository.findById(others.getId()).orElseThrow().getDeletedAt()).isNull();
+		var jobs = mediaJobRepository.findAll();
+		assertThat(jobs).extracting(MediaJob::getStatus).containsOnly(MediaJobStatus.QUEUED);
+		assertThat(jobs).extracting(MediaJob::getTargetId).doesNotContain(otherMedia.getId());
+		assertThat(jobs).filteredOn(j -> j.getKind() == MediaJobKind.DELETE_MEDIA).extracting(MediaJob::getTargetId)
+				.containsExactlyInAnyOrder(a.getId(), b.getId());
+		assertThat(jobs).filteredOn(j -> j.getKind() == MediaJobKind.PURGE_ORIGINAL).extracting(MediaJob::getTargetId)
+				.containsExactlyInAnyOrder(a.getId(), b.getId());
 	}
 }

@@ -61,4 +61,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 			where p.status = com.theclimbingnight.feed.entity.PostStatus.DRAFT and p.createdAt < :before
 			""")
 	List<Long> findDraftIdsCreatedBefore(@Param("before") Instant before);
+
+	/** 지워지지 않은 내 글 id(초안·실패 포함). 탈퇴 정리용. */
+	@Query("select p.id from Post p where p.authorId = :authorId and p.deletedAt is null")
+	List<Long> findLiveIdsByAuthorId(@Param("authorId") long authorId);
 }
