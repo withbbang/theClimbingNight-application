@@ -19,6 +19,8 @@ import com.theclimbingnight.meetup.service.MeetupCreatedEvent;
 import com.theclimbingnight.meetup.service.MeetupReminderDueEvent;
 import com.theclimbingnight.membership.entity.MembershipRequestStatus;
 import com.theclimbingnight.membership.service.MembershipReviewedEvent;
+import com.theclimbingnight.moderation.entity.ReportTargetType;
+import com.theclimbingnight.moderation.service.ReportSubmittedEvent;
 import com.theclimbingnight.notice.service.NoticePublishedEvent;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -63,6 +65,7 @@ class PushEventListenerTest {
 		NoticePublishedEvent notice = new NoticePublishedEvent(4L, 1L, "공지");
 		InquiryAnsweredEvent answered = new InquiryAnsweredEvent(5L, 6L);
 		MeetupReminderDueEvent reminder = new MeetupReminderDueEvent(2L, List.of(3L));
+		ReportSubmittedEvent report = new ReportSubmittedEvent(ReportTargetType.POST, 50L, 3L);
 
 		// when
 		listener.on(reviewed);
@@ -72,6 +75,7 @@ class PushEventListenerTest {
 		listener.on(notice);
 		listener.on(answered);
 		listener.on(reminder);
+		listener.on(report);
 
 		// then
 		verify(notifier).membershipReviewed(reviewed);
@@ -81,6 +85,7 @@ class PushEventListenerTest {
 		verify(notifier).noticePublished(notice);
 		verify(notifier).inquiryAnswered(answered);
 		verify(notifier).meetupReminder(reminder);
+		verify(notifier).reportSubmitted(report);
 	}
 
 	@Test

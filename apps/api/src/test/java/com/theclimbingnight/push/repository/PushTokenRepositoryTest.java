@@ -314,4 +314,25 @@ class PushTokenRepositoryTest {
 		// then
 		assertThat(output.getAll()).doesNotContain("secretdup");
 	}
+
+	@Test
+	void 운영진_토큰은_활성_ADMIN만_신고자를_빼고_찾는다() {
+		// given
+		User reporter = user("reporter", Role.ADMIN);
+		User admin = user("admin", Role.ADMIN);
+		User left = user("left", Role.ADMIN);
+		User member = user("member", Role.MEMBER);
+		token(reporter, "ExponentPushToken[reporter]");
+		token(admin, "ExponentPushToken[admin]");
+		token(left, "ExponentPushToken[left]");
+		token(member, "ExponentPushToken[member]");
+		left.withdraw(NOW);
+		userRepository.saveAndFlush(left);
+
+		// when
+		List<String> tokens = pushTokenRepository.findTokensOfAdmins(reporter.getId());
+
+		// then
+		assertThat(tokens).containsExactly("ExponentPushToken[admin]");
+	}
 }

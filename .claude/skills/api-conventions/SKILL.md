@@ -65,6 +65,9 @@ description: apps/api 와 apps/mobile · apps/web 이 공유하는 REST 규약 �
 | `POST_UPLOAD_INCOMPLETE` | 409 | 아직 올라가지 않은 사진이 있습니다. 다시 올려 주세요. |
 | `POST_NOT_DRAFT` | 409 | 이미 게시한 글입니다. |
 | `POST_NOT_EDITABLE` | 409 | 숨겨지거나 삭제된 글은 고칠 수 없습니다. |
+| `BLOCK_SELF` | 400 | 자기 자신은 차단할 수 없습니다. |
+| `REPORT_SELF` | 400 | 내 글은 신고할 수 없습니다. 나 자신을 신고해도 같다 |
+| `REPORT_ALREADY_SUBMITTED` | 409 | 이미 신고한 항목입니다. |
 
 - 401은 두 종류다. `AUTH_REQUIRED`는 세션이 없거나 만료된 것이라 로그인 화면으로 보내고, `AUTH_INVALID_SOCIAL_TOKEN`은 소셜 토큰 검증 실패라 세션 만료가 아니다.
 - 리프레시 토큰은 회전하며 한 번만 쓸 수 있다. 클라이언트는 리프레시 요청을 single-flight(동시에 하나만)로 보내야 한다. 같은 토큰의 중복 요청은 `AUTH_REQUIRED`(401)를 받는다.

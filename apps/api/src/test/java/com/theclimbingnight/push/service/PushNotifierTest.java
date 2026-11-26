@@ -19,6 +19,8 @@ import com.theclimbingnight.meetup.service.MeetupApplicationPromotedEvent;
 import com.theclimbingnight.meetup.service.MeetupCanceledEvent;
 import com.theclimbingnight.meetup.service.MeetupCreatedEvent;
 import com.theclimbingnight.meetup.service.MeetupReminderDueEvent;
+import com.theclimbingnight.moderation.entity.ReportTargetType;
+import com.theclimbingnight.moderation.service.ReportSubmittedEvent;
 import com.theclimbingnight.membership.entity.MembershipRequestStatus;
 import com.theclimbingnight.membership.service.MembershipReviewedEvent;
 import com.theclimbingnight.notice.service.NoticePublishedEvent;
@@ -246,5 +248,17 @@ class PushNotifierTest {
 
 		// then
 		verify(sender, never()).send(anyCollection(), anyString(), anyString(), anyMap());
+	}
+
+	@Test
+	void 신고_알림은_신고자를_뺀_운영진에게_간다() {
+		// given
+		given(tokenRepository.findTokensOfAdmins(3L)).willReturn(TOKENS);
+
+		// when
+		notifier.reportSubmitted(new ReportSubmittedEvent(ReportTargetType.POST, 50L, 3L));
+
+		// then
+		sentWith("새 신고", "검토할 신고가 들어왔어요.", Map.of("type", "REPORT_SUBMITTED"));
 	}
 }

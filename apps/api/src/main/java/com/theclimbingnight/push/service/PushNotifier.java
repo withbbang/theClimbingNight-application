@@ -10,6 +10,7 @@ import com.theclimbingnight.meetup.service.MeetupCreatedEvent;
 import com.theclimbingnight.meetup.service.MeetupReminderDueEvent;
 import com.theclimbingnight.membership.entity.MembershipRequestStatus;
 import com.theclimbingnight.membership.service.MembershipReviewedEvent;
+import com.theclimbingnight.moderation.service.ReportSubmittedEvent;
 import com.theclimbingnight.notice.service.NoticePublishedEvent;
 import com.theclimbingnight.push.repository.PushTokenRepository;
 import com.theclimbingnight.roster.repository.RosterMemberRepository;
@@ -103,6 +104,12 @@ public class PushNotifier {
 		deliver(openMeetupPlan(event.meetupId(), event.rosterMemberIds(),
 				meetup -> meetup.getTitle() + " · " + when(meetup)), "벙 일정 알림",
 				meetupData("MEETUP_REMINDER", event.meetupId()));
+	}
+
+	/** 대상의 첫 신고만 온다. 신고한 사람이 운영진이면 그 사람은 뺀다. */
+	public void reportSubmitted(ReportSubmittedEvent event) {
+		deliver(read(() -> new Plan(tokenRepository.findTokensOfAdmins(event.reporterId()), "검토할 신고가 들어왔어요.")),
+				"새 신고", Map.of("type", "REPORT_SUBMITTED"));
 	}
 
 	/** 그사이 취소된 벙이면 계획이 없다. */

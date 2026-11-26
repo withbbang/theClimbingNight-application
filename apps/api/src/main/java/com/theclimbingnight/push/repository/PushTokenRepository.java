@@ -40,6 +40,13 @@ public interface PushTokenRepository extends JpaRepository<PushToken, Long> {
 			+ "order by t.id")
 	List<String> findTokensForNewNotice(@Param("excludeUserId") long excludeUserId);
 
+	/** 활성 운영진 전원의 토큰. 신고한 운영진 본인은 뺀다. */
+	@Query("select t.expoPushToken from PushToken t join User u on u.id = t.userId "
+			+ "where u.status = com.theclimbingnight.user.entity.UserStatus.ACTIVE "
+			+ "and u.role = com.theclimbingnight.user.entity.Role.ADMIN and u.id <> :excludeUserId "
+			+ "order by t.id")
+	List<String> findTokensOfAdmins(@Param("excludeUserId") long excludeUserId);
+
 	/** 발송 시각 이후에 다시 등록(lastSeenAt 갱신)된 토큰은 지우지 않는다. */
 	@Modifying
 	@Query("delete from PushToken t where t.expoPushToken = :token and t.lastSeenAt <= :sentAt")

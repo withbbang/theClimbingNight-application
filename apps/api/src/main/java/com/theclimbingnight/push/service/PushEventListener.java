@@ -7,6 +7,7 @@ import com.theclimbingnight.meetup.service.MeetupCanceledEvent;
 import com.theclimbingnight.meetup.service.MeetupCreatedEvent;
 import com.theclimbingnight.meetup.service.MeetupReminderDueEvent;
 import com.theclimbingnight.membership.service.MembershipReviewedEvent;
+import com.theclimbingnight.moderation.service.ReportSubmittedEvent;
 import com.theclimbingnight.notice.service.NoticePublishedEvent;
 import java.util.concurrent.RejectedExecutionException;
 import org.slf4j.Logger;
@@ -69,6 +70,11 @@ public class PushEventListener {
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
 	public void on(MeetupReminderDueEvent event) {
 		dispatch("MeetupReminderDue", () -> notifier.meetupReminder(event));
+	}
+
+	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+	public void on(ReportSubmittedEvent event) {
+		dispatch("ReportSubmitted", () -> notifier.reportSubmitted(event));
 	}
 
 	private void dispatch(String eventName, Runnable task) {

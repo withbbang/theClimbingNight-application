@@ -44,7 +44,10 @@ public enum ErrorCode {
 	MEDIA_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "사진 올리기를 잠시 쓸 수 없습니다. 잠시 후 다시 시도해 주세요."),
 	POST_UPLOAD_INCOMPLETE(HttpStatus.CONFLICT, "아직 올라가지 않은 사진이 있습니다. 다시 올려 주세요."),
 	POST_NOT_DRAFT(HttpStatus.CONFLICT, "이미 게시한 글입니다."),
-	POST_NOT_EDITABLE(HttpStatus.CONFLICT, "숨겨지거나 삭제된 글은 고칠 수 없습니다.");
+	POST_NOT_EDITABLE(HttpStatus.CONFLICT, "숨겨지거나 삭제된 글은 고칠 수 없습니다."),
+	BLOCK_SELF(HttpStatus.BAD_REQUEST, "자기 자신은 차단할 수 없습니다."),
+	REPORT_SELF(HttpStatus.BAD_REQUEST, "내 글은 신고할 수 없습니다."),
+	REPORT_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "이미 신고한 항목입니다.");
 
 	private final HttpStatus status;
 	private final String message;
