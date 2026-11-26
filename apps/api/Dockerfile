@@ -15,7 +15,9 @@ RUN ./gradlew --no-daemon bootJar -x test \
 	&& java -Djarmode=tools -jar app.jar extract --destination extracted
 
 FROM eclipse-temurin:17-jre AS api
-RUN groupadd --system app && useradd --system --gid app --no-create-home --shell /usr/sbin/nologin app
+# uid·gid를 고정한다. NAS 원본 폴더를 이 값으로 chown 한다(deploy/README.md).
+RUN groupadd --system --gid 10001 app \
+	&& useradd --system --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app
 WORKDIR /app
 # 프로파일이 없으면 local(H2)로 뜬다. compose도 명시하지만 이미지 단독 실행에도 막아 둔다.
 ENV SPRING_PROFILES_ACTIVE=prod

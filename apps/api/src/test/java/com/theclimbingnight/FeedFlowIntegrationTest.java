@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.theclimbingnight.auth.service.JwtTokenService;
 import com.theclimbingnight.feed.entity.Post;
 import com.theclimbingnight.feed.entity.PostMedia;
+import com.theclimbingnight.feed.entity.PostMediaStatus;
 import com.theclimbingnight.feed.entity.PostStatus;
 import com.theclimbingnight.feed.repository.PostMediaRepository;
 import com.theclimbingnight.feed.repository.PostRepository;
@@ -170,6 +171,8 @@ class FeedFlowIntegrationTest {
 		// then : 사진을 다시 올릴 때까지 PENDING이고 RELEASE 작업이 생긴다
 		assertThat(postRepository.findById(postId).orElseThrow().getStatus()).isEqualTo(PostStatus.PENDING);
 		assertThat(jobs(MediaJobKind.RELEASE)).extracting(MediaJob::getTargetId).containsExactly(mediaId);
+		assertThat(postMediaRepository.findById(mediaId).orElseThrow().getStatus())
+				.isEqualTo(PostMediaStatus.PROCESSING);
 		assertThat(feedContains(postId)).isFalse();
 	}
 }

@@ -109,6 +109,12 @@ public class PostMedia extends BaseTimeEntity {
 		this.publicKey = publicKey;
 	}
 
+	/** 격리본을 새 폴더로 되돌렸다. 크기·원본 위치는 처음 처리할 때 기록한 그대로다. */
+	public void markRestored(String publicKey) {
+		this.publicKey = publicKey;
+		this.status = PostMediaStatus.READY;
+	}
+
 	public void clearOriginal() {
 		this.originalPath = null;
 	}

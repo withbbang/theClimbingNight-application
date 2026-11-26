@@ -86,7 +86,7 @@ class ReleaseJobHandlerTest {
 	@Test
 	void 새_키로_되돌리고_예전_격리본을_지운다() throws Exception {
 		// given
-		PostMedia media = givenMedia(PostMediaStatus.READY, "2026/11/11.jpg");
+		PostMedia media = givenMedia(PostMediaStatus.PROCESSING, "2026/11/11.jpg");
 		given(storage.quarantineExists("p/old/d.webp")).willReturn(true);
 		given(storage.quarantineExists("p/old/t.webp")).willReturn(true);
 
@@ -100,6 +100,7 @@ class ReleaseJobHandlerTest {
 		verify(storage).deleteQuarantine("p/old/t.webp");
 		verify(transcoder, never()).transcode(any(), any());
 		assertThat(media.getPublicKey()).isEqualTo(NEW_KEY);
+		assertThat(media.getStatus()).isEqualTo(PostMediaStatus.READY);
 		assertThat(post.getStatus()).isEqualTo(PostStatus.VISIBLE);
 		assertThat(post.getPublishedAt()).isEqualTo(FIRST_PUBLISHED);
 	}
@@ -164,7 +165,7 @@ class ReleaseJobHandlerTest {
 	@Test
 	void 그새_다시_숨긴_글이면_아무것도_안_한다() throws Exception {
 		// given
-		givenMedia(PostMediaStatus.READY, "2026/11/11.jpg");
+		givenMedia(PostMediaStatus.PROCESSING, "2026/11/11.jpg");
 		ReflectionTestUtils.setField(post, "status", PostStatus.HIDDEN);
 
 		// when
@@ -177,7 +178,7 @@ class ReleaseJobHandlerTest {
 	@Test
 	void 공개본을_되돌리는_사이에_숨겨지면_새_공개본을_지운다() throws Exception {
 		// given
-		PostMedia media = givenMedia(PostMediaStatus.READY, "2026/11/11.jpg");
+		PostMedia media = givenMedia(PostMediaStatus.PROCESSING, "2026/11/11.jpg");
 		given(storage.quarantineExists(anyString())).willReturn(true);
 		org.mockito.Mockito.doAnswer(inv -> {
 			if (inv.getArgument(0).equals("p/old/t.webp")) {
@@ -199,7 +200,7 @@ class ReleaseJobHandlerTest {
 	@Test
 	void 격리본으로_되돌릴_때_남아_있던_예전_공개본도_지우고_캐시를_비운다() throws Exception {
 		// given: 격리 작업이 복사는 마쳤지만 공개본을 지우기 전에 실패했다
-		givenMedia(PostMediaStatus.READY, "2026/11/11.jpg");
+		givenMedia(PostMediaStatus.PROCESSING, "2026/11/11.jpg");
 		given(storage.quarantineExists(anyString())).willReturn(true);
 
 		// when
@@ -216,7 +217,7 @@ class ReleaseJobHandlerTest {
 	@Test
 	void 되돌린_뒤_기록하다_실패하면_이번_새_사본을_지운다() throws Exception {
 		// given
-		PostMedia media = givenMedia(PostMediaStatus.READY, "2026/11/11.jpg");
+		PostMedia media = givenMedia(PostMediaStatus.PROCESSING, "2026/11/11.jpg");
 		given(storage.quarantineExists(anyString())).willReturn(true);
 		given(posts.findByIdForUpdate(POST_ID)).willThrow(new IllegalStateException("DB 끊김"));
 
@@ -230,5 +231,98 @@ class ReleaseJobHandlerTest {
 		verify(storage).deletePublic(NEW_KEY + "/t.webp");
 		verify(storage, never()).deleteQuarantine(anyString());
 		assertThat(media.getPublicKey()).isEqualTo("p/old");
+	}
+	@Test
+	void 여러_장인_글은_마지막_사진까지_새_키로_옮긴_뒤에야_보인다() throws Exception {
+		// given: 사진 세 장을 숨겼다가 복원했다. 시도마다 다른 키가 나오게 한다
+		SecureRandom counting = new SecureRandom() {
+			private int calls;
+
+			@Override
+			public void nextBytes(byte[] bytes) {
+				java.util.Arrays.fill(bytes, (byte) 0);
+				bytes[bytes.length - 1] = (byte) ++calls;
+			}
+		};
+		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+		ProcessJobHandler process = new ProcessJobHandler(storage, originals, transcoder, posts, mediaRepository,
+				WorkerFixtures.tx(), clock);
+		MediaUrls urls = new MediaUrls(new MediaProperties(true, "a", "k", "s", "in", "pub", "https://m.example", null));
+		ReleaseJobHandler multi = new ReleaseJobHandler(storage, purger, urls, originals, process, posts,
+				mediaRepository, WorkerFixtures.tx(), clock, counting);
+		List<PostMedia> media = new java.util.ArrayList<>();
+		for (long id = 11; id <= 13; id++) {
+			PostMedia m = WorkerFixtures.media(id, PostMediaStatus.PROCESSING, "p/old" + id);
+			ReflectionTestUtils.setField(m, "originalPath", "2026/11/" + id + ".jpg");
+			given(mediaRepository.findById(id)).willReturn(Optional.of(m));
+			media.add(m);
+		}
+		given(mediaRepository.findAllByPostIdOrderBySortOrder(POST_ID)).willReturn(media);
+		given(storage.quarantineExists(anyString())).willReturn(true);
+
+		// when / then: 앞의 두 장을 옮기는 동안은 PENDING이다
+		multi.handle(WorkerFixtures.job(MediaJobKind.RELEASE, 11L, 0));
+		assertThat(post.getStatus()).isEqualTo(PostStatus.PENDING);
+		multi.handle(WorkerFixtures.job(MediaJobKind.RELEASE, 12L, 0));
+		assertThat(post.getStatus()).isEqualTo(PostStatus.PENDING);
+		multi.handle(WorkerFixtures.job(MediaJobKind.RELEASE, 13L, 0));
+
+		// then: 세 장 모두 서로 다른 새 키로 옮겨졌고 예전 격리본은 지워졌다
+		assertThat(post.getStatus()).isEqualTo(PostStatus.VISIBLE);
+		assertThat(media).extracting(PostMedia::getStatus).containsOnly(PostMediaStatus.READY);
+		assertThat(media).extracting(PostMedia::getPublicKey).doesNotHaveDuplicates()
+				.noneMatch(k -> k.startsWith("p/old"));
+		for (PostMedia m : media) {
+			String old = "p/old" + m.getId();
+			verify(storage).copyQuarantineToPublic(old + "/d.webp", m.getPublicKey() + "/d.webp");
+			verify(storage).copyQuarantineToPublic(old + "/t.webp", m.getPublicKey() + "/t.webp");
+			verify(storage).deleteQuarantine(old + "/d.webp");
+			verify(storage).deleteQuarantine(old + "/t.webp");
+		}
+		verify(transcoder, never()).transcode(any(), any());
+	}
+
+	@Test
+	void 이번_복원에서_이미_옮긴_사진이면_다시_옮기지_않는다() throws Exception {
+		// given: 지난 시도가 READY까지 기록했다(예전 격리본 삭제에서 실패했거나 작업이 두 번 생겼다)
+		givenMedia(PostMediaStatus.READY, "2026/11/11.jpg");
+
+		// when
+		handler.handle(WorkerFixtures.job(MediaJobKind.RELEASE, 11L, 0));
+
+		// then: 지금 쓰는 공개본을 지우지 않는다
+		org.mockito.Mockito.verifyNoInteractions(storage, originals, transcoder, purger);
+	}
+
+	@Test
+	void 예전_공개본_캐시_비우기가_실패해도_격리본으로_복원한다() throws Exception {
+		// given: 격리 작업이 이미 예전 URL을 비웠으니 이 비우기는 안전망일 뿐이다
+		PostMedia media = givenMedia(PostMediaStatus.PROCESSING, "2026/11/11.jpg");
+		given(storage.quarantineExists(anyString())).willReturn(true);
+		org.mockito.Mockito.doThrow(new IllegalStateException("Cloudflare 503")).when(purger).purge(any());
+
+		// when
+		handler.handle(WorkerFixtures.job(MediaJobKind.RELEASE, 11L, 0));
+
+		// then
+		verify(storage).copyQuarantineToPublic("p/old/d.webp", NEW_KEY + "/d.webp");
+		assertThat(media.getStatus()).isEqualTo(PostMediaStatus.READY);
+		assertThat(media.getPublicKey()).isEqualTo(NEW_KEY);
+		assertThat(post.getStatus()).isEqualTo(PostStatus.VISIBLE);
+	}
+
+	@Test
+	void 예전_공개본_지우기가_실패해도_복원한다() throws Exception {
+		// given
+		PostMedia media = givenMedia(PostMediaStatus.PROCESSING, "2026/11/11.jpg");
+		given(storage.quarantineExists(anyString())).willReturn(true);
+		org.mockito.Mockito.doThrow(new IllegalStateException("R2 500")).when(storage).deletePublic("p/old/d.webp");
+
+		// when
+		handler.handle(WorkerFixtures.job(MediaJobKind.RELEASE, 11L, 0));
+
+		// then
+		assertThat(media.getStatus()).isEqualTo(PostMediaStatus.READY);
+		assertThat(post.getStatus()).isEqualTo(PostStatus.VISIBLE);
 	}
 }

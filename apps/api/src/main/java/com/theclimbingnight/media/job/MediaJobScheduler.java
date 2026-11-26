@@ -2,6 +2,7 @@ package com.theclimbingnight.media.job;
 
 import com.theclimbingnight.feed.entity.Post;
 import com.theclimbingnight.feed.entity.PostMedia;
+import com.theclimbingnight.feed.entity.PostMediaStatus;
 import com.theclimbingnight.feed.repository.PostMediaRepository;
 import java.time.Clock;
 import java.time.Duration;
@@ -56,8 +57,13 @@ public class MediaJobScheduler {
 		queueEach(media, MediaJobKind.QUARANTINE);
 	}
 
+	/**
+	 * 숨김·격리는 사진을 READY로 둔다. 복원하면 사진을 PROCESSING으로 돌려, RELEASE가 사진을 하나씩 새 키로 옮길 때마다
+	 * READY가 되고 마지막 사진까지 옮겨진 뒤에만 글이 보이게 한다(그 전엔 응답에 죽은 예전 URL도 나가지 않는다).
+	 */
 	public void onPostRestored(Post post) {
 		List<PostMedia> media = mediaOf(post);
+		media.stream().filter(m -> m.getStatus() == PostMediaStatus.READY).forEach(PostMedia::markProcessing);
 		queueEach(media, MediaJobKind.RELEASE);
 	}
 

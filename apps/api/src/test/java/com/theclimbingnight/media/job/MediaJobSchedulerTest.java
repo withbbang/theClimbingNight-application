@@ -94,4 +94,24 @@ class MediaJobSchedulerTest {
 		assertThat(saved()).extracting(MediaJob::getKind, MediaJob::getTargetId)
 				.containsExactly(tuple(MediaJobKind.RELEASE, 11L), tuple(MediaJobKind.RELEASE, 12L));
 	}
+
+	@Test
+	void 복원하면_READY인_사진을_PROCESSING으로_돌려_모두_옮길_때까지_글이_보이지_않게_한다() {
+		// given: 숨김·격리는 사진 상태를 READY로 둔다
+		List<PostMedia> media = new java.util.ArrayList<>();
+		for (long id : new long[] { 11L, 12L }) {
+			PostMedia m = PostMedia.image(POST_ID, (int) id, "uploads/u" + id + ".jpg", "p/k" + id);
+			ReflectionTestUtils.setField(m, "id", id);
+			m.markReady("2026/11/" + id + ".jpg", 1080, 810, 1234L);
+			media.add(m);
+		}
+		given(mediaRepository.findAllByPostIdOrderBySortOrder(POST_ID)).willReturn(media);
+
+		// when
+		scheduler.onPostRestored(post);
+
+		// then
+		assertThat(media).extracting(PostMedia::getStatus)
+				.containsOnly(com.theclimbingnight.feed.entity.PostMediaStatus.PROCESSING);
+	}
 }

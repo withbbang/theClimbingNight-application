@@ -14,7 +14,8 @@ class MediaConfigTest {
 
 	private static final String[] ALL_KEYS = {
 			"app.media.account-id=acc", "app.media.access-key-id=ak", "app.media.secret-access-key=sk",
-			"app.media.incoming-bucket=media-in", "app.media.public-bucket=media-pub" };
+			"app.media.incoming-bucket=media-in", "app.media.public-bucket=media-pub",
+			"app.media.public-base-url=https://media.example" };
 
 	@Test
 	void 키가_모두_있으면_R2_저장소가_뜬다() {

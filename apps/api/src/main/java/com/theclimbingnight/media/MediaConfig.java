@@ -24,7 +24,7 @@ public class MediaConfig {
 
 	private static final Region REGION = Region.of("auto");
 
-	/** 키 다섯 개가 모두 있으면 R2, 하나라도 비면 모든 호출을 MEDIA_UNAVAILABLE로 거절한다. */
+	/** 키 다섯 개와 공개 주소가 모두 있으면 R2, 하나라도 비면 모든 호출을 MEDIA_UNAVAILABLE로 거절한다. */
 	@Bean
 	MediaStorage mediaStorage(MediaProperties properties) {
 		if (!properties.enabled()) {
