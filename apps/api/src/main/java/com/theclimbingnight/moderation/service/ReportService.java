@@ -33,10 +33,11 @@ public class ReportService {
 
 	static final int AUTO_HIDE_REPORTERS = 3;
 	private static final String CONSTRAINT_REPORTER_TARGET = "uk_reports_reporter_target";
-	/** 다른 사람이 신고할 수 있는 글 상태. 초안·실패한 글은 작성자만 보므로 404다. */
-	private static final Set<PostStatus> REPORTABLE = EnumSet.of(PostStatus.PENDING, PostStatus.VISIBLE,
-			PostStatus.HIDDEN_PENDING, PostStatus.HIDDEN);
-	private static final Set<PostStatus> AUTO_HIDEABLE = EnumSet.of(PostStatus.PENDING, PostStatus.VISIBLE);
+	/**
+	 * 다른 사람이 신고할 수 있는 글 상태. 초안·실패·숨긴 글은 남에게 보이지 않으므로 존재 여부를 흘리지 않게 404다.
+	 * 그래서 이미 숨긴 글에는 신고가 쌓이지 않고 격리 작업도 다시 생기지 않는다.
+	 */
+	private static final Set<PostStatus> REPORTABLE = EnumSet.of(PostStatus.PENDING, PostStatus.VISIBLE);
 
 	private final ReportRepository reports;
 	private final PostRepository posts;
@@ -75,8 +76,7 @@ public class ReportService {
 			throw notFound();
 		}
 		long openReports = save(reporterId, request);
-		if (AUTO_HIDEABLE.contains(post.getStatus())
-				&& (request.reason() == ReportReason.PORTRAIT_PRIVACY || openReports >= AUTO_HIDE_REPORTERS)) {
+		if (request.reason() == ReportReason.PORTRAIT_PRIVACY || openReports >= AUTO_HIDE_REPORTERS) {
 			post.hide(true);
 			scheduler.onPostHidden(post);
 		}

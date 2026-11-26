@@ -206,8 +206,60 @@ class ModerationServiceTest {
 	}
 
 	@Test
-	void 기각은_글을_건드리지_않고_신고만_DISMISSED다() {
+	void 보이는_글을_기각하면_글은_그대로고_신고만_DISMISSED다() {
 		// given
+		Post post = givenPost(PostStatus.VISIBLE);
+		Report report = givenOpenReport(ReportTargetType.POST, POST_ID);
+
+		// when
+		service.act(ADMIN, ReportTargetType.POST, POST_ID, Action.DISMISS);
+
+		// then
+		assertThat(post.getStatus()).isEqualTo(PostStatus.VISIBLE);
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.DISMISSED);
+		verifyNoInteractions(jobs);
+	}
+
+	@Test
+	void 자동_숨김된_글을_기각하면_복원되고_RELEASE_작업이_생긴다() {
+		// given
+		Post post = givenPost(PostStatus.HIDDEN_PENDING);
+		givenMedia();
+		Report report = givenOpenReport(ReportTargetType.POST, POST_ID);
+
+		// when
+		service.act(ADMIN, ReportTargetType.POST, POST_ID, Action.DISMISS);
+
+		// then
+		assertThat(post.getStatus()).isEqualTo(PostStatus.PENDING);
+		assertThat(savedJobs()).extracting(MediaJob::getKind, MediaJob::getTargetId).containsExactly(
+				org.assertj.core.groups.Tuple.tuple(MediaJobKind.RELEASE, 11L),
+				org.assertj.core.groups.Tuple.tuple(MediaJobKind.RELEASE, 12L));
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.DISMISSED);
+		assertThat(report.getHandledBy()).isEqualTo(ADMIN);
+	}
+
+	@Test
+	void 확정_숨김된_글을_기각하면_신고만_닫힌다() {
+		// given
+		Post post = givenPost(PostStatus.HIDDEN);
+		Report report = givenOpenReport(ReportTargetType.POST, POST_ID);
+		lenient().when(mediaRepository.findAllByPostIdOrderBySortOrder(POST_ID))
+				.thenReturn(List.of(media(11L, 0), media(12L, 1)));
+
+		// when
+		service.act(ADMIN, ReportTargetType.POST, POST_ID, Action.DISMISS);
+
+		// then
+		assertThat(post.getStatus()).isEqualTo(PostStatus.HIDDEN);
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.DISMISSED);
+		verifyNoInteractions(jobs);
+	}
+
+	@Test
+	void 지운_글의_신고도_기각할_수_있다() {
+		// given
+		given(posts.findByIdForUpdate(POST_ID)).willReturn(Optional.empty());
 		Report report = givenOpenReport(ReportTargetType.POST, POST_ID);
 
 		// when
@@ -215,7 +267,7 @@ class ModerationServiceTest {
 
 		// then
 		assertThat(report.getStatus()).isEqualTo(ReportStatus.DISMISSED);
-		verifyNoInteractions(posts, jobs);
+		verifyNoInteractions(jobs);
 	}
 
 	@Test
@@ -240,7 +292,7 @@ class ModerationServiceTest {
 	}
 
 	@Test
-	void 없는_글이나_지운_글이나_초안을_숨기면_404다() {
+	void 없는_글이나_지운_글이나_초안이나_실패한_글을_숨기면_404다() {
 		// given
 		given(posts.findByIdForUpdate(99L)).willReturn(Optional.empty());
 
@@ -262,6 +314,13 @@ class ModerationServiceTest {
 
 		// when / then
 		assertThatThrownBy(() -> service.act(ADMIN, ReportTargetType.POST, POST_ID, Action.RESTORE))
+				.isInstanceOf(BusinessException.class);
+
+		// given
+		givenPost(PostStatus.FAILED);
+
+		// when / then
+		assertThatThrownBy(() -> service.act(ADMIN, ReportTargetType.POST, POST_ID, Action.HIDE))
 				.isInstanceOf(BusinessException.class);
 		verifyNoInteractions(jobs);
 		verify(reports, never()).findAllByTargetTypeAndTargetIdAndStatus(any(), anyLong(), any());

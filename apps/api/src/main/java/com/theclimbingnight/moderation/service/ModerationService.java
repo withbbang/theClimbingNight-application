@@ -42,7 +42,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 운영진의 신고 목록과 조치(숨김·복원·기각). 숨김·복원은 게시물 행을 잠근 뒤 상태를 본다. */
+/** 운영진의 신고 목록과 조치(숨김·복원·기각). 게시물 상태를 바꾸는 조치는 모두 게시물 행을 잠근 뒤 상태를 본다. */
 @Service
 @Transactional(readOnly = true)
 public class ModerationService {
@@ -112,8 +112,23 @@ public class ModerationService {
 				restore(lockedPost(targetId));
 				close(targetType, targetId, ReportStatus.DISMISSED, adminId);
 			}
-			case DISMISS -> close(targetType, targetId, ReportStatus.DISMISSED, adminId);
+			case DISMISS -> {
+				if (targetType == ReportTargetType.POST) {
+					releaseAutoHidden(targetId);
+				}
+				close(targetType, targetId, ReportStatus.DISMISSED, adminId);
+			}
 		}
+	}
+
+	/**
+	 * 신고를 기각하면 숨길 이유가 없으므로 자동 숨김(HIDDEN_PENDING)된 글은 되살린다. 운영진이 확정한 숨김(HIDDEN)은 그대로 둔다.
+	 * 지웠거나 없는 글이어도 신고는 닫아야 하므로 404로 막지 않는다.
+	 */
+	private void releaseAutoHidden(long postId) {
+		posts.findByIdForUpdate(postId)
+				.filter(p -> p.getDeletedAt() == null && p.getStatus() == PostStatus.HIDDEN_PENDING)
+				.ifPresent(this::restore);
 	}
 
 	/** 자동 숨김(HIDDEN_PENDING)이면 격리 작업이 이미 있으니 상태만 확정한다. */
@@ -138,7 +153,8 @@ public class ModerationService {
 
 	private Post lockedPost(long postId) {
 		return posts.findByIdForUpdate(postId)
-				.filter(p -> p.getDeletedAt() == null && p.getStatus() != PostStatus.DRAFT)
+				.filter(p -> p.getDeletedAt() == null && p.getStatus() != PostStatus.DRAFT
+						&& p.getStatus() != PostStatus.FAILED)
 				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 	}
 

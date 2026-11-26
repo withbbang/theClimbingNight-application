@@ -131,28 +131,29 @@ class ReportServiceTest {
 	void 이미_숨긴_글에_신고가_더_와도_격리_작업을_다시_만들지_않는다() {
 		// given
 		Post pending = givenPost(PostStatus.HIDDEN_PENDING);
-		givenOpenCounts(3L);
 
-		// when
-		service.submit(REPORTER, postReport(ReportReason.PORTRAIT_PRIVACY));
-
-		// then
+		// when / then
+		assertNotFound(() -> service.submit(REPORTER, postReport(ReportReason.PORTRAIT_PRIVACY)));
 		assertThat(pending.getStatus()).isEqualTo(PostStatus.HIDDEN_PENDING);
 		verify(scheduler, never()).onPostHidden(any());
+		verify(reports, never()).saveAndFlush(any());
 	}
 
 	@Test
-	void 운영진이_숨긴_글은_신고가_더_와도_상태가_그대로다() {
+	void 숨긴_글이나_실패한_글을_신고하면_존재를_흘리지_않게_404다() {
 		// given
-		Post hidden = givenPost(PostStatus.HIDDEN);
-		givenOpenCounts(5L);
+		givenPost(PostStatus.HIDDEN);
 
-		// when
-		service.submit(REPORTER, postReport(ReportReason.SPAM));
+		// when / then
+		assertNotFound(() -> service.submit(REPORTER, postReport(ReportReason.SPAM)));
 
-		// then
-		assertThat(hidden.getStatus()).isEqualTo(PostStatus.HIDDEN);
-		verify(scheduler, never()).onPostHidden(any());
+		// given
+		givenPost(PostStatus.FAILED);
+
+		// when / then
+		assertNotFound(() -> service.submit(REPORTER, postReport(ReportReason.SPAM)));
+		verify(reports, never()).saveAndFlush(any());
+		verify(events, never()).publishEvent(any(Object.class));
 	}
 
 	@Test
