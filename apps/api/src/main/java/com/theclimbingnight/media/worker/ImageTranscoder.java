@@ -15,6 +15,9 @@ import java.util.regex.Pattern;
  * <p>
  * {@code -map_metadata -1}은 컨테이너·스트림 메타데이터만 지운다. 최근 ffmpeg는 JPEG EXIF(GPS 포함)를 프레임 사이드
  * 데이터·프레임 태그로 들고 다녀서 인코더가 다시 써 넣을 수 있으므로, 필터에서 {@link #STRIP_FRAME_METADATA}로 함께 지운다.
+ * <p>
+ * 입력은 사용자가 올린 파일이라 형식을 JPEG로 고정하고({@code -f jpeg_pipe}) 파일 프로토콜만 허용한다. 재생목록처럼
+ * 다른 파일이나 네트워크를 읽게 만드는 입력을 막는다.
  */
 public class ImageTranscoder {
 
@@ -37,7 +40,8 @@ public class ImageTranscoder {
 		run(webp(source, display, DISPLAY_LONG_SIDE));
 		run(webp(source, thumb, THUMB_LONG_SIDE));
 		Path probe = workDir.resolve("probe.txt");
-		run(List.of("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+		run(List.of("ffprobe", "-v", "error", "-protocol_whitelist", "file", "-f", "webp_pipe",
+				"-select_streams", "v:0", "-show_entries", "stream=width,height",
 				"-of", "csv=s=x:p=0", "-o", probe.toString(), display.toString()));
 		Matcher size = SIZE.matcher(Files.readString(probe).strip());
 		if (!size.matches()) {
@@ -52,7 +56,8 @@ public class ImageTranscoder {
 	}
 
 	private static List<String> webp(Path source, Path out, int longSide) {
-		return List.of("ffmpeg", "-nostdin", "-v", "error", "-y", "-threads", "2", "-i", source.toString(),
+		return List.of("ffmpeg", "-nostdin", "-v", "error", "-y", "-threads", "2",
+				"-protocol_whitelist", "file", "-f", "jpeg_pipe", "-i", source.toString(),
 				"-map_metadata", "-1", "-vf", scale(longSide) + "," + STRIP_FRAME_METADATA,
 				"-c:v", "libwebp", "-quality", "80", "-frames:v", "1", out.toString());
 	}

@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 public class FfmpegProcessRunner implements ProcessRunner {
 
 	static final int STDERR_TAIL_CHARS = 2000;
+	private static final long KILL_WAIT_SECONDS = 5;
 
 	@Override
 	public ProcessResult run(List<String> command, Duration timeout) throws IOException {
@@ -28,17 +29,27 @@ public class FfmpegProcessRunner implements ProcessRunner {
 			try {
 				finished = process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
 			} catch (InterruptedException e) {
-				process.destroyForcibly();
+				kill(process);
 				Thread.currentThread().interrupt();
 				throw new IllegalStateException(command.get(0) + " 실행 중 중단됨", e);
 			}
 			if (!finished) {
-				process.destroyForcibly();
+				kill(process);
 				throw new IllegalStateException(command.get(0) + " 시간 초과(" + timeout.toSeconds() + "초)");
 			}
 			return new ProcessResult(process.exitValue(), tail(stderr));
 		} finally {
 			Files.deleteIfExists(stderr);
+		}
+	}
+
+	/** 강제 종료 뒤 잠깐 기다려, 죽지 않은 프로세스가 임시 파일을 계속 쓰지 않게 한다. */
+	private static void kill(Process process) {
+		process.destroyForcibly();
+		try {
+			process.waitFor(KILL_WAIT_SECONDS, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		}
 	}
 

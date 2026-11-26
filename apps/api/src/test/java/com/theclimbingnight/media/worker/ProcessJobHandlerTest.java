@@ -161,4 +161,26 @@ class ProcessJobHandlerTest {
 		// then
 		verifyNoInteractions(storage, originals, transcoder);
 	}
+
+	@Test
+	void 공개본을_올리다_실패하면_올린_사본을_지우고_예외를_그대로_던진다() throws Exception {
+		// given
+		lenient().doAnswer(inv -> {
+			if (inv.getArgument(0).equals("p/k11/t.webp")) {
+				throw new IllegalStateException("R2 503");
+			}
+			return null;
+		}).when(storage).putPublic(anyString(), any(), anyString());
+
+		// when
+		Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(
+				() -> handler.handle(WorkerFixtures.job(MediaJobKind.PROCESS, 11L, 0)));
+
+		// then
+		assertThat(thrown).hasMessage("R2 503");
+		verify(storage).deletePublic("p/k11/d.webp");
+		verify(storage).deletePublic("p/k11/t.webp");
+		verify(storage, never()).deleteUpload(anyString());
+		assertThat(media.getStatus()).isEqualTo(PostMediaStatus.PROCESSING);
+	}
 }

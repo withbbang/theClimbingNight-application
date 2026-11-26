@@ -83,11 +83,12 @@ public class WorkerConfig {
 	}
 
 	@Bean
-	ReleaseJobHandler releaseJobHandler(MediaStorage storage, OriginalStore originals, ProcessJobHandler process,
-			PostRepository posts, PostMediaRepository mediaRepository, TransactionTemplate workerTransactionTemplate,
-			Clock clock, SecureRandom random) {
-		return new ReleaseJobHandler(storage, originals, process, posts, mediaRepository, workerTransactionTemplate,
-				clock, random);
+	ReleaseJobHandler releaseJobHandler(MediaStorage storage, CachePurger purger, MediaUrls urls,
+			OriginalStore originals, ProcessJobHandler process, PostRepository posts,
+			PostMediaRepository mediaRepository, TransactionTemplate workerTransactionTemplate, Clock clock,
+			SecureRandom random) {
+		return new ReleaseJobHandler(storage, purger, urls, originals, process, posts, mediaRepository,
+				workerTransactionTemplate, clock, random);
 	}
 
 	@Bean

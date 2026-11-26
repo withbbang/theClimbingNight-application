@@ -1,5 +1,6 @@
 package com.theclimbingnight.media.worker;
 
+import com.theclimbingnight.common.FailureSummary;
 import com.theclimbingnight.feed.entity.Post;
 import com.theclimbingnight.feed.entity.PostMedia;
 import com.theclimbingnight.feed.entity.PostMediaStatus;
@@ -16,7 +17,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -26,6 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 public class ProcessJobHandler implements JobHandler {
 
+	private static final Logger log = LoggerFactory.getLogger(ProcessJobHandler.class);
 	static final String WEBP = "image/webp";
 
 	private final MediaStorage storage;
@@ -117,16 +122,34 @@ public class ProcessJobHandler implements JobHandler {
 		}
 		String display = publicKey + PostMedia.DISPLAY_SUFFIX;
 		String thumb = publicKey + PostMedia.THUMB_SUFFIX;
-		storage.putPublic(display, image.display(), WEBP);
-		storage.putPublic(thumb, image.thumb(), WEBP);
-		long byteSize = Files.size(image.display());
-		Boolean committed = tx.execute(s -> markReadyIfPending(mediaId, originalPath, publicKey, image, byteSize));
+		Boolean committed;
+		try {
+			storage.putPublic(display, image.display(), WEBP);
+			storage.putPublic(thumb, image.thumb(), WEBP);
+			long byteSize = Files.size(image.display());
+			committed = tx.execute(s -> markReadyIfPending(mediaId, originalPath, publicKey, image, byteSize));
+		} catch (IOException | RuntimeException e) {
+			// READY를 기록하지 못했다. 복원(RELEASE)은 시도마다 새 키를 쓰므로 여기서 지우지 않으면 아무도 지우지 않는다.
+			deletePublicQuietly(storage, publicKey, e);
+			throw e;
+		}
 		if (!Boolean.TRUE.equals(committed)) {
 			storage.deletePublic(display);
 			storage.deletePublic(thumb);
 			return false;
 		}
 		return true;
+	}
+
+	/** 실패 처리 중의 정리. 정리 실패는 원래 예외에 덧붙이고 원래 예외를 그대로 던지게 한다. */
+	static void deletePublicQuietly(MediaStorage storage, String publicKey, Exception cause) {
+		for (String key : List.of(publicKey + PostMedia.DISPLAY_SUFFIX, publicKey + PostMedia.THUMB_SUFFIX)) {
+			try {
+				storage.deletePublic(key);
+			} catch (RuntimeException cleanup) {
+				cause.addSuppressed(cleanup);
+			}
+		}
 	}
 
 	/** 게시물 행을 잠근 채 아직 PENDING인지 보고, 맞으면 사진을 READY로, 사진이 모두 READY면 게시물을 보이게 한다. */
@@ -162,7 +185,8 @@ public class ProcessJobHandler implements JobHandler {
 		return Boolean.TRUE.equals(tx.execute(s -> isPending(posts.findById(postId).orElse(null))));
 	}
 
-	private static void deleteRecursively(Path dir) throws IOException {
+	/** 임시 폴더 정리 실패는 로그만 남긴다. 원래 예외를 덮거나 성공한 작업을 실패로 바꾸지 않는다. */
+	private static void deleteRecursively(Path dir) {
 		if (!Files.exists(dir)) {
 			return;
 		}
@@ -170,6 +194,8 @@ public class ProcessJobHandler implements JobHandler {
 			for (Path p : paths.sorted(Comparator.reverseOrder()).toList()) {
 				Files.deleteIfExists(p);
 			}
+		} catch (IOException | RuntimeException e) {
+			log.warn("임시 폴더 삭제 실패 {} {}", dir, FailureSummary.of(e));
 		}
 	}
 }

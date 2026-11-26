@@ -70,6 +70,7 @@ class ImageTranscoderTest {
 		for (List<String> command : List.of(display, thumb)) {
 			assertThat(command).startsWith("ffmpeg");
 			assertThat(command).containsSubsequence("-threads", "2", "-i", source.toString());
+			assertThat(command).containsSequence("-protocol_whitelist", "file", "-f", "jpeg_pipe", "-i", source.toString());
 			assertThat(command).containsSubsequence("-map_metadata", "-1");
 			assertThat(command).containsSubsequence("-c:v", "libwebp", "-quality", "80");
 		}
@@ -94,6 +95,7 @@ class ImageTranscoderTest {
 		// then
 		List<String> probe = commands().get(2);
 		assertThat(probe).startsWith("ffprobe").endsWith(workDir.resolve("d.webp").toString());
+		assertThat(probe).containsSequence("-protocol_whitelist", "file", "-f", "webp_pipe");
 		assertThat(image.width()).isEqualTo(1080);
 		assertThat(image.height()).isEqualTo(810);
 		assertThat(image.display()).isEqualTo(workDir.resolve("d.webp"));

@@ -5,6 +5,7 @@ import com.theclimbingnight.feed.entity.PostMedia;
 import com.theclimbingnight.feed.entity.PostMediaStatus;
 import com.theclimbingnight.feed.repository.PostMediaRepository;
 import com.theclimbingnight.feed.repository.PostRepository;
+import com.theclimbingnight.media.MediaUrls;
 import com.theclimbingnight.media.job.MediaJob;
 import com.theclimbingnight.media.job.MediaJobKind;
 import com.theclimbingnight.media.storage.MediaStorage;
@@ -12,6 +13,7 @@ import java.io.IOException;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.HexFormat;
+import java.util.List;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -22,12 +24,15 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <li>아무것도 없으면 사진과 게시물을 FAILED로 둔다.</li>
  * </ol>
  * 공개본을 올린 뒤에는 처리 작업과 같이 게시물 행을 잠그고 다시 PENDING인지 본다. 그새 다시 숨겼으면 새 공개본을 지운다.
+ * 어느 경로든 먼저 예전 키의 공개본을 지우고 그 URL의 캐시를 비운다(격리가 중간에 실패했을 때 남은 사본).
  */
 public class ReleaseJobHandler implements JobHandler {
 
 	private static final int KEY_BYTES = 16;
 
 	private final MediaStorage storage;
+	private final CachePurger purger;
+	private final MediaUrls urls;
 	private final OriginalStore originals;
 	private final ProcessJobHandler process;
 	private final PostRepository posts;
@@ -36,10 +41,12 @@ public class ReleaseJobHandler implements JobHandler {
 	private final Clock clock;
 	private final SecureRandom random;
 
-	public ReleaseJobHandler(MediaStorage storage, OriginalStore originals, ProcessJobHandler process,
-			PostRepository posts, PostMediaRepository mediaRepository, TransactionTemplate tx, Clock clock,
-			SecureRandom random) {
+	public ReleaseJobHandler(MediaStorage storage, CachePurger purger, MediaUrls urls, OriginalStore originals,
+			ProcessJobHandler process, PostRepository posts, PostMediaRepository mediaRepository,
+			TransactionTemplate tx, Clock clock, SecureRandom random) {
 		this.storage = storage;
+		this.purger = purger;
+		this.urls = urls;
 		this.originals = originals;
 		this.process = process;
 		this.posts = posts;
@@ -62,6 +69,9 @@ public class ReleaseJobHandler implements JobHandler {
 		}
 		String oldKey = media.getPublicKey();
 		String newKey = "p/" + randomHex();
+		// 격리 작업이 복사 뒤 공개본 삭제 전에 실패했으면 예전 공개본(이미 알려진 URL)이 남아 있다. 새 사본을 만들기 전에 지워서,
+		// 비우기가 실패해 재시도될 때도(그때는 아직 PENDING이다) 다시 지우게 한다. 없어도 지우기는 성공한다.
+		deleteOldPublic(oldKey);
 		if (media.getStatus() == PostMediaStatus.READY && hasQuarantineCopy(oldKey)) {
 			restoreFromQuarantine(media.getId(), oldKey, newKey);
 			return;
@@ -76,22 +86,27 @@ public class ReleaseJobHandler implements JobHandler {
 			return;
 		}
 		if (published) {
-			// 격리에 실패해 예전 공개본이 남아 있었을 수 있다. 없어도 지우기는 성공한다.
-			deleteOld(oldKey);
+			deleteOldQuarantine(oldKey);
 		}
 	}
 
 	private void restoreFromQuarantine(long mediaId, String oldKey, String newKey) {
-		storage.copyQuarantineToPublic(oldKey + PostMedia.DISPLAY_SUFFIX, newKey + PostMedia.DISPLAY_SUFFIX);
-		storage.copyQuarantineToPublic(oldKey + PostMedia.THUMB_SUFFIX, newKey + PostMedia.THUMB_SUFFIX);
-		Boolean committed = tx.execute(s -> moveIfPending(mediaId, newKey));
+		Boolean committed;
+		try {
+			storage.copyQuarantineToPublic(oldKey + PostMedia.DISPLAY_SUFFIX, newKey + PostMedia.DISPLAY_SUFFIX);
+			storage.copyQuarantineToPublic(oldKey + PostMedia.THUMB_SUFFIX, newKey + PostMedia.THUMB_SUFFIX);
+			committed = tx.execute(s -> moveIfPending(mediaId, newKey));
+		} catch (RuntimeException e) {
+			// 시도마다 새 키라 여기서 지우지 않으면 이 사본은 아무도 지우지 않는다.
+			ProcessJobHandler.deletePublicQuietly(storage, newKey, e);
+			throw e;
+		}
 		if (!Boolean.TRUE.equals(committed)) {
 			storage.deletePublic(newKey + PostMedia.DISPLAY_SUFFIX);
 			storage.deletePublic(newKey + PostMedia.THUMB_SUFFIX);
 			return;
 		}
-		storage.deleteQuarantine(oldKey + PostMedia.DISPLAY_SUFFIX);
-		storage.deleteQuarantine(oldKey + PostMedia.THUMB_SUFFIX);
+		deleteOldQuarantine(oldKey);
 	}
 
 	private boolean moveIfPending(long mediaId, String newKey) {
@@ -115,9 +130,15 @@ public class ReleaseJobHandler implements JobHandler {
 		});
 	}
 
-	private void deleteOld(String oldKey) {
-		storage.deletePublic(oldKey + PostMedia.DISPLAY_SUFFIX);
-		storage.deletePublic(oldKey + PostMedia.THUMB_SUFFIX);
+	private void deleteOldPublic(String oldKey) {
+		String display = oldKey + PostMedia.DISPLAY_SUFFIX;
+		String thumb = oldKey + PostMedia.THUMB_SUFFIX;
+		storage.deletePublic(display);
+		storage.deletePublic(thumb);
+		purger.purge(List.of(urls.publicUrl(display), urls.publicUrl(thumb)));
+	}
+
+	private void deleteOldQuarantine(String oldKey) {
 		storage.deleteQuarantine(oldKey + PostMedia.DISPLAY_SUFFIX);
 		storage.deleteQuarantine(oldKey + PostMedia.THUMB_SUFFIX);
 	}
