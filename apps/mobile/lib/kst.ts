@@ -94,3 +94,21 @@ export function toIso(day: DateKey, time: string): string {
   const [hour, minute] = time.split(':').map(Number);
   return new Date(startOfDay(day) + (hour * 60 + minute) * 60_000).toISOString();
 }
+
+/** 지난 시간. 1분 전까지는 '방금', 일주일이 지나면 서울 날짜로 적는다. */
+export function formatRelative(iso: string, now: Date = new Date()): string {
+  const elapsed = now.getTime() - Date.parse(iso);
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) {
+    return '방금';
+  }
+  if (minutes < 60) {
+    return `${minutes}분 전`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours}시간 전`;
+  }
+  const days = Math.floor(hours / 24);
+  return days < 7 ? `${days}일 전` : formatDay(toDateKey(iso), todayKst(now));
+}

@@ -18,6 +18,10 @@ interface PagedListProps<T> {
   renderItem: (item: T, index: number) => ReactElement;
   empty: ReactElement;
   header?: ReactElement;
+  /** 목록 끝에 붙인다. 다음 페이지 오류가 있으면 오류가 먼저다. */
+  footer?: ReactElement | null;
+  /** false면 끝에 닿아도 더 받지 않는다. */
+  canLoadMore?: boolean;
 }
 
 /** 끝에 닿으면 다음 페이지를 이어 받는 목록. */
@@ -28,9 +32,12 @@ export function PagedList<T>({
   renderItem,
   empty,
   header,
+  footer = null,
+  canLoadMore = true,
 }: PagedListProps<T>) {
   const { space } = useTheme();
-  const { fetchNextPage, hasNextPage, isFetching } = query;
+  const { fetchNextPage, isFetching } = query;
+  const hasNextPage = canLoadMore && query.hasNextPage;
   // 다시 받는 중에 끝에 닿으면 목록은 다시 알려 주지 않으므로 기억했다가 이어 받는다.
   const reachedEnd = useRef(false);
 
@@ -73,7 +80,9 @@ export function PagedList<T>({
                     onPress={() => void fetchNextPage()}
                   />
                 </View>
-              ) : null
+              ) : (
+                footer
+              )
             }
             ListEmptyComponent={empty}
             automaticallyAdjustKeyboardInsets

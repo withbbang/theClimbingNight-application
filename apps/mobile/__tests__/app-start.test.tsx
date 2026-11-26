@@ -90,11 +90,12 @@ it('keeps the splash until the session is loaded', async () => {
   expect(SplashScreen.hideAsync).toHaveBeenCalledTimes(1);
 });
 
-it('shows the four tabs to a guest', async () => {
+it('shows the five tabs to a guest', async () => {
   await start();
   expect(screen.getAllByRole('tab').map((t) => t.props.accessibilityLabel)).toEqual([
     '홈',
     '벙',
+    '피드',
     '굿즈',
     '마이',
   ]);

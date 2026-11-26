@@ -3,6 +3,7 @@ import {
   addMonths,
   formatDateTime,
   formatDay,
+  formatRelative,
   formatTime,
   monthGrid,
   parseTime,
@@ -72,4 +73,18 @@ it.each([
 it('reads the input as Seoul time', () => {
   expect(toIso('2026-11-25', '19:30')).toBe('2026-11-25T10:30:00.000Z');
   expect(toIso('2027-01-01', '00:00')).toBe('2026-12-31T15:00:00.000Z');
+});
+
+it('formats elapsed time and falls back to the Seoul date after a week', () => {
+  const now = new Date('2026-11-26T03:00:00Z');
+  const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+  expect(formatRelative(ago(59_999), now)).toBe('방금');
+  expect(formatRelative(ago(60_000), now)).toBe('1분 전');
+  expect(formatRelative(ago(3_600_000 - 1), now)).toBe('59분 전');
+  expect(formatRelative(ago(3_600_000), now)).toBe('1시간 전');
+  expect(formatRelative(ago(86_400_000), now)).toBe('1일 전');
+  expect(formatRelative(ago(7 * 86_400_000 - 1), now)).toBe('6일 전');
+  expect(formatRelative('2026-11-18T15:30:00Z', now)).toBe('11월 19일(목)');
+  // 기기 시계가 조금 늦어도 미래로 적지 않는다.
+  expect(formatRelative(ago(-5_000), now)).toBe('방금');
 });

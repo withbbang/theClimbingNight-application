@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 
 import { CalendarDotsIcon } from 'phosphor-react-native/src/icons/CalendarDots';
 import { HouseIcon } from 'phosphor-react-native/src/icons/House';
+import { ImagesSquareIcon } from 'phosphor-react-native/src/icons/ImagesSquare';
 import { ToteIcon } from 'phosphor-react-native/src/icons/Tote';
 import { UserIcon } from 'phosphor-react-native/src/icons/User';
 import type { Icon } from 'phosphor-react-native';
@@ -23,6 +24,7 @@ import { useTheme } from '@/hooks/use-theme';
 const TABS: Record<string, { label: string; icon: Icon }> = {
   index: { label: '홈', icon: HouseIcon },
   meetups: { label: '벙', icon: CalendarDotsIcon },
+  feed: { label: '피드', icon: ImagesSquareIcon },
   goods: { label: '굿즈', icon: ToteIcon },
   my: { label: '마이', icon: UserIcon },
 };
