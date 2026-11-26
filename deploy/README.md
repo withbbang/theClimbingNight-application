@@ -147,9 +147,14 @@ gunzip -c backups/theclimbingnight-<시각>.sql.gz | sudo docker compose -f depl
 | `EXPO_ACCESS_TOKEN` | 출시 전 | Expo 푸시 액세스 토큰 (8장 Enhanced push security) |
 | `CLOUDFLARE_TUNNEL_TOKEN` | 예 | 2장 |
 | `PUBLIC_HOST` | 예 | 터널 Public Hostname. 배포 확인과 문서에 쓴다 |
-| `R2_ACCOUNT_ID` 외 3개 | — | 4장. 비우면 백업을 NAS에만 둔다 |
+| `R2_ACCOUNT_ID` 외 3개 | — | 4장. 비우면 백업을 NAS에만 둔다. `R2_ACCOUNT_ID`는 사진 피드도 같이 쓴다 |
+| `R2_MEDIA_ACCESS_KEY_ID`, `R2_MEDIA_SECRET_ACCESS_KEY` | 출시 전 | 사진 피드용 R2 API 토큰 (8장). 두 버킷 Object Read & Write만 |
+| `R2_MEDIA_INCOMING_BUCKET`, `R2_MEDIA_PUBLIC_BUCKET` | 출시 전 | 비공개 업로드·격리 버킷, 공개 사진 버킷 이름. 다섯 개(계정 ID 포함) 중 하나라도 비면 사진 올리기는 `MEDIA_UNAVAILABLE` |
+| `MEDIA_PUBLIC_BASE_URL` | 출시 전 | 공개 버킷의 커스텀 도메인 (예: `https://media.<도메인>`). 응답의 사진 URL 앞부분 |
+| `MEDIA_ORIGINALS_HOST_DIR` | 예 | 워커 전용, compose 전용 키. NAS의 원본 사진 폴더 (예: `/volume1/docker/theclimbingnight/media/originals`). 컨테이너 안 `/media/originals`로 마운트되고 앱은 `MEDIA_ORIGINALS_DIR`(기본 같은 값)로 읽는다 |
+| `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_CACHE_PURGE_TOKEN` | 출시 전 | 워커 전용. 숨긴 사진의 CDN 캐시 비우기. 하나라도 비면 비우지 않는다 |
 
-API 환경변수를 추가하면 `apps/api/src/main/resources/application.yml`, `apps/api/.env.example`, 이 표, `.env.example`, `compose.yml`의 api `environment`를 함께 고친다.
+API·워커 환경변수를 추가하면 `apps/api/src/main/resources/application.yml`, `apps/api/.env.example`, 이 표, `.env.example`, `compose.yml`의 api·worker `environment`를 함께 고친다.
 
 ## 6. 메모리
 
@@ -157,10 +162,11 @@ API 환경변수를 추가하면 `apps/api/src/main/resources/application.yml`, 
 |---|---|---|
 | nginx | 32m | 8MiB |
 | api | 768m | 411MiB (`-Xmx512m`) |
+| worker | 512m | — (`-Xmx256m`, ffmpeg 포함. 로컬 실측은 첫 사진 처리 뒤 채운다) |
 | web | 256m | 41MiB |
 | mysql | 512m | 285MiB (`innodb-buffer-pool-size=128M`) |
 | cloudflared | 64m | — |
-| 합계 상한 | 약 1.6GB | |
+| 합계 상한 | 약 2.1GB | |
 
 NAS 여유는 약 4.4GB(2026-11-23 실측)다. 다른 프로젝트와 같이 쓰므로 한도를 올리기 전에 `free -m`을 확인한다.
 
@@ -170,7 +176,7 @@ NAS 여유는 약 4.4GB(2026-11-23 실측)다. 다른 프로젝트와 같이 쓰
 
 ```sh
 docker compose -p tcn-local -f deploy/compose.yml -f deploy/compose.build.yml --env-file <임시 파일> \
-  up -d --build --wait mysql api web nginx
+  up -d --build --wait mysql api worker web nginx
 docker exec tcn-local-nginx-1 wget -qO- http://127.0.0.1/api/v1/health
 docker compose -p tcn-local -f deploy/compose.yml -f deploy/compose.build.yml --env-file <임시 파일> down -v --rmi local
 ```
@@ -206,6 +212,12 @@ cloudflared는 실제 터널 토큰이 있어야 하므로 로컬에서는 띄�
 - [ ] **EAS `production` 환경변수** (`pnpm dlx eas-cli env:create --environment production`)
   - `EXPO_PUBLIC_API_URL=https://<PUBLIC_HOST>` (`EXPO_PUBLIC_WEB_URL`은 비움 — 같은 주소)
   - `EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY`, `EXPO_PUBLIC_NAVER_CLIENT_ID`, `EXPO_PUBLIC_NAVER_CLIENT_SECRET`, `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`, `EAS_PROJECT_ID`, `GOOGLE_SERVICES_JSON`
+- [ ] **사진 피드 (R2·NAS)**
+  - R2 버킷 두 개: `media-incoming`(비공개)과 `media-public`. `media-incoming`에는 수명 주기 규칙으로 `uploads/` 접두사 객체를 1일 뒤 삭제 (`quarantine/`에는 규칙을 걸지 않는다). 이름을 바꿨다면 `R2_MEDIA_INCOMING_BUCKET`, `R2_MEDIA_PUBLIC_BUCKET`에 그대로 넣는다.
+  - `media-public`에 커스텀 도메인 `media.<도메인>` 연결 (Settings → Custom Domains). `MEDIA_PUBLIC_BASE_URL=https://media.<도메인>`. `r2.dev` 공개 주소는 켜지 않는다.
+  - R2 API 토큰: 위 두 버킷에만 Object Read & Write → `R2_MEDIA_ACCESS_KEY_ID`, `R2_MEDIA_SECRET_ACCESS_KEY`. 계정 ID는 기존 `R2_ACCOUNT_ID`.
+  - Cloudflare API 토큰(My Profile → API Tokens): 해당 Zone의 Cache Purge 권한만 → `CLOUDFLARE_CACHE_PURGE_TOKEN`, Zone ID(도메인 Overview 오른쪽)는 `CLOUDFLARE_ZONE_ID`.
+  - NAS 원본 폴더: `mkdir -p /volume1/docker/theclimbingnight/media/originals` 후 컨테이너 `app` 사용자가 쓸 수 있게 한다. `app`의 uid는 `docker compose run --rm --no-deps --entrypoint id worker app`으로 확인하고 `chown <uid>:<gid>` 한다. 경로를 `MEDIA_ORIGINALS_HOST_DIR`에 넣는다. 이 폴더는 원본 보관소이니 DB 백업과 별도로 백업한다.
 - [ ] **스토어 등록 주소**
   - 개인정보처리방침: `https://<PUBLIC_HOST>/app/privacy`
   - 계정 삭제 안내(Google Play 데이터 보안): `https://<PUBLIC_HOST>/app/privacy#account-deletion`

@@ -95,10 +95,10 @@ A를 고른 이유: 국내 사용자에게 필요한 카카오 로그인은 Fire
 | api | 1 | 768MB | `-Xmx512m -XX:+ExitOnOutOfMemoryError` |
 | web | 1 | 256MB | Next.js standalone |
 | mysql | 1 | 512MB | 프로젝트 전용 인스턴스 (제안). 기존 MySQL 통합은 별도 작업 |
-| worker | 2 | 512MB | 작업 큐에서 한 번에 하나씩 처리 |
+| worker | 2 | 512MB | 작업 큐에서 한 번에 하나씩 처리. `-Xmx256m`, ffmpeg 별도 프로세스 포함 |
 | redis | 3 | 64MB | DM 세션·pub/sub |
 
-1단계 합계 상한 약 1.6GB (로컬 실측 기동 직후 약 750MB, `deploy/README.md` 6장). 현재 NAS 여유 약 4.4GB.
+1단계 합계 상한 약 1.6GB, 2단계 사진 워커를 더하면 약 2.1GB (로컬 실측 기동 직후 약 750MB, `deploy/README.md` 6장). 현재 NAS 여유 약 4.4GB.
 
 ### 도메인 (제안)
 

@@ -1,6 +1,6 @@
 # 집 서버(Synology NAS) 운영 구성. 사용법은 deploy/README.md.
 #   docker compose -f deploy/compose.yml --env-file deploy/.env up -d
-# api·web 이미지는 GitHub Actions(.github/workflows/deploy.yml)가 GHCR에 올린 것을 받는다.
+# api·web·worker 이미지는 GitHub Actions(.github/workflows/deploy.yml)가 GHCR에 올린 것을 받는다.
 # IMAGE_TAG(커밋 SHA)는 워크플로가 deploy/.env 에 써 넣는다. 비어 있으면 latest.
 # 로컬에서 소스로 빌드할 때만 compose.build.yml 을 겹친다 (README 7장).
 # 호스트에 여는 포트는 없다. 외부 요청은 cloudflared(Cloudflare Tunnel) → nginx 로만 들어온다.
@@ -61,6 +61,13 @@ services:
       APPLE_KEY_ID: ${APPLE_KEY_ID:-}
       APPLE_PRIVATE_KEY: ${APPLE_PRIVATE_KEY:-}
       EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+      # 사진 피드 R2. 다섯 개 중 하나라도 비면 사진 올리기가 꺼진다(MEDIA_UNAVAILABLE). R2_ACCOUNT_ID는 백업과 같은 키.
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_MEDIA_ACCESS_KEY_ID: ${R2_MEDIA_ACCESS_KEY_ID:-}
+      R2_MEDIA_SECRET_ACCESS_KEY: ${R2_MEDIA_SECRET_ACCESS_KEY:-}
+      R2_MEDIA_INCOMING_BUCKET: ${R2_MEDIA_INCOMING_BUCKET:-}
+      R2_MEDIA_PUBLIC_BUCKET: ${R2_MEDIA_PUBLIC_BUCKET:-}
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-}
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError
     depends_on:
       mysql:
@@ -74,6 +81,41 @@ services:
     # Spring 기본 graceful 종료(30초)가 끝날 때까지 기다린다. 대기 중인 푸시 발송도 이때 마친다.
     stop_grace_period: 40s
     mem_limit: 768m
+    logging: *logging
+    restart: unless-stopped
+
+  worker:
+    image: ghcr.io/withbbang/theclimbingnight-worker:${IMAGE_TAG:-latest}
+    environment:
+      # 이미지가 prod,worker 로 맞춰 두지만 api와 같이 명시한다. 웹 서버·Flyway·@Scheduled 는 worker 프로필이 끈다.
+      SPRING_PROFILES_ACTIVE: prod,worker
+      TZ: Asia/Seoul
+      DB_URL: jdbc:mysql://mysql:3306/theclimbingnight
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?deploy/.env에 JWT_SECRET을 넣으세요}
+      # 사진 피드 R2. 다섯 개 중 하나라도 비면 사진 올리기가 꺼진다(MEDIA_UNAVAILABLE). R2_ACCOUNT_ID는 백업과 같은 키.
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_MEDIA_ACCESS_KEY_ID: ${R2_MEDIA_ACCESS_KEY_ID:-}
+      R2_MEDIA_SECRET_ACCESS_KEY: ${R2_MEDIA_SECRET_ACCESS_KEY:-}
+      R2_MEDIA_INCOMING_BUCKET: ${R2_MEDIA_INCOMING_BUCKET:-}
+      R2_MEDIA_PUBLIC_BUCKET: ${R2_MEDIA_PUBLIC_BUCKET:-}
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-}
+      MEDIA_ORIGINALS_DIR: /media/originals
+      # 숨긴 사진의 CDN 캐시 비우기. 둘 중 하나라도 비면 비우지 않는다.
+      CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID:-}
+      CLOUDFLARE_CACHE_PURGE_TOKEN: ${CLOUDFLARE_CACHE_PURGE_TOKEN:-}
+      JAVA_TOOL_OPTIONS: -Xms64m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError
+    volumes:
+      # NAS의 원본 사진 폴더. 컨테이너 app 사용자가 쓸 수 있어야 한다 (README 8장)
+      - ${MEDIA_ORIGINALS_HOST_DIR:?deploy/.env에 MEDIA_ORIGINALS_HOST_DIR을 넣으세요}:/media/originals
+    # api가 Flyway를 끝내고 healthy 가 된 뒤에 뜬다. 웹 포트가 없으니 healthcheck 는 두지 않는다.
+    depends_on:
+      api:
+        condition: service_healthy
+    # 종료 때 진행 중인 작업을 마친다. PROCESS 작업은 ffmpeg 를 최대 2번(각 30초) 돌리므로 40초로는 모자라다.
+    stop_grace_period: 90s
+    mem_limit: 512m
     logging: *logging
     restart: unless-stopped
 

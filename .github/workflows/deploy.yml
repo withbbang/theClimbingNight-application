@@ -34,7 +34,13 @@ jobs:
       packages: write
     strategy:
       matrix:
-        app: [api, web]
+        include:
+          - app: api
+            target: api
+          - app: web
+            target: ""
+          - app: worker
+            target: worker
     steps:
       - uses: actions/checkout@v4
 
@@ -54,7 +60,9 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: apps/${{ matrix.app }}
+          # worker 는 api 와 같은 소스에서 ffmpeg 를 더한 타깃이다
+          context: apps/${{ matrix.app == 'web' && 'web' || 'api' }}
+          target: ${{ matrix.target }}
           push: true
           # Synology DS1520+ (x86_64)
           platforms: linux/amd64
@@ -120,7 +128,7 @@ jobs:
             if [ ! -f "$ENV_FILE" ]; then echo "::error::deploy/.env 가 없습니다 — deploy/README.md 1-2"; exit 1; fi
             # 컨테이너를 건드리기 전에 필수 값을 확인한다. 따옴표·공백만 있는 값도 비어 있는 것으로 본다.
             missing=""
-            for key in JWT_SECRET DB_PASSWORD MYSQL_ROOT_PASSWORD CLOUDFLARE_TUNNEL_TOKEN PUBLIC_HOST; do
+            for key in JWT_SECRET DB_PASSWORD MYSQL_ROOT_PASSWORD CLOUDFLARE_TUNNEL_TOKEN PUBLIC_HOST MEDIA_ORIGINALS_HOST_DIR; do
               val=$(grep "^$key=" "$ENV_FILE" | tail -n 1 | cut -d= -f2- | tr -d "\"' \t\r")
               [ -z "$val" ] && missing="$missing $key"
             done
@@ -129,7 +137,7 @@ jobs:
             if grep -q '^IMAGE_TAG=' "$ENV_FILE"; then sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${{ github.sha }}/" "$ENV_FILE"; else echo "IMAGE_TAG=${{ github.sha }}" >> "$ENV_FILE"; fi
             if docker ps >/dev/null 2>&1; then DOCKER=docker; else DOCKER="sudo -n /usr/local/bin/docker"; fi
             DC="$DOCKER compose -f deploy/compose.yml --env-file $ENV_FILE"
-            $DC pull api web
+            $DC pull api web worker
             $DC up -d --remove-orphans
             # api 가 healthy 가 될 때까지 최대 5분 기다린다. 아니면 로그를 남기고 실패한다.
             for i in $(seq 1 60); do
