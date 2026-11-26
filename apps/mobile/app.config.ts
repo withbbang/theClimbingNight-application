@@ -64,6 +64,15 @@ export default function createConfig(): ExpoConfig {
       './plugins/with-config-changes',
       'expo-secure-store',
       'expo-image',
+      [
+        'expo-image-picker',
+        {
+          photosPermission: '게시물에 올릴 사진을 고르려고 사진 보관함에 접근해요.',
+          // 카메라로 찍어 올리기는 아직 없다.
+          cameraPermission: false,
+          microphonePermission: false,
+        },
+      ],
       'expo-apple-authentication',
       ['expo-notifications', { color: '#FFC83D', defaultChannel: 'default' }],
       [

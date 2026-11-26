@@ -120,3 +120,82 @@ it('refetches the feed when the session changes', async () => {
   expect(screen.queryByText('4번째 글')).toBeNull();
   expect(screen.getByText(LOGIN_CARD)).toBeOnTheScreen();
 });
+
+describe('my posts in progress', () => {
+  const MINE = '/posts/mine/in-progress';
+
+  it('shows the + button only when signed in', async () => {
+    // given
+    await startAs(null);
+    const server = mockServer({ [FIRST]: ok({ items: three, nextCursor: null }) });
+
+    // when
+    await renderApp('/feed');
+
+    // then: 비로그인은 올리기 버튼이 없고 내 글을 묻지 않는다.
+    expect(screen.queryByRole('button', { name: '사진 올리기' })).toBeNull();
+    expect(server.count(MINE)).toBe(0);
+  });
+
+  it('shows the + button and my failed post with a delete button', async () => {
+    // given
+    await startAs('USER');
+    const server = mockServer({
+      [FIRST]: ok({ items: three, nextCursor: null }),
+      [MINE]: ok([post({ id: 9, status: 'FAILED', mine: true, publishedAt: null })]),
+      'DELETE /posts/9': { status: 204 },
+    });
+    await renderApp('/feed');
+    expect(screen.getByRole('button', { name: '사진 올리기' })).toBeOnTheScreen();
+    expect(screen.getByText('올리지 못했어요')).toBeOnTheScreen();
+
+    // when
+    await fireEvent.press(screen.getByRole('button', { name: '올리지 못한 글 삭제' }));
+    await flush();
+    await fireEvent.press(screen.getByRole('button', { name: '올리지 못한 글 삭제 확정' }));
+    await flush();
+
+    // then
+    expect(server.count('DELETE /posts/9')).toBe(1);
+  });
+
+  it('polls every 10 seconds while a post is pending and refreshes the feed when done', async () => {
+    // given: 처음 두 번은 정리 중이고, 세 번째에 끝난다.
+    await startAs('USER');
+    let polls = 0;
+    const server = mockServer({
+      [FIRST]: ok({ items: three, nextCursor: null }),
+      [MINE]: () => {
+        polls += 1;
+        return ok(polls < 3 ? [post({ id: 9, status: 'PENDING', mine: true })] : []);
+      },
+    });
+    await renderApp('/feed');
+    expect(screen.getByText('사진 정리 중…')).toBeOnTheScreen();
+    const feedLoads = server.count(FIRST);
+
+    // when
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10_000);
+    });
+    await flush();
+
+    // then
+    expect(server.count(MINE)).toBe(2);
+    expect(server.count(FIRST)).toBe(feedLoads);
+
+    // when: 정리가 끝나면
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10_000);
+    });
+    await flush();
+
+    // then: 안내가 사라지고 피드를 다시 받으며 더 묻지 않는다.
+    expect(screen.queryByText('사진 정리 중…')).toBeNull();
+    expect(server.count(FIRST)).toBe(feedLoads + 1);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(30_000);
+    });
+    expect(server.count(MINE)).toBe(3);
+  });
+});

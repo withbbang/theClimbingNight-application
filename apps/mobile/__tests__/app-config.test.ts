@@ -108,3 +108,15 @@ it('ships the icon files the config points to', () => {
     require('../assets/splash-icon.png'),
   ]).not.toThrow();
 });
+
+it('asks only for the photo library to pick post photos', () => {
+  // when
+  const config = load({});
+
+  // then: 카메라·마이크 권한은 넣지 않는다.
+  expect(pluginOptions(config, 'expo-image-picker')).toEqual({
+    photosPermission: '게시물에 올릴 사진을 고르려고 사진 보관함에 접근해요.',
+    cameraPermission: false,
+    microphonePermission: false,
+  });
+});

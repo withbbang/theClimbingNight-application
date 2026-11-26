@@ -1,9 +1,12 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
 import { ImagesSquareIcon } from 'phosphor-react-native/src/icons/ImagesSquare';
+import { PlusIcon } from 'phosphor-react-native/src/icons/Plus';
+import Animated, { useReducedMotion, ZoomIn } from 'react-native-reanimated';
 
+import { InProgressPosts } from '@/components/feed/InProgressPosts';
 import { LoginToSeeMore } from '@/components/feed/LoginToSeeMore';
 import { PostCard } from '@/components/feed/PostCard';
 import { AppText } from '@/components/ui/AppText';
@@ -13,6 +16,7 @@ import { Notice } from '@/components/ui/Notice';
 import { PagedList } from '@/components/ui/PagedList';
 import { Screen } from '@/components/ui/Screen';
 import { useFeed } from '@/hooks/use-feed';
+import { usePressScale } from '@/hooks/use-press-scale';
 import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -36,6 +40,35 @@ function FeedEmpty({ signedIn }: { signedIn: boolean }) {
   );
 }
 
+/** 오른쪽 위의 올리기 버튼. 홀드 모양으로 튀어나온다. */
+function NewPostButton() {
+  const router = useRouter();
+  const { colors, motion } = useTheme();
+  const reduced = useReducedMotion();
+  const press = usePressScale(0.9);
+  return (
+    <Animated.View
+      entering={
+        reduced
+          ? undefined
+          : ZoomIn.springify().damping(motion.spring.damping).stiffness(motion.spring.stiffness)
+      }
+      style={press.style}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="사진 올리기"
+        hitSlop={8}
+        onPress={() => router.push('/posts/new')}
+        {...press.handlers}
+        style={[styles.add, { backgroundColor: colors.accent }]}
+      >
+        <PlusIcon size={24} color={colors.onAccent} weight="bold" />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export default function FeedScreen() {
   const { space } = useTheme();
   const router = useRouter();
@@ -46,9 +79,13 @@ export default function FeedScreen() {
   return (
     <Screen bottomInset={false}>
       <View style={[styles.fill, { gap: space(4) }]}>
-        <AppText variant="display" accessibilityRole="header">
-          피드
-        </AppText>
+        <View style={styles.header}>
+          <AppText variant="display" accessibilityRole="header">
+            피드
+          </AppText>
+          {signedIn ? <NewPostButton /> : null}
+        </View>
+        {signedIn ? <InProgressPosts /> : null}
         <PagedList
           query={query}
           label="피드 게시물"
@@ -71,4 +108,18 @@ export default function FeedScreen() {
   );
 }
 
-const styles = StyleSheet.create({ fill: { flex: 1 } });
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  add: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // FloatingIcon과 같은 홀드 모양.
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 22,
+    borderBottomLeftRadius: 16,
+  },
+});
