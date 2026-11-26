@@ -71,6 +71,7 @@ description: apps/api 와 apps/mobile · apps/web 이 공유하는 REST 규약 �
 
 - `REPORT_SELF`는 내 글뿐 아니라 나 자신(사용자 대상)을 신고해도 같은 코드다.
 - 401은 두 종류다. `AUTH_REQUIRED`는 세션이 없거나 만료된 것이라 로그인 화면으로 보내고, `AUTH_INVALID_SOCIAL_TOKEN`은 소셜 토큰 검증 실패라 세션 만료가 아니다.
+- `@PublicApi` 엔드포인트도 `Authorization` 헤더가 있는데 무효·만료면 401 `AUTH_REQUIRED`를 준다. 헤더가 아예 없을 때만 비로그인으로 처리한다.
 - 리프레시 토큰은 회전하며 한 번만 쓸 수 있다. 클라이언트는 리프레시 요청을 single-flight(동시에 하나만)로 보내야 한다. 같은 토큰의 중복 요청은 `AUTH_REQUIRED`(401)를 받는다.
 
 도메인별 코드는 기능을 만들 때 이 표에 추가한다.

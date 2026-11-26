@@ -70,14 +70,15 @@ A를 고른 이유: 국내 사용자에게 필요한 카카오 로그인은 Fire
 [iOS/Android 앱 (Expo)]
    │  HTTPS (API, JWT)                       │ 미디어 PUT (presigned URL) / GET
    ▼                                         ▼
-[Cloudflare Tunnel]                    [Cloudflare R2]
-   │                                     ├─ incoming/  (업로드 원본, 처리 후 삭제)
-   ▼                                     └─ public/    (압축본·썸네일, 공개 도메인)
+[Cloudflare Tunnel]                    [Cloudflare R2 버킷 둘]
+   │                                     ├─ media-incoming (비공개)
+   ▼                                     │    uploads/ 업로드 원본(1일 뒤 삭제), quarantine/ 숨긴 사진
+                                         └─ media-public (압축본·썸네일, media.<도메인>)
 [NAS: Docker Compose]                        ▲
    ├─ nginx ──┬─ /api/*  → api (Spring)      │
    │          └─ /*      → web (Next.js)      │
    ├─ api      Spring Boot (REST, 2단계부터 WebSocket)
-   ├─ worker   미디어 처리 (ffmpeg + VAAPI, 2단계) ── 원본 다운로드·NAS 보관·변환·R2 업로드
+   ├─ worker   미디어 처리 (ffmpeg, 2단계) ── 원본 다운로드·NAS 보관·변환·R2 업로드·숨김 격리
    ├─ mysql    MySQL 8.4
    └─ redis    (2단계 DM부터. 1단계엔 두지 않음)
         │
@@ -95,7 +96,7 @@ A를 고른 이유: 국내 사용자에게 필요한 카카오 로그인은 Fire
 | api | 1 | 768MB | `-Xmx512m -XX:+ExitOnOutOfMemoryError` |
 | web | 1 | 256MB | Next.js standalone |
 | mysql | 1 | 512MB | 프로젝트 전용 인스턴스 (제안). 기존 MySQL 통합은 별도 작업 |
-| worker | 2 | 512MB | 작업 큐에서 한 번에 하나씩 처리. `-Xmx256m`, ffmpeg 별도 프로세스 포함 |
+| worker | 2 | 512MB | 작업 큐에서 한 번에 하나씩 처리. `-Xmx256m`, ffmpeg 별도 프로세스 포함. `api`와 같은 코드의 `worker` 프로필(웹 서버·Flyway·`@Scheduled` 없음) |
 | redis | 3 | 64MB | DM 세션·pub/sub |
 
 1단계 합계 상한 약 1.6GB, 2단계 사진 워커를 더하면 약 2.1GB (로컬 실측 기동 직후 약 750MB, `deploy/README.md` 6장). 현재 NAS 여유 약 4.4GB.
@@ -328,18 +329,24 @@ app_settings                         -- 앱 업데이트 없이 바꾸는 값
   -- somoim_join_url, smartstore_url 등
 ```
 
-### 2단계 (방향만)
+### 2단계
+
+정본은 `docs/superpowers/specs/2026-11-26-phase2-feed-design.md` 9장이다. 요약:
 
 ```
-posts            id, author_id, body, visibility, status, created_at
-post_media       id, post_id, type(IMAGE, VIDEO), status(UPLOADING, PROCESSING, READY, FAILED),
-                 incoming_key, original_path(NAS), display_key, thumbnail_key, width, height, duration_ms, sort_order
-comments         id, post_id, author_id, parent_id(nullable, 대댓글 1단계까지), body, deleted_at
-post_likes       post_id, user_id  PK(post_id, user_id)
-reports          id, reporter_id, target_type(POST, COMMENT, USER), target_id, reason, status, handled_by
-user_blocks      blocker_id, blocked_id  PK(blocker_id, blocked_id)
-media_jobs       id, post_media_id, status, attempts, last_error   -- 워커 작업 큐 (DB 폴링)
+posts          id, author_id, body, status(DRAFT, PENDING, VISIBLE, FAILED, HIDDEN_PENDING, HIDDEN),
+               like_count, comment_count, published_at, deleted_at
+post_media     id, post_id, type, status(UPLOADING, PROCESSING, READY, FAILED), sort_order,
+               upload_key, original_path(NAS 상대 경로), display_key, thumb_key, width, height, byte_size
+media_jobs     id, kind(PROCESS, QUARANTINE, RELEASE, DELETE_MEDIA, PURGE_ORIGINAL), target_id,
+               status(QUEUED, RUNNING, DONE, FAILED), attempts, next_run_at, last_error   -- 워커 작업 큐 (DB 폴링)
+reports        id, reporter_id, target_type, target_id, reason, detail, status(OPEN, ACTIONED, DISMISSED)
+               UNIQUE(reporter_id, target_type, target_id)
+user_blocks    blocker_id, blocked_id  PK(blocker_id, blocked_id)
+comments, post_likes, profile_images   -- 2번 계획(좋아요·댓글·프로필)에서 추가
 ```
+
+작업 종류는 설계 문서 8장을 따른다. 우선순위는 `QUARANTINE`·`DELETE_MEDIA` > `RELEASE` > `PROCESS` > `PURGE_ORIGINAL`이다.
 
 3단계 DM(`dm_rooms`, `dm_messages`, `dm_reads`)은 그때 설계한다.
 
@@ -366,11 +373,14 @@ media_jobs       id, post_media_id, status, attempts, last_error   -- 워커 작
 
 ### 미디어 처리 (2단계)
 
-1. 앱이 사진은 리사이즈(긴 변 2048px), 영상은 압축(720p, 최대 60초) 후 API에 업로드 요청.
-2. API가 `post_media`(UPLOADING)를 만들고 R2 `incoming/` presigned PUT URL을 준다.
-3. 앱이 R2에 직접 올리고 API에 완료를 알린다 → `media_jobs` 생성, PROCESSING.
-4. worker가 작업을 하나씩 가져와 R2에서 원본을 받아 NAS에 보관 → 표시용(이미지: WebP 여러 크기, 영상: H.264 MP4 + 썸네일, VAAPI 하드웨어 인코딩) 생성 → R2 `public/`에 업로드 → `incoming/` 원본 삭제 → READY.
-5. 실패하면 3회 재시도 후 FAILED, 앱에 실패 표시.
+사진만 지금 구현돼 있고 영상은 3번 계획이다. 세부는 설계 문서 8장이 정본이다.
+
+1. 앱이 사진을 JPEG로 리사이즈(긴 변 2048px)해 API에 게시물 초안과 업로드 URL을 요청한다.
+2. API가 `posts`(DRAFT)와 `post_media`(UPLOADING)를 만들고 R2 `media-incoming`의 `uploads/` presigned PUT URL(15분)을 준다.
+3. 앱이 R2에 직접 올리고 API에 게시를 알린다 → API가 HEAD로 확인한 뒤 `PROCESS` 작업을 만들고 게시물 PENDING.
+4. worker가 작업을 하나씩 조건부 UPDATE로 가져와 R2에서 원본을 받아 NAS에 보관 → WebP 두 크기(1080px, 480px, 메타데이터 제거) 생성 → `media-public`에 업로드 → `uploads/` 원본 삭제 → READY. 모두 READY면 게시물 VISIBLE.
+5. 실패하면 1분 → 5분 뒤에 다시 하고 3번째 실패에서 FAILED. `RUNNING`으로 10분 넘은 작업은 다시 큐에 넣는다.
+6. 숨김(`HIDDEN_PENDING`·`HIDDEN`)이면 `QUARANTINE`이 공개본을 비공개 버킷의 `quarantine/`으로 옮기고 Cloudflare 캐시를 비운다. 운영진은 5분짜리 presigned GET으로 격리된 사진을 본다. 복원하면 `RELEASE`가 새 키로 다시 공개한다. 삭제는 `DELETE_MEDIA`가 공개본을 지우고, NAS 원본은 30일 뒤 `PURGE_ORIGINAL`이 지운다.
 
 ### 굿즈 (1단계)
 
@@ -388,7 +398,7 @@ media_jobs       id, post_media_id, status, attempts, last_error   -- 워커 작
 | 소셜 로그인 시 Apple 로그인 (4.8) | iOS에 카카오·네이버·구글과 함께 Apple 로그인 | 1 |
 | 최소 기능, 웹뷰 래퍼 금지 (4.2) | 핵심 화면은 네이티브 | 1 |
 | 개인정보처리방침 URL | 웹뷰 페이지, 스토어 등록 | 1 |
-| UGC 신고·차단·운영자 조치 (1.2) | 신고, 차단, 운영자 숨김 처리 | 2 (피드와 함께) |
+| UGC 신고·차단·운영자 조치 (1.2) | 게시물 신고(사유 선택), 회원 차단(양방향 숨김), 운영진 신고 목록에서 숨김·복원·기각, 초상권 신고 1건 또는 서로 다른 3명 신고 시 자동 임시조치 | 2 (피드와 함께, 댓글 신고는 2번 계획) |
 | 심사용 테스트 계정 | 심사 전 MEMBER 테스트 계정 준비 (카카오 로그인만으로는 심사자가 못 들어올 수 있음) | 1 |
 
 ## 13. 결정 기록

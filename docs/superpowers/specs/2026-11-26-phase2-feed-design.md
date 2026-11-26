@@ -101,7 +101,7 @@
 
 | 버킷 | 공개 | 내용 | 수명 주기 |
 |---|---|---|---|
-| `media-incoming` | 비공개 | 앱이 presigned PUT으로 올린 원본 | 1일 뒤 삭제 (처리 못 한 찌꺼기 정리) |
+| `media-incoming` | 비공개 | `uploads/`: 앱이 presigned PUT으로 올린 원본. `quarantine/`: 숨긴 사진의 공개본 | `uploads/`만 1일 뒤 삭제 (처리 못 한 찌꺼기 정리). `quarantine/`은 없음 |
 | `media-public` | `media.<도메인>` | WebP·MP4·썸네일 | 없음 |
 | 기존 백업 버킷 | 비공개 | DB 백업 | 30일 (변경 없음) |
 
@@ -110,16 +110,21 @@
 - DB에는 R2 키만 저장하고, URL은 응답할 때 `MEDIA_PUBLIC_BASE_URL` + 키로 만든다. 도메인을 바꿔도 데이터 이전이 없다 (제안).
 - 운영에는 `media.<도메인>` 커스텀 도메인이 필요하다(`r2.dev` 주소는 요청 제한이 있는 개발용). 도메인 구매·연결은 1번 작업 출시의 선행 조건이며 `deploy/README.md` 8장의 도메인 항목과 같이 처리한다. 개발 중에는 `r2.dev` 주소를 쓴다.
 - 키에는 추측 가능한 ID 대신 무작위 값(UUID)을 쓴다.
-- **숨기면 URL로도 바로 막는다 (결정)**: 자동 임시조치(`HIDDEN_PENDING`), 운영진 숨김(`HIDDEN`), 삭제 모두 즉시 `DELETE_PUBLIC` 작업을 만든다. 워커는 R2 `media-public`에서 변환본을 지우고, Cloudflare API로 그 URL들의 캐시를 비운다(URL 단위 purge, 무료 플랜 가능). 운영진이 복원(신고 기각)하면 `REBUILD` 작업이 NAS 원본에서 변환본을 새 키로 다시 만들고, 다 되면 다시 보인다. 새 키를 쓰므로 예전 URL은 되살아나지 않는다.
-- 숨김·삭제 작업은 변환 작업보다 먼저 가져간다(작업 우선순위). 캐시 비우기가 실패하면 재시도하고, 3회 실패하면 운영진 신고 목록에 "캐시 비우기 실패"로 표시한다.
+- **숨기면 URL로도 바로 막는다 (결정)**: 자동 임시조치(`HIDDEN_PENDING`), 운영진 숨김(`HIDDEN`)은 `QUARANTINE` 작업을, 삭제는 `DELETE_MEDIA` 작업을 즉시 만든다. 워커는 `media-public`의 공개본을 비공개 버킷 `media-incoming`의 `quarantine/{공개 키}`로 옮기고(복사 후 삭제) Cloudflare API로 그 URL들의 캐시를 비운다(URL 단위 purge, 무료 플랜 가능). 처음 설계는 공개본을 지우고 복원 때 NAS 원본에서 다시 만드는 것이었으나, 그러면 운영진이 신고된 사진을 볼 방법이 없어 격리로 바꿨다. 운영진은 신고 목록에서 5분짜리 presigned GET으로 격리된 사진을 보고 숨김·복원·기각을 판단한다.
+- **복원**: 운영진이 복원하거나 자동 숨김 글의 신고를 기각하면 `RELEASE` 작업이 격리본을 **새 키**로 공개 버킷에 복사하고 예전 공개본을 지운다. 새 키를 쓰므로 예전 URL은 되살아나지 않는다. 격리본이 없으면(처리 전에 숨겨진 사진) NAS 원본에서, 그것도 없으면 `uploads/`의 업로드 객체에서 다시 변환한다. 셋 다 없으면 사진과 게시물이 `FAILED`가 된다.
+- 기각(`DISMISS`)은 자동 숨김(`HIDDEN_PENDING`) 글을 복원한다(숨길 이유가 없다는 뜻). 운영진이 확정 숨김한 `HIDDEN` 글은 신고만 닫고 숨김은 유지한다. 이미 숨겨졌거나 `FAILED`인 글을 신고하면 API는 404를 주고, 앱은 접수된 것처럼 안내한다.
+- **작업 종류와 우선순위**: `QUARANTINE`·`DELETE_MEDIA`(0) > `RELEASE`(1) > `PROCESS`(2) > `PURGE_ORIGINAL`(3). 숨김·삭제는 아직 `QUEUED`인 `PROCESS`를 취소한다. `PURGE_ORIGINAL`은 삭제 30일 뒤 NAS 원본을 지운다.
+- 워커는 처리 중에도 게시물 상태를 다시 읽는다. 업로드 전후에 `PENDING`이 아니면 방금 올린 공개 사본을 지운다.
+- 캐시 비우기가 실패하면 작업이 재시도되고, 3번째 실패에서 `FAILED`가 된다. 운영진 신고 목록에는 "캐시 비우기 실패"(`cleanupFailed`)로 표시한다.
+- **알려진 한계**: 사진이 처리되기 전에 숨겨진 글을 업로드 객체 수명(1일)이 지난 뒤 복원하면 NAS 원본도 격리본도 없어 `FAILED`가 된다. 작성자가 다시 올려야 한다.
 
 ### 흐름
 
 1. 앱: 사진은 편집 결과를 JPEG로 긴 변 2048px, 영상은 720p·최대 60초로 압축 **(architecture.md 결정)**.
 2. 앱 → API `게시물 초안 만들기`(미디어 개수·종류·크기) → `posts`(DRAFT) + `post_media`(UPLOADING)마다 presigned PUT URL(유효 15분, Content-Type·최대 크기 고정: 사진 15MB, 영상 150MB).
 3. 앱이 R2 `media-incoming`에 직접 올린다. 다 올리면 API `게시물 확정`(본문 포함) → API가 R2 HEAD로 각 객체 존재·크기를 확인 → `media_jobs` 생성, 미디어 PROCESSING, 게시물 PENDING.
-4. worker가 작업을 하나씩 가져와(`SELECT ... FOR UPDATE SKIP LOCKED`, 동시성 1): 원본 다운로드 → NAS 저장 → 변환 → `media-public` 업로드 → incoming 원본 삭제 → READY. 게시물의 미디어가 모두 READY면 게시물 VISIBLE, `published_at` 기록.
-5. 실패하면 지수 백오프로 3회 재시도 후 FAILED. 워커가 처리 중 죽으면 `locked_at`이 10분 지난 작업을 다시 가져간다.
+4. worker가 작업을 하나씩 가져와(조건부 `UPDATE ... WHERE id=? AND status='QUEUED'`로 선점, 동시성 1): 원본 다운로드 → NAS 저장 → 변환 → `media-public` 업로드 → incoming 원본 삭제 → READY. 게시물의 미디어가 모두 READY면 게시물 VISIBLE, `published_at` 기록.
+5. 실패하면 1분 → 5분 뒤에 다시 하고, 3번째 실패에서 FAILED. 워커가 처리 중 죽어 `RUNNING`으로 10분 넘게 있는 작업은 다시 `QUEUED`로 돌린다(시도 횟수는 늘어난다).
 6. DRAFT로 24시간 지난 게시물은 정리 작업이 지운다.
 
 ### 변환 결과 (제안)
@@ -149,7 +154,7 @@ posts           id, author_id, body, status(DRAFT, PENDING, VISIBLE, FAILED, HID
 post_media      id, post_id, type(IMAGE, VIDEO), status(UPLOADING, PROCESSING, READY, FAILED),
                 sort_order, incoming_key, original_path, display_key, thumbnail_key,
                 width, height, duration_ms, byte_size
-media_jobs      id, kind(PROCESS, DELETE_PUBLIC, REBUILD), target_type(POST_MEDIA, PROFILE_IMAGE), target_id,
+media_jobs      id, kind(PROCESS, QUARANTINE, RELEASE, DELETE_MEDIA, PURGE_ORIGINAL), target_type(POST_MEDIA, PROFILE_IMAGE), target_id,
                 status(QUEUED, RUNNING, DONE, FAILED), attempts, next_run_at, locked_at, last_error
 profile_images  id, user_id, status, incoming_key, original_path, large_key, small_key   -- users.profile_image_id로 현재 것 지정
 comments        id, post_id, author_id, parent_id(nullable), body, status(VISIBLE, HIDDEN_PENDING, HIDDEN), deleted_at
@@ -184,7 +189,7 @@ user_blocks     blocker_id, blocked_id, created_at   PK(blocker_id, blocked_id)
 
 ## 12. 인프라·문서 변경
 
-- 환경변수(API·워커): `R2_ACCOUNT_ID`(기존 키 재사용), `R2_MEDIA_ACCESS_KEY_ID`, `R2_MEDIA_SECRET_ACCESS_KEY`, `R2_MEDIA_INCOMING_BUCKET`, `R2_MEDIA_PUBLIC_BUCKET`, `MEDIA_PUBLIC_BASE_URL`, `MEDIA_ORIGINALS_DIR`(워커), `CLOUDFLARE_ZONE_ID`·`CLOUDFLARE_CACHE_PURGE_TOKEN`(워커, Zone → Cache Purge 권한만). CLAUDE.md 규칙대로 `application.yml`·두 `.env.example`·`compose.yml`·`deploy/README.md` 표를 함께 고친다.
+- 환경변수(API·워커): `R2_ACCOUNT_ID`(기존 키 재사용), `R2_MEDIA_ACCESS_KEY_ID`, `R2_MEDIA_SECRET_ACCESS_KEY`, `R2_MEDIA_INCOMING_BUCKET`, `R2_MEDIA_PUBLIC_BUCKET`, `MEDIA_PUBLIC_BASE_URL`, `MEDIA_ORIGINALS_DIR`(워커), `CLOUDFLARE_ZONE_ID`·`CLOUDFLARE_CACHE_PURGE_TOKEN`(워커, Zone → Cache Purge 권한만), `MEDIA_ORIGINALS_HOST_DIR`(compose 전용, NAS 원본 폴더). CLAUDE.md 규칙대로 `application.yml`·두 `.env.example`·`compose.yml`·`deploy/README.md` 표를 함께 고친다.
 - `deploy/compose.yml`에 `worker` 서비스(`mem_limit: 512m`, `/dev/dri`, 원본 볼륨). `deploy.yml`이 워커 이미지도 빌드·배포.
 - `deploy/README.md` 8장에 R2 미디어 버킷·커스텀 도메인·CORS(앱은 CORS가 필요 없지만 웹 관리자 대비 GET만 허용)·수명 주기 설정 추가.
 - `docs/content-todo.md`: 개인정보처리방침에 "피드 최신 게시물 3개는 앱 설치자 누구나 볼 수 있음", 게시물·신고 기록 보관 기간, 임시조치 기준(법률), 이용약관에 게시물 권리·삭제 기준(법률) 추가.
@@ -196,7 +201,7 @@ user_blocks     blocker_id, blocked_id, created_at   PK(blocker_id, blocked_id)
 
 **비로그인 노출**: 전체 공개 / 로그인 필수 / 최신 N개 맛보기(채택, N=3). 초상권·신고 불가 위험을 줄이면서 가입 전 맛보기를 남기려고 사용자가 골랐다.
 
-**숨김 시 공개 사진 처리**: 자동 숨김 즉시 R2 삭제 + 캐시 비우기(채택) / 앱에서만 숨기고 확정 때 삭제. 초상권 신고 즉시 URL로도 막히게 하려고 골랐다. 대가는 Cloudflare 토큰 하나와 복원 시 재변환 (사용자).
+**숨김 시 공개 사진 처리**: 자동 숨김 즉시 비공개 버킷으로 격리 + 캐시 비우기(채택) / 앱에서만 숨기고 확정 때 삭제. 초상권 신고 즉시 URL로도 막히게 하려고 골랐다. 처음에는 R2 삭제 후 복원 시 재변환이었으나, 운영진이 신고된 사진을 볼 수 있어야 해서 격리로 바꿨다. 대가는 Cloudflare 토큰 하나와 비공개 버킷의 격리본 보관 (사용자).
 
 **워커**: API 코드 공유 별도 컨테이너(채택) / API 안에서 변환 / Go·Python 별도 워커. API 안 변환은 ffmpeg가 API와 메모리를 나눠 OOM 위험, 별도 언어는 상태 전이 로직이 두 곳으로 갈라져 1인 개발 유지보수 부담이 커서 제외했다 (사용자).
 

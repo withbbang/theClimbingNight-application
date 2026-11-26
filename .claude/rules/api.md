@@ -23,3 +23,5 @@ paths:
 - 운영 점검: 컨테이너 상태 확인은 `GET /api/v1/health`(`@PublicApi`, DB 안 봄). prod는 MySQL 격리 수준이 READ-COMMITTED가 아니면 기동하지 않는다 (`DatabaseSettingsCheck`).
 - 탈퇴는 `AccountWithdrawalService`로 들어온다. Apple 같은 외부 호출은 사용자 행 잠금 트랜잭션(`UserService.withdraw`) 밖에서 한다.
 - 메모리: 운영 API는 `-Xmx512m` + `ExitOnOutOfMemoryError`. 파일을 `byte[]`로 통째로 들고 있지 말고 스트림으로 처리한다.
+- 공개 API(`@PublicApi`): `Authorization` 헤더가 없으면 비로그인으로 처리하지만, 헤더가 있는데 무효이거나 만료됐으면 공개 API도 401 `AUTH_REQUIRED`다(만료된 사용자가 비로그인으로 보이는 것을 막고, 클라이언트가 갱신 후 재시도하게 한다).
+- 워커 프로필(`SPRING_PROFILES_ACTIVE=prod,worker`): 웹 서버·Flyway·`@Scheduled`가 돌지 않는다. 새 `@Scheduled` 작업은 `app.scheduling.enabled`로 묶여(`SchedulingConfig`) 워커에서 꺼지므로, 그 설정 아래에 둔다. 워커 작업은 `MediaWorkerLoop` 스레드가 처리한다.
