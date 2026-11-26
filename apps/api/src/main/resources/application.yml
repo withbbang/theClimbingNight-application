@@ -50,3 +50,12 @@ app:
     enabled: false
     base-url: https://exp.host
     access-token: ${EXPO_ACCESS_TOKEN:}
+  # R2 키 다섯 개(accountId·accessKeyId·secretAccessKey·incomingBucket·publicBucket)가 모두 있어야 켜진다. 비면 사진 올리기는 MEDIA_UNAVAILABLE.
+  media:
+    account-id: ${R2_ACCOUNT_ID:}
+    access-key-id: ${R2_MEDIA_ACCESS_KEY_ID:}
+    secret-access-key: ${R2_MEDIA_SECRET_ACCESS_KEY:}
+    incoming-bucket: ${R2_MEDIA_INCOMING_BUCKET:}
+    public-bucket: ${R2_MEDIA_PUBLIC_BUCKET:}
+    public-base-url: ${MEDIA_PUBLIC_BASE_URL:}
+    originals-dir: ${MEDIA_ORIGINALS_DIR:/media/originals}

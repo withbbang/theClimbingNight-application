@@ -40,7 +40,8 @@ public enum ErrorCode {
 	MEETUP_APPLICATION_NOT_ACTIVE(HttpStatus.CONFLICT, "이미 취소되었거나 내보낸 신청입니다."),
 	PENALTY_NOT_LATE_CANCEL(HttpStatus.CONFLICT, "늦은 취소로 표시된 신청이 아닙니다."),
 	PENALTY_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 블랙리스트에 기록된 건입니다."),
-	PENALTY_ALREADY_REVOKED(HttpStatus.CONFLICT, "이미 취소된 블랙리스트 기록입니다.");
+	PENALTY_ALREADY_REVOKED(HttpStatus.CONFLICT, "이미 취소된 블랙리스트 기록입니다."),
+	MEDIA_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "사진 올리기를 잠시 쓸 수 없습니다. 잠시 후 다시 시도해 주세요.");
 
 	private final HttpStatus status;
 	private final String message;
