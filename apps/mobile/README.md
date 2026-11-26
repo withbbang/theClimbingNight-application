@@ -57,3 +57,15 @@ keytool -exportcert -alias androiddebugkey -keystore android/app/debug.keystore 
 pnpm lint && pnpm typecheck && pnpm test
 pnpm expo install --check
 ```
+
+## 운영 빌드
+
+값은 EAS `production` 환경변수에 넣는다 (`deploy/README.md` 8장 목록). 로컬 env 파일은 운영 빌드에 쓰이지 않는다.
+
+```bash
+pnpm dlx eas-cli build --platform all --profile production   # 스토어 빌드 (빌드 번호 자동 증가)
+pnpm dlx eas-cli submit --platform ios --latest              # 제출
+pnpm dlx eas-cli update --branch production                  # JS만 바뀐 경우
+```
+
+Apple 로그인 사용자의 탈퇴는 서버가 요구하면 Apple 재인증 창을 한 번 더 띄운다 (토큰 폐기용, 심사 요건).

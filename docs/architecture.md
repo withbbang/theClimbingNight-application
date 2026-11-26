@@ -91,13 +91,14 @@ A를 고른 이유: 국내 사용자에게 필요한 카카오 로그인은 Fire
 | 컨테이너 | 단계 | mem_limit (제안) | 비고 |
 |---|---|---|---|
 | nginx | 1 | 32MB | 프로젝트 전용 |
+| cloudflared | 1 | 64MB | Cloudflare Tunnel. 호스트 포트 없이 nginx로 넘긴다 |
 | api | 1 | 768MB | `-Xmx512m -XX:+ExitOnOutOfMemoryError` |
 | web | 1 | 256MB | Next.js standalone |
 | mysql | 1 | 512MB | 프로젝트 전용 인스턴스 (제안). 기존 MySQL 통합은 별도 작업 |
 | worker | 2 | 512MB | 작업 큐에서 한 번에 하나씩 처리 |
 | redis | 3 | 64MB | DM 세션·pub/sub |
 
-1단계 합계 상한 약 1.5GB. 현재 NAS 여유 약 4.4GB.
+1단계 합계 상한 약 1.6GB (로컬 실측 기동 직후 약 750MB, `deploy/README.md` 6장). 현재 NAS 여유 약 4.4GB.
 
 ### 도메인 (제안)
 
@@ -107,11 +108,11 @@ A를 고른 이유: 국내 사용자에게 필요한 카카오 로그인은 Fire
 
 ### 배포
 
-k-drinker와 같은 패턴: `master` 푸시 → GitHub Actions가 이미지 빌드(GHCR) → NAS에 `deploy/` 복사 → `compose pull && up`. 앱은 EAS Build로 스토어 빌드, JS만 바뀌면 EAS Update.
+k-drinker와 같은 패턴: `master` 푸시 → GitHub Actions가 이미지 빌드(GHCR) → NAS에 `deploy/` 복사 → `compose pull && up`. 앱은 EAS Build로 스토어 빌드, JS만 바뀌면 EAS Update. 절차는 `deploy/README.md`.
 
 ### 백업
 
-매일 `mysqldump`를 압축해 NAS에 보관하고, 같은 파일을 R2 비공개 경로에 한 부 더 올린다 (제안: 30일 보관). 원본 미디어는 RAID5 위에 있고 별도 외부 백업은 하지 않는다 (제안, 비용 이유).
+매일 04:00 `deploy/backup.sh`가 `mysqldump`를 압축해 NAS에 30개 보관하고, 같은 파일을 R2 비공개 버킷에 한 부 더 올린다 (버킷 수명 주기로 30일 뒤 삭제). 원본 미디어는 RAID5 위에 있고 별도 외부 백업은 하지 않는다 (제안, 비용 이유).
 
 ## 6. 회원과 권한
 
@@ -393,6 +394,8 @@ media_jobs       id, post_media_id, status, attempts, last_error   -- 워커 작
 | 결정 | 내용 |
 |---|---|
 | 앱 | Expo SDK 58 (React Native, TypeScript), Expo Router. 앱 식별자 `com.theclimbingnight.app` (iOS·Android 공통) |
+| Apple 탈퇴 | Apple 로그인 사용자는 탈퇴할 때 앱이 Apple 재인증으로 받은 code를 보내고, API가 토큰으로 바꿔 탈퇴 뒤 폐기한다. 토큰은 저장하지 않고, 폐기 실패는 탈퇴를 막지 않는다 |
+| 외부 노출 | compose 안의 cloudflared(Cloudflare Tunnel) → nginx. NAS 포트를 열지 않는다 |
 | 웹뷰 주소 | `EXPO_PUBLIC_WEB_URL`, 비우면 API 주소. 웹뷰와 앱이 주고받는 메시지 없음. 굿즈 목록은 `apps/web/content/goods.ts`에서 관리하고 가격은 싣지 않음 |
 | 서버 | Spring Boot + nginx + Next.js, NAS Docker Compose |
 | 로그인 | 카카오·네이버·구글 + iOS Apple, Spring 자체 JWT (접근 방식 A) |

@@ -11,7 +11,8 @@ Expo(앱) + Next.js(웹뷰·관리자) + Spring Boot(API) 모노레포, 1인 개
 | `apps/mobile` | iOS·Android 앱 | Expo / React Native / TypeScript | pnpm · EAS |
 | `apps/web` | 웹뷰 화면(공지·소개·약관·굿즈) + 관리자 | Next.js / React / TypeScript / Tailwind | pnpm |
 | `apps/api` | REST API · WebSocket(DM) | Spring Boot / Java / JPA / MySQL | Gradle |
-| `deploy/` | NAS(Synology DS1520+) Docker Compose · nginx | — | — |
+| `deploy/` | NAS(Synology DS1520+) Docker Compose · nginx · Cloudflare Tunnel · 백업 (`deploy/README.md`) | — | — |
+| `.github/workflows/` | `master` 푸시 → GHCR 이미지 → NAS 배포 (`deploy.yml`) | GitHub Actions | — |
 | `docs/` | 아키텍처 등 설계 문서 | — | — |
 | `.claude/` | Claude Code 설정 (rules · skills · agents · hooks) | — | — |
 

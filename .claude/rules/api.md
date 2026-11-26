@@ -20,4 +20,6 @@ paths:
 - 개인정보를 저장하는 테이블을 늘리면 탈퇴 처리(`UserWithdrawnEvent` 리스너)와 `apps/web/content/privacy.ts`를 함께 고친다.
 - Flyway 마이그레이션은 적용된 버전을 고치지 말고 새 버전을 만든다.
 - 미디어: 파일 본문은 API 서버를 거치지 않는다. API는 R2 presigned URL 발급과 업로드 완료 통보만 받고, 변환·원본 보관은 별도 워커가 한다.
+- 운영 점검: 컨테이너 상태 확인은 `GET /api/v1/health`(`@PublicApi`, DB 안 봄). prod는 MySQL 격리 수준이 READ-COMMITTED가 아니면 기동하지 않는다 (`DatabaseSettingsCheck`).
+- 탈퇴는 `AccountWithdrawalService`로 들어온다. Apple 같은 외부 호출은 사용자 행 잠금 트랜잭션(`UserService.withdraw`) 밖에서 한다.
 - 메모리: 운영 API는 `-Xmx512m` + `ExitOnOutOfMemoryError`. 파일을 `byte[]`로 통째로 들고 있지 말고 스트림으로 처리한다.

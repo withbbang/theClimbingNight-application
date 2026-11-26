@@ -185,3 +185,29 @@ cloudflared는 실제 터널 토큰이 있어야 하므로 로컬에서는 띄�
 - nginx가 `/api/*`와 `/app/*`를 나누고, 접속 기록에 쿼리스트링이 남지 않는다.
 - `backup.sh`가 덤프를 만들고, R2 키가 없으면 업로드를 건너뛴다.
 - api `stop`이 graceful 종료로 1초 안에 끝난다.
+
+## 8. 출시 전 외부 설정 (직접 할 일)
+
+코드로 할 수 없는 설정이다. 끝낸 항목은 `deploy/.env`나 EAS 환경변수에 값을 넣는다.
+
+- [ ] **도메인·터널**: 도메인 구매 → Cloudflare 연결 → 터널 생성, `PUBLIC_HOST` 결정 (2장).
+- [ ] **Apple Developer**
+  - Identifiers에서 `com.theclimbingnight.app`에 Sign in with Apple 켜기.
+  - Keys → 새 키에 Sign in with Apple 체크 → `.p8` 내려받기 (한 번만 받을 수 있다). `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`.
+  - `APPLE_AUDIENCES=com.theclimbingnight.app`.
+- [ ] **카카오**: 내 애플리케이션 → 플랫폼에 iOS 번들 ID, Android 패키지 `com.theclimbingnight.app`과 **스토어 서명 키 해시** 등록. 해시는 `pnpm dlx eas-cli credentials`에서 본 Android 키스토어 SHA-1을 base64로 바꾼 값. `KAKAO_APP_ID`.
+- [ ] **구글**: Google Cloud 콘솔에 Android OAuth 클라이언트(스토어 서명 SHA-1)와 iOS 클라이언트 추가. `GOOGLE_CLIENT_IDS`에 웹·iOS·Android ID를 쉼표로. Play가 앱을 다시 서명하므로 Play Console의 앱 서명 키 SHA-1도 등록한다.
+- [ ] **네이버**: 개발자 센터 → 애플리케이션 → 서비스 환경에 iOS URL Scheme(`theclimbingnightnaver`)·번들 ID, Android 패키지 등록.
+- [ ] **Expo·푸시**
+  - expo.dev에서 프로젝트 생성 → ID를 EAS 환경변수 `EAS_PROJECT_ID`로.
+  - Project settings → Push security → **Enhanced push security** 켜기 → Access token 발급 → `EXPO_ACCESS_TOKEN`. 켠 뒤에는 토큰 없는 발송이 거부된다.
+  - Credentials → Android → FCM V1 서비스 계정 키 업로드. `google-services.json`은 EAS 파일 환경변수 `GOOGLE_SERVICES_JSON`으로.
+  - iOS 푸시 키는 첫 `eas build` 때 함께 만든다.
+- [ ] **EAS `production` 환경변수** (`pnpm dlx eas-cli env:create --environment production`)
+  - `EXPO_PUBLIC_API_URL=https://<PUBLIC_HOST>` (`EXPO_PUBLIC_WEB_URL`은 비움 — 같은 주소)
+  - `EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY`, `EXPO_PUBLIC_NAVER_CLIENT_ID`, `EXPO_PUBLIC_NAVER_CLIENT_SECRET`, `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`, `EAS_PROJECT_ID`, `GOOGLE_SERVICES_JSON`
+- [ ] **스토어 등록 주소**
+  - 개인정보처리방침: `https://<PUBLIC_HOST>/app/privacy`
+  - 계정 삭제 안내(Google Play 데이터 보안): `https://<PUBLIC_HOST>/app/privacy#account-deletion`
+- [ ] **심사용 계정**: 심사자가 쓸 MEMBER 계정을 만들어 두고 로그인 방법을 심사 메모에 적는다 (카카오만으로는 심사자가 못 들어올 수 있다).
+- [ ] **문안**: `docs/content-todo.md`의 `[확인 필요]`를 모두 채운다. 남아 있으면 `/release`가 멈춘다.
