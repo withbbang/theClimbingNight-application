@@ -36,3 +36,18 @@ it('collapses the body after three lines and expands on 더 보기', async () =>
   expect(screen.getByText(LONG).props.numberOfLines).toBeUndefined();
   expect(screen.queryByRole('button', { name: '더 보기' })).toBeNull();
 });
+
+it('collapses again when the body changes', async () => {
+  // given: 펼쳐 둔 본문
+  const view = await render(<PostCard post={post({ body: LONG })} />);
+  const measure = screen.getByTestId('post-body-measure', { includeHiddenElements: true });
+  await fireEvent(measure, 'textLayout', { nativeEvent: { lines: [{}, {}, {}, {}] } });
+  await fireEvent.press(screen.getByRole('button', { name: '더 보기' }));
+
+  // when: 고친 글을 다시 받는다.
+  const edited = `${LONG}\n다섯째 줄`;
+  await view.rerender(<PostCard post={post({ body: edited })} />);
+
+  // then
+  expect(screen.getByText(edited)).toHaveProp('numberOfLines', 3);
+});

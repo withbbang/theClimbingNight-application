@@ -40,7 +40,7 @@ it.each([new ApiError('COMMON_NOT_FOUND', '없음', 404), networkError()])(
   },
 );
 
-it.each([['notices', 'recent'], ['app-settings']])(
+it.each([['notices', 'recent'], ['app-settings'], ['posts'], ['posts', 1]])(
   'keeps an observer of public %p working after the session cache is cleared',
   async (...queryKey) => {
     const queryFn = jest.fn(async () => 1);
@@ -61,4 +61,30 @@ it('removes everything else with the session', async () => {
   queryClient.setQueryData(['meetups', 'detail', 1], 1);
   await clearSessionCache();
   expect(queryClient.getQueryCache().getAll()).toEqual([]);
+});
+
+it('drops what the previous session saw in a public feed query', async () => {
+  // given
+  queryClient.setQueryData(['posts'], 'signed-in feed');
+  queryClient.setQueryData(['posts', 1], 'signed-in post');
+
+  // when
+  await clearSessionCache();
+
+  // then
+  expect(queryClient.getQueryData(['posts'])).toBeUndefined();
+  expect(queryClient.getQueryData(['posts', 1])).toBeUndefined();
+});
+
+it('removes my in-progress posts with the session', async () => {
+  // given
+  queryClient.setQueryData(['posts', 'mine', 'in-progress'], 1);
+
+  // when
+  await clearSessionCache();
+
+  // then
+  expect(queryClient.getQueryCache().find({ queryKey: ['posts', 'mine', 'in-progress'] })).toBe(
+    undefined,
+  );
 });

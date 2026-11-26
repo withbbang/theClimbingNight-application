@@ -44,6 +44,9 @@ function Slide({ item, index, count, width, offset, onPress }: SlideProps) {
   const label = `사진 ${count}장 중 ${index + 1}번째`;
 
   const animated = useAnimatedStyle(() => {
+    if (reduced) {
+      return { opacity: 1, transform: [{ scale: 1 }] };
+    }
     const distance = Math.min(1, Math.abs(offset.get() / width - index));
     return {
       opacity: interpolate(distance, [0, 1], [1, 0.55]),

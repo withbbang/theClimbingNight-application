@@ -1,8 +1,11 @@
-import { fireEvent, screen } from 'expo-router/testing-library';
+import { act, fireEvent, screen } from 'expo-router/testing-library';
 
+import { clearSessionCache } from '@/lib/query-client';
+import { sessionStore } from '@/lib/session-store';
 import { flush, mockServer, ok, renderApp } from '@/test-utils/app';
 import { post } from '@/test-utils/posts';
 import { startAs } from '@/test-utils/session';
+import { tokens } from '@/test-utils/tokens';
 
 jest.mock('expo-secure-store', () =>
   jest.requireActual('@/test-utils/native-mocks').secureStoreMock(),
@@ -79,4 +82,41 @@ it('shows the empty message when there are no posts', async () => {
 
   // then
   expect(screen.getByText('아직 올라온 사진이 없어요')).toBeOnTheScreen();
+});
+
+it('refetches the feed when the session changes', async () => {
+  // given: 비로그인에게는 3개만, 로그인하면 커서까지 준다.
+  await startAs(null);
+  const signedIn = () => sessionStore.getState().status === 'authenticated';
+  const server = mockServer({
+    [FIRST]: () => ok({ items: three, nextCursor: signedIn() ? 'c1' : null }),
+    [NEXT]: ok({ items: [post({ id: 4, body: '4번째 글' })], nextCursor: null }),
+  });
+  await renderApp('/feed');
+  expect(screen.getByText(LOGIN_CARD)).toBeOnTheScreen();
+
+  // when: 로그인 화면이 하는 대로 세션을 바꾸고 캐시를 비운다.
+  await act(async () => {
+    await sessionStore.signIn(tokens('2'));
+    await clearSessionCache();
+  });
+  await flush();
+  await reachEnd();
+
+  // then
+  expect(server.count(FIRST)).toBe(2);
+  expect(screen.getByText('4번째 글')).toBeOnTheScreen();
+  expect(screen.queryByText(LOGIN_CARD)).toBeNull();
+
+  // when: 로그아웃하면
+  await act(async () => {
+    await sessionStore.signOut();
+    await clearSessionCache();
+  });
+  await flush();
+
+  // then: 로그인 상태에서 받은 글이 남지 않는다.
+  expect(server.count(FIRST)).toBe(3);
+  expect(screen.queryByText('4번째 글')).toBeNull();
+  expect(screen.getByText(LOGIN_CARD)).toBeOnTheScreen();
 });

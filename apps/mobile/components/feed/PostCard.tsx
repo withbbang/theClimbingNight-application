@@ -140,7 +140,8 @@ export function PostCard({ post, onOpen, hideMedia = false }: PostCardProps) {
             <AppText variant="label">{post.commentCount}</AppText>
           </View>
         </View>
-        {post.body ? <PostBody body={post.body} /> : null}
+        {/* 본문이 바뀌면 접힘과 줄 수를 다시 잰다. */}
+        {post.body ? <PostBody key={post.body} body={post.body} /> : null}
       </View>
     </View>
   );
