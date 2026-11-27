@@ -24,6 +24,8 @@ paths:
 - 웹뷰 화면은 `WebPage`로 `apps/web`의 `/app/*` 페이지를 연다 (주소는 `EXPO_PUBLIC_WEB_URL`, 비우면 API 주소). 안에서 열 주소는 `lib/web-url.ts`의 `decideLink`로만 판정한다. 지금은 웹뷰와 앱이 주고받는 메시지가 없다. 필요해지면 `postMessage` 메시지 타입을 `types/bridge.ts` 한 곳에 정의한다.
 - 디렉토리: `app/`(라우트) · `components/ui/`(범용) · `components/<feature>/`(도메인) · `hooks/` · `lib/` · `types/api/`.
 - 파일명: 컴포넌트 `PascalCase.tsx`, 훅 `use-xxx.ts`, 그 외 `kebab-case.ts`. 라우트 파일은 Expo Router 규칙을 따른다.
+- 화면 테스트는 `app/` 밖 `__tests__/<화면>.test.tsx`에 둔다 (`app/` 아래 파일은 모두 라우트로 잡힌다).
+- 라우트를 추가·이동하면 `.expo/types`(gitignore)를 다시 만들어야 typecheck가 통과한다 (개발 서버를 잠깐 켜거나 expo CLI의 타입 생성 사용).
 - 타입: `any` 금지. API 응답 타입은 `types/api/`에 두고 백엔드 DTO 이름(`XxxResponse`)과 일치시킨다.
 - import 순서: react → react-native → expo → 외부 패키지 → `@/` 절대경로 → 상대경로.
 - 플랫폼 분기는 `Platform.OS` 또는 `.ios.tsx`/`.android.tsx` 파일로. 한쪽에서만 확인하고 끝내지 않는다.
