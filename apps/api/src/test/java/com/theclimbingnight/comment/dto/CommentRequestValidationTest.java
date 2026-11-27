@@ -20,6 +20,15 @@ class CommentRequestValidationTest {
 	}
 
 	@Test
+	void 앞뒤_공백을_빼고_500자면_통과한다() {
+		// given
+		CommentCreateRequest request = new CommentCreateRequest("  " + "가".repeat(500) + "  ", null);
+
+		// when / then
+		assertThat(validator.validate(request)).isEmpty();
+	}
+
+	@Test
 	void 본문_500자는_되고_501자는_거절한다() {
 		// given
 		CommentCreateRequest ok = new CommentCreateRequest("가".repeat(500), null);

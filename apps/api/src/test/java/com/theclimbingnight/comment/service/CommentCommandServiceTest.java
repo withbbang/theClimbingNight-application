@@ -186,7 +186,7 @@ class CommentCommandServiceTest {
 	}
 
 	private void givenDeletable(Comment comment, Post post) {
-		given(comments.findById(comment.getId())).willReturn(Optional.of(comment));
+		given(comments.findLivePostIdById(comment.getId())).willReturn(Optional.of(POST));
 		givenPost(post);
 		given(comments.findByIdForUpdate(comment.getId())).willReturn(Optional.of(comment));
 	}
@@ -204,6 +204,35 @@ class CommentCommandServiceTest {
 		// then
 		assertThat(comment.getDeletedAt()).isEqualTo(NOW);
 		verify(counter).recount(post);
+	}
+
+	@Test
+	void 작성자_본인은_자기_댓글을_지울_수_있다() {
+		// given
+		Comment comment = comment(20L, POST, ME, null);
+		Post post = post(PostStatus.VISIBLE);
+		givenDeletable(comment, post);
+
+		// when
+		service.delete(ME, Role.USER, 20L);
+
+		// then
+		assertThat(comment.getDeletedAt()).isEqualTo(NOW);
+		verify(counter).recount(post);
+	}
+
+	@Test
+	void 잠근_뒤_이미_지워졌으면_404다() {
+		// given
+		Comment comment = comment(20L, POST, ME, null);
+		comment.softDelete(NOW);
+		given(comments.findLivePostIdById(20L)).willReturn(Optional.of(POST));
+		givenPost(post(PostStatus.VISIBLE));
+		given(comments.findByIdForUpdate(20L)).willReturn(Optional.of(comment));
+
+		// when / then
+		assertNotFound(() -> service.delete(ME, Role.USER, 20L));
+		verify(counter, never()).recount(any());
 	}
 
 	@Test
@@ -237,7 +266,7 @@ class CommentCommandServiceTest {
 		// given
 		Comment comment = comment(20L, POST, ME, null);
 		comment.softDelete(NOW);
-		given(comments.findById(20L)).willReturn(Optional.of(comment));
+		given(comments.findLivePostIdById(20L)).willReturn(Optional.empty());
 
 		// when / then
 		assertNotFound(() -> service.delete(ME, Role.USER, 20L));

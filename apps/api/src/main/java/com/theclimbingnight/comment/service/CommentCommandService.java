@@ -66,9 +66,8 @@ public class CommentCommandService {
 
 	@Transactional
 	public void delete(long userId, Role role, long commentId) {
-		Comment found = comments.findById(commentId).filter(c -> c.getDeletedAt() == null)
-				.orElseThrow(CommentCommandService::notFound);
-		Post post = access.lockLive(found.getPostId());
+		long postId = comments.findLivePostIdById(commentId).orElseThrow(CommentCommandService::notFound);
+		Post post = access.lockLive(postId);
 		Comment comment = comments.findByIdForUpdate(commentId).filter(c -> c.getDeletedAt() == null)
 				.orElseThrow(CommentCommandService::notFound);
 		boolean allowed = comment.getAuthorId().equals(userId) || post.getAuthorId().equals(userId)

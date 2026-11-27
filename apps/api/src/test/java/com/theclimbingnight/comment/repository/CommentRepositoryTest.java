@@ -33,6 +33,21 @@ class CommentRepositoryTest {
 	}
 
 	@Test
+	void 살아있는_댓글의_게시물_id만_찾고_지운_댓글은_비어_있다() {
+		// given
+		long author = users.saveAndFlush(User.create("작성자")).getId();
+		long postId = post(author);
+		Comment live = comments.saveAndFlush(Comment.create(postId, author, null, null, "살아있음"));
+		Comment deleted = comments.saveAndFlush(Comment.create(postId, author, null, null, "지움"));
+		deleted.softDelete(T0);
+		comments.flush();
+
+		// when / then
+		assertThat(comments.findLivePostIdById(live.getId())).contains(postId);
+		assertThat(comments.findLivePostIdById(deleted.getId())).isEmpty();
+	}
+
+	@Test
 	void 수는_지우거나_숨긴_댓글을_빼고_답글을_포함한다() {
 		// given
 		long author = users.saveAndFlush(User.create("작성자")).getId();
