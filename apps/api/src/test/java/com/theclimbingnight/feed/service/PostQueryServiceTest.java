@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -20,6 +21,7 @@ import com.theclimbingnight.feed.entity.Post;
 import com.theclimbingnight.feed.entity.PostMedia;
 import com.theclimbingnight.feed.entity.PostMediaStatus;
 import com.theclimbingnight.feed.entity.PostStatus;
+import com.theclimbingnight.feed.repository.PostLikeRepository;
 import com.theclimbingnight.feed.repository.PostMediaRepository;
 import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.media.MediaProperties;
@@ -49,13 +51,15 @@ class PostQueryServiceTest {
 	@Mock PostMediaRepository mediaRepository;
 	@Mock UserRepository users;
 	@Mock UserBlockRepository blocks;
+	@Mock PostLikeRepository likes;
 
 	private PostQueryService service;
 
 	@BeforeEach
 	void setUp() {
 		MediaUrls urls = new MediaUrls(new MediaProperties(true, "a", "k", "s", "in", "pub", "https://m.example", null));
-		service = new PostQueryService(posts, mediaRepository, users, blocks, new PostResponseMapper(urls));
+		service = new PostQueryService(posts, mediaRepository, users, likes, new PostAccess(posts, blocks),
+				new PostResponseMapper(urls));
 	}
 
 	private Post post(long id, long authorId, PostStatus status) {
@@ -77,6 +81,32 @@ class PostQueryServiceTest {
 		User user = User.create(nickname);
 		ReflectionTestUtils.setField(user, "id", id);
 		return user;
+	}
+
+	@Test
+	void 내가_누른_글은_likedByMe가_true다() {
+		// given
+		given(posts.findById(5L)).willReturn(Optional.of(post(5, OTHER, PostStatus.VISIBLE)));
+		given(blocks.existsBetween(ME, OTHER)).willReturn(false);
+		given(mediaRepository.findAllByPostIdInOrderBySortOrder(anyCollection())).willReturn(List.of());
+		given(users.findAllById(anyCollection())).willReturn(List.of(user(OTHER, "남")));
+		given(likes.findLikedPostIds(eq(ME), anyCollection())).willReturn(List.of(5L));
+
+		// when / then
+		assertThat(service.detail(ME, 5L).likedByMe()).isTrue();
+	}
+
+	@Test
+	void 비로그인은_likedByMe가_false다() {
+		// given
+		given(posts.findLatestVisibleIds(3)).willReturn(List.of(8L));
+		given(posts.findById(8L)).willReturn(Optional.of(post(8, OTHER, PostStatus.VISIBLE)));
+		given(mediaRepository.findAllByPostIdInOrderBySortOrder(anyCollection())).willReturn(List.of());
+		given(users.findAllById(anyCollection())).willReturn(List.of(user(OTHER, "남")));
+
+		// when / then
+		assertThat(service.detail(null, 8L).likedByMe()).isFalse();
+		verify(likes, never()).findLikedPostIds(anyLong(), anyCollection());
 	}
 
 	@Test

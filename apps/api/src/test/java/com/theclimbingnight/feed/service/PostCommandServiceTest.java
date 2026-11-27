@@ -22,6 +22,7 @@ import com.theclimbingnight.feed.entity.Post;
 import com.theclimbingnight.feed.entity.PostMedia;
 import com.theclimbingnight.feed.entity.PostMediaStatus;
 import com.theclimbingnight.feed.entity.PostStatus;
+import com.theclimbingnight.feed.repository.PostLikeRepository;
 import com.theclimbingnight.feed.repository.PostMediaRepository;
 import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.media.MediaProperties;
@@ -60,6 +61,7 @@ class PostCommandServiceTest {
 	@Mock PostRepository posts;
 	@Mock PostMediaRepository mediaRepository;
 	@Mock UserRepository users;
+	@Mock PostLikeRepository likes;
 	@Mock MediaStorage storage;
 	@Mock MediaJobRepository jobs;
 	@Mock MediaJobScheduler scheduler;
@@ -75,7 +77,7 @@ class PostCommandServiceTest {
 	private PostCommandService newService(MediaStorage mediaStorage, MediaJobScheduler mediaJobScheduler) {
 		MediaUrls urls = new MediaUrls(new MediaProperties(true, "a", "k", "s", "in", "pub", "https://m.example", null));
 		return new PostCommandService(posts, mediaRepository, users, mediaStorage, mediaJobScheduler,
-				new PostResponseMapper(urls), new SecureRandom(), clock);
+				new PostResponseMapper(urls), likes, new SecureRandom(), clock);
 	}
 
 	private Post post(long id, long authorId, PostStatus status) {

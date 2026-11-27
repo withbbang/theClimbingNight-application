@@ -8,16 +8,18 @@ import com.theclimbingnight.feed.dto.PostResponse;
 import com.theclimbingnight.feed.entity.Post;
 import com.theclimbingnight.feed.entity.PostMedia;
 import com.theclimbingnight.feed.entity.PostStatus;
+import com.theclimbingnight.feed.repository.PostLikeRepository;
 import com.theclimbingnight.feed.repository.PostMediaRepository;
 import com.theclimbingnight.feed.repository.PostRepository;
-import com.theclimbingnight.moderation.repository.UserBlockRepository;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -34,15 +36,17 @@ public class PostQueryService {
 	private final PostRepository posts;
 	private final PostMediaRepository mediaRepository;
 	private final UserRepository users;
-	private final UserBlockRepository blocks;
+	private final PostLikeRepository likes;
+	private final PostAccess access;
 	private final PostResponseMapper mapper;
 
 	public PostQueryService(PostRepository posts, PostMediaRepository mediaRepository, UserRepository users,
-			UserBlockRepository blocks, PostResponseMapper mapper) {
+			PostLikeRepository likes, PostAccess access, PostResponseMapper mapper) {
 		this.posts = posts;
 		this.mediaRepository = mediaRepository;
 		this.users = users;
-		this.blocks = blocks;
+		this.likes = likes;
+		this.access = access;
 		this.mapper = mapper;
 	}
 
@@ -71,21 +75,12 @@ public class PostQueryService {
 				throw new BusinessException(ErrorCode.AUTH_REQUIRED);
 			}
 		}
-		Post post = posts.findById(id).filter(p -> p.getDeletedAt() == null)
-				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 		if (viewerId == null) {
+			Post post = posts.findById(id).filter(p -> p.getDeletedAt() == null)
+					.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 			return toResponses(List.of(post), null).get(0);
 		}
-		if (post.getAuthorId().equals(viewerId)) {
-			// 초안은 아직 글이 아니다. 그 밖의 상태는 작성자 본인에게 보인다.
-			if (post.getStatus() == PostStatus.DRAFT) {
-				throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
-			}
-		}
-		else if (post.getStatus() != PostStatus.VISIBLE || blocks.existsBetween(viewerId, post.getAuthorId())) {
-			throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
-		}
-		return toResponses(List.of(post), viewerId).get(0);
+		return toResponses(List.of(access.readable(viewerId, id)), viewerId).get(0);
 	}
 
 	public List<PostResponse> inProgress(long userId) {
@@ -111,7 +106,8 @@ public class PostQueryService {
 		for (User user : users.findAllById(page.stream().map(Post::getAuthorId).distinct().toList())) {
 			nicknames.put(user.getId(), user.getNickname());
 		}
+		Set<Long> liked = viewerId == null ? Set.of() : new HashSet<>(likes.findLikedPostIds(viewerId, postIds));
 		return page.stream().map(post -> mapper.toResponse(post, nicknames.getOrDefault(post.getAuthorId(), ""),
-				media.getOrDefault(post.getId(), List.of()), viewerId)).toList();
+				media.getOrDefault(post.getId(), List.of()), viewerId, liked.contains(post.getId()))).toList();
 	}
 }

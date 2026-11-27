@@ -10,6 +10,7 @@ import com.theclimbingnight.feed.dto.PostUploadResponse;
 import com.theclimbingnight.feed.entity.Post;
 import com.theclimbingnight.feed.entity.PostMedia;
 import com.theclimbingnight.feed.entity.PostStatus;
+import com.theclimbingnight.feed.repository.PostLikeRepository;
 import com.theclimbingnight.feed.repository.PostMediaRepository;
 import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.media.job.MediaJobScheduler;
@@ -43,11 +44,13 @@ public class PostCommandService {
 	private final MediaStorage storage;
 	private final MediaJobScheduler scheduler;
 	private final PostResponseMapper mapper;
+	private final PostLikeRepository likes;
 	private final SecureRandom random;
 	private final Clock clock;
 
 	public PostCommandService(PostRepository posts, PostMediaRepository mediaRepository, UserRepository users,
-			MediaStorage storage, MediaJobScheduler scheduler, PostResponseMapper mapper, SecureRandom random,
+			MediaStorage storage, MediaJobScheduler scheduler, PostResponseMapper mapper, PostLikeRepository likes,
+			SecureRandom random,
 			Clock clock) {
 		this.posts = posts;
 		this.mediaRepository = mediaRepository;
@@ -55,6 +58,7 @@ public class PostCommandService {
 		this.storage = storage;
 		this.scheduler = scheduler;
 		this.mapper = mapper;
+		this.likes = likes;
 		this.random = random;
 		this.clock = clock;
 	}
@@ -132,7 +136,7 @@ public class PostCommandService {
 
 	private PostResponse toResponse(Post post, List<PostMedia> media, long viewerId) {
 		String nickname = users.findById(post.getAuthorId()).map(User::getNickname).orElse("");
-		return mapper.toResponse(post, nickname, media, viewerId);
+		return mapper.toResponse(post, nickname, media, viewerId, likes.existsByPostIdAndUserId(post.getId(), viewerId));
 	}
 
 	private String randomHex() {

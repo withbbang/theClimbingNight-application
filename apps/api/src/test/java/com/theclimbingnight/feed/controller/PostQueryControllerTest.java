@@ -60,7 +60,7 @@ class PostQueryControllerTest {
 	}
 
 	private PostResponse response(long id) {
-		return new PostResponse(id, new PostAuthorResponse(2L, "남"), "본문", List.of(), 0, 0,
+		return new PostResponse(id, new PostAuthorResponse(2L, "남"), "본문", List.of(), 0, 0, false,
 				OffsetDateTime.parse("2026-11-26T12:00:00Z"), null, false);
 	}
 

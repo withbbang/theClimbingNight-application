@@ -143,6 +143,6 @@ class PostControllerTest {
 	}
 
 	private PostResponse response() {
-		return new PostResponse(3L, new PostAuthorResponse(1L, "climber"), "", List.of(), 0, 0, null, "PENDING", true);
+		return new PostResponse(3L, new PostAuthorResponse(1L, "climber"), "", List.of(), 0, 0, false, null, "PENDING", true);
 	}
 }

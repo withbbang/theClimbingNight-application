@@ -180,7 +180,7 @@ public class ModerationService {
 		}
 		List<PostMedia> media = mediaByPost.getOrDefault(post.getId(), List.of());
 		User author = userById.get(post.getAuthorId());
-		PostResponse body = mapper.toResponse(post, author == null ? null : author.getNickname(), media, null);
+		PostResponse body = mapper.toResponse(post, author == null ? null : author.getNickname(), media, null, false);
 		List<String> quarantineUrls = isHidden(post) ? media.stream()
 				.filter(m -> m.getStatus() != PostMediaStatus.UPLOADING)
 				.map(this::reviewUrl)
