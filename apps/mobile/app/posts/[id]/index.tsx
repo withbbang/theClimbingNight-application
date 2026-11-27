@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ImageBrokenIcon } from 'phosphor-react-native/src/icons/ImageBroken';
 import { LockKeyIcon } from 'phosphor-react-native/src/icons/LockKey';
 
+import { LikeCountLink } from '@/components/feed/LikeCountLink';
 import { PostCard } from '@/components/feed/PostCard';
 import { PostHiddenNotice } from '@/components/feed/PostHiddenNotice';
 import { BackButton } from '@/components/ui/BackButton';
@@ -44,6 +45,7 @@ function Detail({ post, onRefresh }: { post: PostResponse; onRefresh: () => Prom
           onGone={() => (router.canGoBack() ? router.back() : router.dismissTo('/feed'))}
         />
       </FadeInItem>
+      <LikeCountLink postId={post.id} count={post.likeCount} />
     </ScrollView>
   );
 }

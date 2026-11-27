@@ -18,6 +18,7 @@ import { LikeButton } from '@/components/feed/LikeButton';
 import { MediaCarousel } from '@/components/feed/MediaCarousel';
 import { PostMenu } from '@/components/feed/PostMenu';
 import { AppText } from '@/components/ui/AppText';
+import { Avatar } from '@/components/ui/Avatar';
 import { useLikePost } from '@/hooks/use-like-post';
 import { usePressScale } from '@/hooks/use-press-scale';
 import { useSession } from '@/hooks/use-session';
@@ -26,23 +27,6 @@ import { formatRelative } from '@/lib/kst';
 import type { PostResponse } from '@/types/api/post';
 
 const COLLAPSED_LINES = 3;
-const AVATAR = 40;
-
-/** 닉네임 첫 글자를 홀드 모양 위에 얹는다. */
-function Avatar({ nickname }: { nickname: string }) {
-  const { colors } = useTheme();
-  return (
-    <View
-      style={[styles.avatar, { backgroundColor: colors.accent }]}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-    >
-      <AppText variant="label" tone="onAccent" style={styles.initial}>
-        {nickname.slice(0, 1)}
-      </AppText>
-    </View>
-  );
-}
 
 /** 세 줄이 넘으면 접어 두고 "더 보기"로 편다. 줄 수는 보이지 않는 전체 본문으로 잰다. */
 function PostBody({ body }: { body: string }) {
@@ -280,18 +264,6 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   card: { overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center' },
-  avatar: {
-    width: AVATAR,
-    height: AVATAR,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // FloatingIcon과 같은 홀드 모양.
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 13,
-    borderBottomRightRadius: 20,
-    borderBottomLeftRadius: 15,
-  },
-  initial: { fontFamily: 'Pretendard-ExtraBold' },
   measure: { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0 },
   more: { alignSelf: 'flex-start' },
   menuSlot: { position: 'absolute' },
