@@ -1,6 +1,8 @@
 package com.theclimbingnight.feed.service;
 
+import com.theclimbingnight.common.BusinessException;
 import com.theclimbingnight.common.CursorResponse;
+import com.theclimbingnight.common.ErrorCode;
 import com.theclimbingnight.feed.Cursor;
 import com.theclimbingnight.feed.dto.LikeResponse;
 import com.theclimbingnight.feed.dto.LikerResponse;
@@ -34,9 +36,14 @@ public class PostLikeService {
 		this.clock = clock;
 	}
 
-	/** 게시물 행을 잠근 뒤 확인하고 넣으므로, 같은 글의 좋아요는 줄을 서서 처리되고 수가 어긋나지 않는다. */
+	/**
+	 * 게시물 행을 잠근 뒤 확인하고 넣으므로, 같은 글의 좋아요는 줄을 서서 처리되고 수가 어긋나지 않는다.
+	 * post_likes.user_id 외래키가 사용자 행에 공유 잠금을 거므로, 탈퇴와 같은 순서(사용자 → 게시물)로 사용자 행을 먼저 잠근다.
+	 */
 	@Transactional
 	public LikeResponse like(long userId, long postId) {
+		users.findAllByIdForShare(List.of(userId)).stream().filter(User::isActive).findFirst()
+				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 		Post post = access.lockWritable(userId, postId);
 		if (!likes.existsByPostIdAndUserId(postId, userId)) {
 			likes.save(PostLike.of(postId, userId, clock.instant()));

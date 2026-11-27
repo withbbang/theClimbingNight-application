@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -16,14 +19,18 @@ import com.theclimbingnight.feed.entity.PostStatus;
 import com.theclimbingnight.feed.repository.PostLikeRepository;
 import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.moderation.repository.UserBlockRepository;
+import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -46,6 +53,16 @@ class PostLikeServiceTest {
 	@BeforeEach
 	void setUp() {
 		service = new PostLikeService(new PostAccess(posts, blocks), likes, users, Clock.fixed(NOW, ZoneOffset.UTC));
+		lenient().when(users.findAllByIdForShare(anyCollection())).thenAnswer(inv -> {
+			Collection<Long> ids = inv.getArgument(0);
+			return ids.stream().map(PostLikeServiceTest::user).toList();
+		});
+	}
+
+	private static User user(long id) {
+		User user = User.create("u" + id);
+		ReflectionTestUtils.setField(user, "id", id);
+		return user;
 	}
 
 	private Post post(PostStatus status, int likeCount) {
@@ -72,6 +89,35 @@ class PostLikeServiceTest {
 		// then
 		assertThat(response).isEqualTo(new LikeResponse(4, true));
 		verify(likes).save(any(PostLike.class));
+	}
+
+	@Test
+	void 사용자_행을_공유_잠금한_뒤_게시물_행을_잠근다() {
+		// given
+		givenPost(post(PostStatus.VISIBLE, 3));
+		given(likes.existsByPostIdAndUserId(POST, ME)).willReturn(false);
+
+		// when
+		service.like(ME, POST);
+
+		// then
+		InOrder order = inOrder(users, posts, likes);
+		order.verify(users).findAllByIdForShare(List.of(ME));
+		order.verify(posts).findByIdForUpdate(POST);
+		order.verify(likes).save(any(PostLike.class));
+	}
+
+	@Test
+	void 그새_탈퇴한_사용자는_누를_수_없다() {
+		// given
+		User withdrawn = user(ME);
+		withdrawn.withdraw(NOW);
+		given(users.findAllByIdForShare(List.of(ME))).willReturn(List.of(withdrawn));
+
+		// when / then
+		assertThatThrownBy(() -> service.like(ME, POST)).isInstanceOfSatisfying(BusinessException.class,
+				e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_REQUIRED));
+		verify(posts, never()).findByIdForUpdate(POST);
 	}
 
 	@Test

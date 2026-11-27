@@ -23,6 +23,10 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 	@Query("select c.postId from Comment c where c.id = :id and c.deletedAt is null")
 	Optional<Long> findLivePostIdById(@Param("id") long id);
 
+	/** 댓글 작성자 id. 엔티티를 올리지 않고 잠금 전에 답글 대상 사용자 행을 잠그는 데 쓴다. 작성자는 바뀌지 않는다. */
+	@Query("select c.authorId from Comment c where c.id = :id")
+	Optional<Long> findAuthorIdById(@Param("id") long id);
+
 	/** 지워지지 않았고 VISIBLE인 댓글과 답글을 모두 센다. */
 	@Query("select count(c) from Comment c where c.postId = :postId and c.deletedAt is null and c.status = com.theclimbingnight.comment.entity.CommentStatus.VISIBLE")
 	int countShownByPostId(@Param("postId") long postId);

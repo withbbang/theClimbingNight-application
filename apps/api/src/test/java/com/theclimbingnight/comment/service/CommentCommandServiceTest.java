@@ -4,6 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -25,10 +29,13 @@ import com.theclimbingnight.user.repository.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -54,6 +61,22 @@ class CommentCommandServiceTest {
 	void setUp() {
 		service = new CommentCommandService(new PostAccess(posts, blocks), comments, users, counter, blocks,
 				Clock.fixed(NOW, ZoneOffset.UTC));
+		lenient().when(users.findAllByIdForShare(anyCollection())).thenAnswer(inv -> {
+			Collection<Long> ids = inv.getArgument(0);
+			return ids.stream().map(CommentCommandServiceTest::user).toList();
+		});
+		lenient().when(comments.findAuthorIdById(anyLong())).thenReturn(Optional.of(OTHER));
+	}
+
+	/** 넘긴 id 모음이 이 순서와 같은지. 서비스는 TreeSet을 넘긴다. */
+	private static Collection<Long> ids(Long... expected) {
+		return org.mockito.ArgumentMatchers.argThat(c -> List.copyOf(c).equals(List.of(expected)));
+	}
+
+	private static User user(long id) {
+		User user = User.create("u" + id);
+		ReflectionTestUtils.setField(user, "id", id);
+		return user;
 	}
 
 	private Post post(PostStatus status) {
@@ -134,6 +157,69 @@ class CommentCommandServiceTest {
 		assertThat(response.replyToNickname()).isEqualTo("상대");
 		verify(comments).save(org.mockito.ArgumentMatchers.argThat((Comment c) -> c.getParentId() == 10L
 				&& c.getReplyToUserId() == OTHER));
+	}
+
+	@Test
+	void 답글은_두_사용자_행을_id_오름차순으로_공유_잠금한_뒤_게시물과_대상_댓글을_읽는다() {
+		// given
+		givenPost(post(PostStatus.VISIBLE));
+		given(comments.save(any(Comment.class))).willAnswer(inv -> {
+			Comment c = inv.getArgument(0);
+			ReflectionTestUtils.setField(c, "id", 100L);
+			ReflectionTestUtils.setField(c, "createdAt", NOW);
+			return c;
+		});
+		given(comments.findById(20L)).willReturn(Optional.of(comment(20L, POST, OTHER, null)));
+
+		// when
+		service.create(OTHER + 10, POST, new CommentCreateRequest("답", 20L));
+
+		// then
+		InOrder order = inOrder(comments, users, posts);
+		order.verify(comments).findAuthorIdById(20L);
+		order.verify(users).findAllByIdForShare(ids(OTHER, OTHER + 10));
+		order.verify(posts).findByIdForUpdate(POST);
+		order.verify(comments).findById(20L);
+		order.verify(comments).save(any(Comment.class));
+	}
+
+	@Test
+	void 자기_댓글에_답하면_사용자_행은_한_번만_잠근다() {
+		// given
+		givenPost(post(PostStatus.VISIBLE));
+		givenSave();
+		given(comments.findAuthorIdById(20L)).willReturn(Optional.of(ME));
+		given(comments.findById(20L)).willReturn(Optional.of(comment(20L, POST, ME, null)));
+
+		// when
+		service.create(ME, POST, new CommentCreateRequest("답", 20L));
+
+		// then
+		verify(users).findAllByIdForShare(ids(ME));
+	}
+
+	@Test
+	void 그새_탈퇴한_사용자는_댓글을_달_수_없다() {
+		// given
+		User withdrawn = user(ME);
+		withdrawn.withdraw(NOW);
+		given(users.findAllByIdForShare(ids(ME))).willReturn(List.of(withdrawn));
+
+		// when / then
+		assertThatThrownBy(() -> service.create(ME, POST, new CommentCreateRequest("안녕", null)))
+				.isInstanceOfSatisfying(BusinessException.class,
+						e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_REQUIRED));
+		verify(posts, never()).findByIdForUpdate(POST);
+	}
+
+	@Test
+	void 없는_댓글에_답하면_게시물을_잠그기_전에_404다() {
+		// given
+		given(comments.findAuthorIdById(20L)).willReturn(Optional.empty());
+
+		// when / then
+		assertNotFound(() -> service.create(ME, POST, new CommentCreateRequest("답", 20L)));
+		verify(posts, never()).findByIdForUpdate(POST);
 	}
 
 	@Test

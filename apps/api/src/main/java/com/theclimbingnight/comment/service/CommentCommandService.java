@@ -16,10 +16,15 @@ import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
 import java.time.Clock;
 import java.time.ZoneOffset;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 잠금 순서는 게시물 행 다음 댓글 행이다. 댓글이 바뀔 때마다 게시물의 수를 다시 센다. */
+/**
+ * 잠금 순서는 게시물 행 다음 댓글 행이다. 작성은 그 앞에 외래키로 참조할 사용자 행을 id 오름차순 공유 잠금해
+ * 탈퇴(사용자 → 게시물)와 순서를 맞춘다. 댓글이 바뀔 때마다 게시물의 수를 다시 센다.
+ */
 @Service
 @Transactional(readOnly = true)
 public class CommentCommandService {
@@ -43,6 +48,15 @@ public class CommentCommandService {
 
 	@Transactional
 	public CommentResponse create(long userId, long postId, CommentCreateRequest request) {
+		// 답글 대상 작성자는 엔티티를 올리지 않는 조회로 먼저 알아낸다. 댓글 엔티티는 게시물을 잠근 뒤 처음 읽는다.
+		SortedSet<Long> referenced = new TreeSet<>();
+		referenced.add(userId);
+		if (request.replyToCommentId() != null) {
+			referenced.add(comments.findAuthorIdById(request.replyToCommentId())
+					.orElseThrow(CommentCommandService::notFound));
+		}
+		users.findAllByIdForShare(referenced).stream().filter(u -> u.getId().equals(userId) && u.isActive())
+				.findFirst().orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 		Post post = access.lockWritable(userId, postId);
 		Long parentId = null;
 		Long replyToUserId = null;
