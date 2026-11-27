@@ -23,6 +23,7 @@ export interface PostResponse {
   media: PostMediaResponse[];
   likeCount: number;
   commentCount: number;
+  likedByMe: boolean;
   publishedAt: string | null;
   status: PostStatus | null;
   mine: boolean;
@@ -46,4 +47,14 @@ export interface PostUploadResponse {
 export interface PostDraftResponse {
   postId: number;
   uploads: PostUploadResponse[];
+}
+
+export interface LikeResponse {
+  likeCount: number;
+  likedByMe: boolean;
+}
+
+export interface LikerResponse {
+  userId: number;
+  nickname: string;
 }

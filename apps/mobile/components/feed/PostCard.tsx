@@ -5,7 +5,6 @@ import { useRouter } from 'expo-router';
 
 import { ChatCircleIcon } from 'phosphor-react-native/src/icons/ChatCircle';
 import { DotsThreeIcon } from 'phosphor-react-native/src/icons/DotsThree';
-import { HeartIcon } from 'phosphor-react-native/src/icons/Heart';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -15,9 +14,11 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
+import { LikeButton } from '@/components/feed/LikeButton';
 import { MediaCarousel } from '@/components/feed/MediaCarousel';
 import { PostMenu } from '@/components/feed/PostMenu';
 import { AppText } from '@/components/ui/AppText';
+import { useLikePost } from '@/hooks/use-like-post';
 import { usePressScale } from '@/hooks/use-press-scale';
 import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
@@ -144,9 +145,15 @@ interface PostCardProps {
 export function PostCard({ post, onOpen, hideMedia = false, menu = false, onGone }: PostCardProps) {
   const { colors, motion, radius, space } = useTheme();
   const reduced = useReducedMotion();
+  const router = useRouter();
   const press = usePressScale(0.98);
+  const commentPress = usePressScale(0.88);
+  const signedIn = useSession().status === 'authenticated';
+  const { setLiked } = useLikePost();
   const [menuOpen, setMenuOpen] = useState(false);
   const showMedia = !hideMedia && post.media.length > 0;
+  // status는 작성자 본인에게만 있다. 보이지 않는 내 글은 좋아요를 켤 수 없고 끌 수만 있다.
+  const likeBlocked = post.status !== null && post.status !== 'VISIBLE';
 
   const header = (
     <View
@@ -215,21 +222,42 @@ export function PostCard({ post, onOpen, hideMedia = false, menu = false, onGone
           <PostMenu post={post} onClose={() => setMenuOpen(false)} onGone={onGone} />
         </Animated.View>
       ) : null}
-      {showMedia ? <MediaCarousel media={post.media} onPress={onOpen} /> : null}
+      {showMedia ? (
+        <MediaCarousel
+          media={post.media}
+          onPress={onOpen}
+          onDoubleTap={signedIn && !likeBlocked ? () => setLiked(post, true) : undefined}
+        />
+      ) : null}
       <View style={{ gap: space(2), paddingHorizontal: space(4), paddingTop: space(3) }}>
-        <View
-          accessible
-          accessibilityLabel={`좋아요 ${post.likeCount}개, 댓글 ${post.commentCount}개`}
-          style={[styles.row, { gap: space(4) }]}
-        >
-          <View style={[styles.row, { gap: space(1) }]}>
-            <HeartIcon size={20} color={colors.text} weight="bold" />
-            <AppText variant="label">{post.likeCount}</AppText>
-          </View>
-          <View style={[styles.row, { gap: space(1) }]}>
-            <ChatCircleIcon size={20} color={colors.text} weight="bold" />
-            <AppText variant="label">{post.commentCount}</AppText>
-          </View>
+        <View style={[styles.row, { gap: space(4) }]}>
+          <LikeButton
+            liked={post.likedByMe}
+            count={post.likeCount}
+            disabled={likeBlocked}
+            onPress={() => {
+              if (!signedIn) {
+                router.push('/login');
+              } else {
+                setLiked(post, !post.likedByMe);
+              }
+            }}
+          />
+          <Animated.View style={commentPress.style}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`댓글 ${post.commentCount}개`}
+              hitSlop={space(2)}
+              onPress={() => router.push(`/posts/${post.id}?focus=comments`)}
+              {...commentPress.handlers}
+              style={[styles.row, { gap: space(1) }]}
+            >
+              <ChatCircleIcon size={22} color={colors.text} weight="bold" />
+              <AppText variant="label">
+                {post.commentCount}
+              </AppText>
+            </Pressable>
+          </Animated.View>
         </View>
         {/* 본문이 바뀌면 접힘과 줄 수를 다시 잰다. */}
         {post.body ? <PostBody key={post.body} body={post.body} /> : null}

@@ -1,6 +1,12 @@
 import { apiFetch } from '@/lib/api';
 import type { CursorResponse } from '@/types/api/common';
-import type { PostDraftResponse, PostMediaSpec, PostResponse } from '@/types/api/post';
+import type {
+  LikeResponse,
+  LikerResponse,
+  PostDraftResponse,
+  PostMediaSpec,
+  PostResponse,
+} from '@/types/api/post';
 
 export function fetchFeed(cursor: string | null, size: number) {
   const after = cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`;
@@ -29,4 +35,17 @@ export function updatePost(id: number, body: string) {
 
 export function deletePost(id: number) {
   return apiFetch<void>(`/posts/${id}`, { method: 'DELETE' });
+}
+
+export function likePost(id: number) {
+  return apiFetch<LikeResponse>(`/posts/${id}/like`, { method: 'PUT' });
+}
+
+export function unlikePost(id: number) {
+  return apiFetch<LikeResponse>(`/posts/${id}/like`, { method: 'DELETE' });
+}
+
+export function fetchLikers(id: number, cursor: string | null, size: number) {
+  const after = cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`;
+  return apiFetch<CursorResponse<LikerResponse>>(`/posts/${id}/likes?size=${size}${after}`);
 }

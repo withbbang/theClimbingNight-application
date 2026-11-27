@@ -3,6 +3,12 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Image } from 'expo-image';
 
+import {
+  GestureDetector,
+  GestureHandlerRootView,
+  useExclusiveGestures,
+  useTapGesture,
+} from 'react-native-gesture-handler';
 import Animated, {
   interpolate,
   useAnimatedScrollHandler,
@@ -12,6 +18,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
+import { HeartBurst } from '@/components/feed/HeartBurst';
 import { AppText } from '@/components/ui/AppText';
 import { useTheme } from '@/hooks/use-theme';
 import type { PostMediaResponse } from '@/types/api/post';
@@ -35,10 +42,11 @@ interface SlideProps {
   width: number;
   offset: SharedValue<number>;
   onPress?: () => void;
+  onDoubleTap?: () => void;
 }
 
 /** 옆 사진으로 넘기는 동안 떠나는 사진은 조금 작아지고 흐려진다. */
-function Slide({ item, index, count, width, offset, onPress }: SlideProps) {
+function Slide({ item, index, count, width, offset, onPress, onDoubleTap }: SlideProps) {
   const { colors, space } = useTheme();
   const reduced = useReducedMotion();
   const label = `사진 ${count}장 중 ${index + 1}번째`;
@@ -77,9 +85,35 @@ function Slide({ item, index, count, width, offset, onPress }: SlideProps) {
     </View>
   );
 
+  // 두 번 탭을 받는 사진은 제스처로 한 번 탭과 가른다. 두 번째 탭이 오지 않아야 한 번 탭이 된다.
+  const doubleTap = useTapGesture({
+    numberOfTaps: 2,
+    runOnJS: true,
+    testID: 'photo-double-tap',
+    onActivate: () => onDoubleTap?.(),
+  });
+  const singleTap = useTapGesture({
+    runOnJS: true,
+    testID: 'photo-single-tap',
+    onActivate: () => onPress?.(),
+  });
+  const gesture = useExclusiveGestures(doubleTap, singleTap);
+
   return (
     <Animated.View style={[{ width }, styles.fill, animated]}>
-      {onPress ? (
+      {onDoubleTap ? (
+        <GestureDetector gesture={gesture}>
+          <View
+            accessible
+            accessibilityRole={onPress ? 'imagebutton' : 'image'}
+            accessibilityLabel={onPress ? `${label}, 게시물 열기` : label}
+            onAccessibilityTap={onPress}
+            style={styles.fill}
+          >
+            {content}
+          </View>
+        </GestureDetector>
+      ) : onPress ? (
         <Pressable
           onPress={onPress}
           accessibilityRole="imagebutton"
@@ -118,21 +152,25 @@ interface MediaCarouselProps {
   media: PostMediaResponse[];
   /** 주면 사진을 눌러 상세로 간다. */
   onPress?: () => void;
+  /** 주면 사진을 두 번 탭할 때 부르고 큰 하트를 터뜨린다. 한 번 탭(onPress)과 겹치지 않는다. */
+  onDoubleTap?: () => void;
 }
 
-export function MediaCarousel({ media, onPress }: MediaCarouselProps) {
+export function MediaCarousel({ media, onPress, onDoubleTap }: MediaCarouselProps) {
   const { colors, space } = useTheme();
   const [width, setWidth] = useState(0);
   const [current, setCurrent] = useState(0);
+  const [burst, setBurst] = useState(0);
   const offset = useSharedValue(0);
   const onScroll = useAnimatedScrollHandler((event) => {
     offset.set(event.contentOffset.x);
   });
   const ratio = mediaRatio(media[0]);
 
-  return (
+  const body = (
     <View>
       <View
+        testID="media-carousel"
         onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
         style={{ aspectRatio: ratio, backgroundColor: colors.holdOff }}
       >
@@ -157,10 +195,19 @@ export function MediaCarousel({ media, onPress }: MediaCarouselProps) {
                 width={width}
                 offset={offset}
                 onPress={onPress}
+                onDoubleTap={
+                  onDoubleTap
+                    ? () => {
+                        setBurst((n) => n + 1);
+                        onDoubleTap();
+                      }
+                    : undefined
+                }
               />
             )}
           />
         ) : null}
+        {onDoubleTap ? <HeartBurst trigger={burst} accent={colors.accent} /> : null}
       </View>
       {media.length > 1 ? (
         <View
@@ -175,6 +222,9 @@ export function MediaCarousel({ media, onPress }: MediaCarouselProps) {
       ) : null}
     </View>
   );
+
+  // 제스처 감지기는 이 뿌리 안에서만 동작한다.
+  return onDoubleTap ? <GestureHandlerRootView>{body}</GestureHandlerRootView> : body;
 }
 
 const styles = StyleSheet.create({

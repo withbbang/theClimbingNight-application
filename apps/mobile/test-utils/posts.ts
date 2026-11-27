@@ -20,6 +20,7 @@ export function post(over: Partial<PostResponse> = {}): PostResponse {
     media: [media(11)],
     likeCount: 4,
     commentCount: 2,
+    likedByMe: false,
     publishedAt: '2026-11-24T02:30:00Z',
     status: null,
     mine: false,
