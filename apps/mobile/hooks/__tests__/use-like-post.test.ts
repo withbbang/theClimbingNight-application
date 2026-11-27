@@ -163,3 +163,43 @@ it('leaves other lists under the post key alone even when an item id matches', a
   expect(items(['posts', 5, 'likes'])).toEqual([{ id: 5 }]);
   expect(inFeed(5)).toMatchObject({ likedByMe: true });
 });
+
+it('refetches the likers list once the server confirms', async () => {
+  // given: 좋아요 누른 사람 목록이 캐시에 있다.
+  const request = deferred();
+  jest.mocked(likePost).mockReturnValue(request.promise);
+  const { result } = await setup();
+  client.setQueryData(['posts', 5, 'likes'], { pages: [{ items: [] }], pageParams: [null] });
+  const stale = () => client.getQueryState(['posts', 5, 'likes'])?.isInvalidated;
+  await act(async () => {
+    result.current.setLiked(target, true);
+  });
+  expect(stale()).toBe(false);
+
+  // when
+  await act(async () => {
+    request.resolve({ likeCount: 5, likedByMe: true });
+  });
+
+  // then
+  expect(stale()).toBe(true);
+});
+
+it('keeps the likers list when the request fails without a response', async () => {
+  // given
+  const request = deferred();
+  jest.mocked(likePost).mockReturnValue(request.promise);
+  const { result } = await setup();
+  client.setQueryData(['posts', 5, 'likes'], { pages: [{ items: [] }], pageParams: [null] });
+  await act(async () => {
+    result.current.setLiked(target, true);
+  });
+
+  // when
+  await act(async () => {
+    request.reject(new ApiError('COMMON_INTERNAL', '실패', 500));
+  });
+
+  // then
+  expect(client.getQueryState(['posts', 5, 'likes'])?.isInvalidated).toBe(false);
+});

@@ -106,10 +106,13 @@ export function useLikePost() {
       running.set(id, flight);
 
       void (async () => {
+        // 서버가 한 번이라도 응답했으면 좋아요 누른 사람 목록이 바뀌었으니, 끝난 뒤 그 목록을 다시 받게 한다.
+        let confirmed = false;
         try {
           let sent = liked;
           for (;;) {
             const result = await (sent ? likePost(id) : unlikePost(id));
+            confirmed = true;
             flight.settled = result;
             if (flight.wanted === sent) {
               write(client, id, (post) => ({ ...post, ...result }));
@@ -123,6 +126,9 @@ export function useLikePost() {
           notifyError();
         } finally {
           running.delete(id);
+          if (confirmed) {
+            void client.invalidateQueries({ queryKey: ['posts', id, 'likes'] });
+          }
         }
       })();
     },
