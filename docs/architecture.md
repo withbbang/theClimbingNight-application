@@ -374,7 +374,7 @@ profile_images         -- 프로필 계획에서 추가
 
 ### 미디어 처리 (2단계)
 
-사진만 지금 구현돼 있고 영상은 3번 계획이다. 세부는 설계 문서 8장이 정본이다.
+사진만 지금 구현돼 있고 영상은 4번 계획이다. 세부는 설계 문서 8장이 정본이다.
 
 1. 앱이 사진을 JPEG로 리사이즈(긴 변 2048px)해 API에 게시물 초안과 업로드 URL을 요청한다.
 2. API가 `posts`(DRAFT)와 `post_media`(UPLOADING)를 만들고 R2 `media-incoming`의 `uploads/` presigned PUT URL(15분)을 준다.
