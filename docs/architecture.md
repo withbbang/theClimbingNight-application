@@ -244,7 +244,7 @@ k-drinker와 같은 패턴: `master` 푸시 → GitHub Actions가 이미지 빌�
 | 동호회 소개 | 웹뷰 | 전체 | 1 |
 | 굿즈 (소개 + 스마트스토어로 이동) | 웹뷰 | 전체 | 1 |
 | 이용약관, 개인정보처리방침 | 웹뷰 | 전체 | 1 |
-| 피드(`/feed` 탭), 게시물 상세(`/posts/{id}`), 게시물 작성(`/posts/new`)·편집(`/posts/{id}/edit`), 댓글, 신고·차단 | 네이티브 | USER 이상 (보기는 비로그인도 최근 3개까지) | 2 |
+| 피드(`/feed` 탭), 게시물 상세(`/posts/{id}`), 게시물 작성(`/posts/new`)·편집(`/posts/{id}/edit`), 좋아요 목록(`/posts/{id}/likes`), 댓글, 신고·차단 | 네이티브 | USER 이상 (보기는 비로그인도 최근 3개까지) | 2 |
 | 차단 목록 (`/settings/blocks`, 마이 탭) | 네이티브 | USER 이상 | 2 |
 | [운영진] 신고 목록 (`/admin/reports`, 숨김·복원·기각) | 네이티브 | ADMIN | 2 |
 | DM | 네이티브 | USER 이상 | 3 |
@@ -343,7 +343,8 @@ media_jobs     id, kind(PROCESS, QUARANTINE, RELEASE, DELETE_MEDIA, PURGE_ORIGIN
 reports        id, reporter_id, target_type, target_id, reason, detail, status(OPEN, ACTIONED, DISMISSED)
                UNIQUE(reporter_id, target_type, target_id)
 user_blocks    blocker_id, blocked_id  PK(blocker_id, blocked_id)
-comments, post_likes, profile_images   -- 2번 계획(좋아요·댓글·프로필)에서 추가
+comments, post_likes   -- 2번 계획(좋아요·댓글)에서 추가됨
+profile_images         -- 프로필 계획에서 추가
 ```
 
 작업 종류는 설계 문서 8장을 따른다. 우선순위는 `QUARANTINE`·`DELETE_MEDIA` > `RELEASE` > `PROCESS` > `PURGE_ORIGINAL`이다.
@@ -398,7 +399,7 @@ comments, post_likes, profile_images   -- 2번 계획(좋아요·댓글·프로�
 | 소셜 로그인 시 Apple 로그인 (4.8) | iOS에 카카오·네이버·구글과 함께 Apple 로그인 | 1 |
 | 최소 기능, 웹뷰 래퍼 금지 (4.2) | 핵심 화면은 네이티브 | 1 |
 | 개인정보처리방침 URL | 웹뷰 페이지, 스토어 등록 | 1 |
-| UGC 신고·차단·운영자 조치 (1.2) | 게시물 신고(사유 선택), 회원 차단(양방향 숨김), 운영진 신고 목록에서 숨김·복원·기각, 초상권 신고 1건 또는 서로 다른 3명 신고 시 자동 임시조치 | 2 (피드와 함께, 댓글 신고는 2번 계획) |
+| UGC 신고·차단·운영자 조치 (1.2) | 게시물 신고(사유 선택), 회원 차단(양방향 숨김), 운영진 신고 목록에서 숨김·복원·기각, 초상권 신고 1건 또는 서로 다른 3명 신고 시 자동 임시조치 | 2 (피드와 함께, 댓글 신고는 2번 계획에서 추가됨) |
 | 심사용 테스트 계정 | 심사 전 MEMBER 테스트 계정 준비 (카카오 로그인만으로는 심사자가 못 들어올 수 있음) | 1 |
 
 ## 13. 결정 기록
