@@ -136,6 +136,22 @@ describe('comments', () => {
     expect(server.count('/posts/8/comments?size=20&parentId=1')).toBe(1);
   });
 
+  it('lists comments on my hidden post', async () => {
+    // given
+    await startAs('USER');
+    const server = mockServer({
+      '/posts/8': ok(post({ id: 8, mine: true, status: 'HIDDEN' })),
+      '/posts/8/comments?size=20': comments([comment({ id: 1, body: '남은 댓글' })]),
+    });
+
+    // when
+    await renderApp('/posts/8');
+
+    // then
+    expect(screen.getByText('남은 댓글')).toBeOnTheScreen();
+    expect(server.count('/posts/8/comments?size=20')).toBe(1);
+  });
+
   it('asks signed-out users to log in instead of loading comments', async () => {
     // given: 최근 글은 비로그인도 본다
     await startAs(null);

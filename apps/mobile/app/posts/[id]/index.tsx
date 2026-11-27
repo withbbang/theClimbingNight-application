@@ -48,8 +48,8 @@ function Detail({
   const listRef = useRef<FlashListRef<CommentResponse>>(null);
   const focused = useRef(false);
   const hidden = post.status !== null && HIDDEN.includes(post.status);
-  // 비로그인은 댓글을 요청하지 않는다. 숨겨진 내 글에도 댓글은 보이지 않는다.
-  const query = useComments(post.id, signedIn && !hidden);
+  // 비로그인은 댓글을 요청하지 않는다. 숨겨진 내 글의 기존 댓글은 볼 수 있고, 볼 수 있는지는 API가 판단한다.
+  const query = useComments(post.id, signedIn);
   const { data: comments, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage } = query;
 
   // 댓글 단추나 focus=comments로 들어오면 첫 댓글로 내린다. 댓글이 없으면 맨 아래로 간다.
@@ -60,7 +60,8 @@ function Detail({
       listRef.current?.scrollToEnd({ animated: true });
     }
   };
-  const loaded = comments !== undefined;
+  // 비로그인은 댓글을 받지 않으니 로그인 안내 자리로 바로 간다.
+  const loaded = comments !== undefined || !signedIn;
   useEffect(() => {
     if (focusComments && loaded && !focused.current) {
       focused.current = true;
@@ -83,7 +84,7 @@ function Detail({
       <ErrorBanner message={errorMessage(query.error)} />
       <Button label="다시 시도" variant="secondary" onPress={() => void query.refetch()} />
     </View>
-  ) : hidden || query.isPending ? null : (
+  ) : query.isPending ? null : (
     <AppText tone="muted">아직 댓글이 없어요</AppText>
   );
 
@@ -91,7 +92,7 @@ function Detail({
     <FlashList
       ref={listRef}
       accessibilityLabel="댓글"
-      data={signedIn && !hidden ? (comments ?? []) : []}
+      data={signedIn ? (comments ?? []) : []}
       keyExtractor={(comment) => String(comment.id)}
       renderItem={({ item }) => (
         <View style={{ paddingBottom: space(4) }}>
@@ -130,7 +131,7 @@ function Detail({
       keyboardShouldPersistTaps="handled"
       refreshControl={
         <PullToRefresh
-          onRefresh={() => Promise.all([onRefresh(), signedIn && !hidden ? query.refetch() : null])}
+          onRefresh={() => Promise.all([onRefresh(), signedIn ? query.refetch() : null])}
         />
       }
     />
