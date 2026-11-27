@@ -2,12 +2,14 @@ package com.theclimbingnight.comment.repository;
 
 import com.theclimbingnight.comment.entity.Comment;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -75,4 +77,14 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 			group by c.parentId
 			""")
 	List<ReplyCount> countShownReplies(@Param("parentIds") Collection<Long> parentIds);
+
+	/** 탈퇴 정리용. userId가 지워지지 않은 댓글을 남긴 게시물 id. 중복 없음. */
+	@Query("select distinct c.postId from Comment c where c.authorId = :authorId and c.deletedAt is null")
+	List<Long> findLivePostIdsByAuthorId(@Param("authorId") long authorId);
+
+	/** 한 게시물에서 작성자의 지워지지 않은 댓글·답글을 소프트 삭제한다. 지운 행 수를 준다. 호출하는 쪽이 게시물 행을 잠가야 한다. */
+	@Modifying
+	@Query("update Comment c set c.deletedAt = :now where c.postId = :postId and c.authorId = :authorId and c.deletedAt is null")
+	int softDeleteByPostIdAndAuthorId(@Param("postId") long postId, @Param("authorId") long authorId,
+			@Param("now") Instant now);
 }

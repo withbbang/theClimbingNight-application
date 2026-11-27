@@ -4,7 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.theclimbingnight.auth.entity.RefreshToken;
 import com.theclimbingnight.auth.repository.RefreshTokenRepository;
+import com.theclimbingnight.comment.dto.CommentDisplay;
+import com.theclimbingnight.comment.dto.CommentResponse;
+import com.theclimbingnight.comment.entity.Comment;
+import com.theclimbingnight.comment.repository.CommentRepository;
+import com.theclimbingnight.comment.service.CommentQueryService;
 import com.theclimbingnight.feed.entity.Post;
+import com.theclimbingnight.feed.entity.PostLike;
+import com.theclimbingnight.feed.repository.PostLikeRepository;
 import com.theclimbingnight.feed.entity.PostMedia;
 import com.theclimbingnight.feed.repository.PostMediaRepository;
 import com.theclimbingnight.feed.repository.PostRepository;
@@ -24,6 +31,7 @@ import com.theclimbingnight.push.repository.PushTokenRepository;
 import com.theclimbingnight.roster.entity.RosterMember;
 import com.theclimbingnight.roster.entity.RosterSource;
 import com.theclimbingnight.roster.repository.RosterMemberRepository;
+import com.theclimbingnight.user.entity.Role;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.entity.UserStatus;
 import com.theclimbingnight.user.repository.UserRepository;
@@ -52,6 +60,9 @@ class WithdrawalDataIntegrationTest {
 	@Autowired PostRepository postRepository;
 	@Autowired PostMediaRepository postMediaRepository;
 	@Autowired MediaJobRepository mediaJobRepository;
+	@Autowired CommentRepository commentRepository;
+	@Autowired PostLikeRepository postLikeRepository;
+	@Autowired CommentQueryService commentQueryService;
 
 	private User leaving;
 	private User staying;
@@ -70,6 +81,8 @@ class WithdrawalDataIntegrationTest {
 	}
 
 	private void clean() {
+		commentRepository.deleteAllInBatch();
+		postLikeRepository.deleteAllInBatch();
 		mediaJobRepository.deleteAllInBatch();
 		postMediaRepository.deleteAllInBatch();
 		postRepository.deleteAllInBatch();
@@ -163,5 +176,62 @@ class WithdrawalDataIntegrationTest {
 				.containsExactlyInAnyOrder(a.getId(), b.getId());
 		assertThat(jobs).filteredOn(j -> j.getKind() == MediaJobKind.PURGE_ORIGINAL).extracting(MediaJob::getTargetId)
 				.containsExactlyInAnyOrder(a.getId(), b.getId());
+	}
+
+	private Post visiblePost(long authorId) {
+		Post post = Post.draft(authorId);
+		post.publish("본문");
+		post.markVisible(NOW);
+		return postRepository.save(post);
+	}
+
+	@Test
+	void 탈퇴한_사람의_댓글에_남의_답글이_있으면_삭제_자리로_남는다() {
+		// given
+		Post post = visiblePost(staying.getId());
+		Comment mine = commentRepository.save(Comment.create(post.getId(), leaving.getId(), null, null, "내 댓글"));
+		Comment reply = commentRepository
+				.save(Comment.create(post.getId(), staying.getId(), mine.getId(), leaving.getId(), "남의 답글"));
+		Comment lone = commentRepository.save(Comment.create(post.getId(), leaving.getId(), null, null, "혼자 댓글"));
+		postLikeRepository.save(PostLike.of(post.getId(), leaving.getId(), NOW));
+		post.updateLikeCount(1);
+		post.updateCommentCount(3);
+		postRepository.save(post);
+
+		// when
+		userService.withdraw(leaving.getId());
+
+		// then
+		var items = commentQueryService.list(staying.getId(), Role.USER, post.getId(), null, null, 20).items();
+		assertThat(items).extracting(CommentResponse::id).containsExactly(mine.getId());
+		assertThat(items.get(0).display()).isEqualTo(CommentDisplay.DELETED);
+		assertThat(items.get(0).replyCount()).isEqualTo(1);
+		assertThat(items.get(0).body()).isNull();
+		assertThat(commentRepository.findById(lone.getId()).orElseThrow().getDeletedAt()).isNotNull();
+		assertThat(commentRepository.findById(reply.getId()).orElseThrow().getDeletedAt()).isNull();
+		Post after = postRepository.findById(post.getId()).orElseThrow();
+		assertThat(after.getLikeCount()).isZero();
+		assertThat(after.getCommentCount()).isEqualTo(1);
+		assertThat(postLikeRepository.countByPostId(post.getId())).isZero();
+	}
+
+	@Test
+	void 탈퇴한_사람에게_단_답글은_대상_닉네임이_비어_있다() {
+		// given
+		Post post = visiblePost(staying.getId());
+		Comment parent = commentRepository.save(Comment.create(post.getId(), staying.getId(), null, null, "부모"));
+		Comment reply = commentRepository
+				.save(Comment.create(post.getId(), staying.getId(), parent.getId(), leaving.getId(), "답글"));
+		Comment before = reply;
+
+		// when
+		userService.withdraw(leaving.getId());
+
+		// then
+		var replies = commentQueryService.list(staying.getId(), Role.USER, post.getId(), parent.getId(), null, 20)
+				.items();
+		assertThat(replies).extracting(CommentResponse::id).containsExactly(before.getId());
+		assertThat(replies.get(0).replyToNickname()).isNull();
+		assertThat(replies.get(0).body()).isEqualTo("답글");
 	}
 }
