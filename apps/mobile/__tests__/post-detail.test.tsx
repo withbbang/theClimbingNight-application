@@ -1,6 +1,7 @@
 import { screen } from 'expo-router/testing-library';
 
 import { fail, mockServer, ok, renderApp } from '@/test-utils/app';
+import { comment } from '@/test-utils/comments';
 import { media, post } from '@/test-utils/posts';
 import { press } from '@/test-utils/screen';
 import { startAs } from '@/test-utils/session';
@@ -85,4 +86,66 @@ it('blocks the author and goes back from the detail', async () => {
   // then
   expect(server.calls.find((c) => c.path === '/blocks')?.body).toEqual({ userId: 7 });
   expect(app.getPathname()).toBe('/feed');
+});
+
+describe('comments', () => {
+  const comments = (items: unknown[], nextCursor: string | null = null) =>
+    ok({ items, nextCursor });
+
+  it('lists comments oldest first under the post', async () => {
+    // given
+    await startAs('USER');
+    mockServer({
+      '/posts/8': ok(post({ id: 8 })),
+      '/posts/8/comments?size=20': comments([
+        comment({ id: 1, body: '먼저 단 댓글' }),
+        comment({ id: 2, body: '나중에 단 댓글', author: { id: 9, nickname: '구름' } }),
+      ]),
+    });
+
+    // when
+    await renderApp('/posts/8');
+
+    // then
+    expect(screen.getByText('오늘 초록 문제 완등')).toBeOnTheScreen();
+    const order = screen
+      .getAllByText(/먼저 단 댓글|나중에 단 댓글/)
+      .map((node) => node.props.children);
+    expect(order).toEqual(['먼저 단 댓글', '나중에 단 댓글']);
+  });
+
+  it('expands replies on demand', async () => {
+    // given
+    await startAs('USER');
+    const server = mockServer({
+      '/posts/8': ok(post({ id: 8 })),
+      '/posts/8/comments?size=20': comments([comment({ id: 1, replyCount: 1 })]),
+      '/posts/8/comments?size=20&parentId=1': comments([
+        comment({ id: 3, parentId: 1, body: '답글이에요', replyToNickname: '바위' }),
+      ]),
+    });
+    await renderApp('/posts/8');
+    expect(screen.queryByText(/답글이에요/)).not.toBeOnTheScreen();
+
+    // when
+    await press('답글 1개 보기');
+
+    // then
+    expect(screen.getByText(/답글이에요/)).toBeOnTheScreen();
+    expect(screen.getByText('@바위')).toBeOnTheScreen();
+    expect(server.count('/posts/8/comments?size=20&parentId=1')).toBe(1);
+  });
+
+  it('asks signed-out users to log in instead of loading comments', async () => {
+    // given: 최근 글은 비로그인도 본다
+    await startAs(null);
+    const server = mockServer({ '/posts/8': ok(post({ id: 8 })) });
+
+    // when
+    await renderApp('/posts/8');
+
+    // then
+    expect(screen.getByText('로그인하고 댓글을 볼 수 있어요')).toBeOnTheScreen();
+    expect(server.calls.some((c) => c.path.includes('/comments'))).toBe(false);
+  });
 });

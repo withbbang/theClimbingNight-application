@@ -26,14 +26,22 @@ beforeEach(async () => {
 });
 
 /** 좋아요는 캐시를 고치므로, 카드가 보는 글을 캐시에서 읽어 다시 그린다. */
-async function show(initial: PostResponse, options: { onOpen?: () => void } = {}) {
+async function show(
+  initial: PostResponse,
+  options: { onOpen?: () => void; onCommentPress?: () => void } = {},
+) {
   queryClient.setQueryData(['posts', initial.id], initial);
-  const { useQuery } = jest.requireActual<typeof import('@tanstack/react-query')>(
-    '@tanstack/react-query',
-  );
+  const { useQuery } =
+    jest.requireActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
   function Connected() {
     const { data } = useQuery({ queryKey: ['posts', initial.id], queryFn: () => initial });
-    return <PostCard post={data ?? initial} onOpen={options.onOpen} />;
+    return (
+      <PostCard
+        post={data ?? initial}
+        onOpen={options.onOpen}
+        onCommentPress={options.onCommentPress}
+      />
+    );
   }
   const view = await render(
     <GestureHandlerRootView>
@@ -174,6 +182,19 @@ it('opens the detail at comments from the comment button', async () => {
 
   // then
   expect(mockPush).toHaveBeenCalledWith('/posts/9?focus=comments');
+});
+
+it('calls onCommentPress instead of opening the detail', async () => {
+  // given
+  const onCommentPress = jest.fn();
+  await show(post({ id: 9, commentCount: 2 }), { onCommentPress });
+
+  // when
+  await fireEvent.press(screen.getByRole('button', { name: '댓글 2개' }));
+
+  // then
+  expect(onCommentPress).toHaveBeenCalledTimes(1);
+  expect(mockPush).not.toHaveBeenCalled();
 });
 
 it('only allows unliking on my hidden post', async () => {

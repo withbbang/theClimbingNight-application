@@ -124,9 +124,18 @@ interface PostCardProps {
   menu?: boolean;
   /** 메뉴로 지우거나 차단하거나 숨겨서 이 글을 더 볼 수 없게 됐을 때. */
   onGone?: () => void;
+  /** 주면 댓글 버튼이 상세로 가지 않고 이 함수를 부른다. 이미 상세에 있을 때 쓴다. */
+  onCommentPress?: () => void;
 }
 
-export function PostCard({ post, onOpen, hideMedia = false, menu = false, onGone }: PostCardProps) {
+export function PostCard({
+  post,
+  onOpen,
+  hideMedia = false,
+  menu = false,
+  onGone,
+  onCommentPress,
+}: PostCardProps) {
   const { colors, motion, radius, space } = useTheme();
   const reduced = useReducedMotion();
   const router = useRouter();
@@ -242,14 +251,12 @@ export function PostCard({ post, onOpen, hideMedia = false, menu = false, onGone
               accessibilityRole="button"
               accessibilityLabel={`댓글 ${post.commentCount}개`}
               hitSlop={space(2)}
-              onPress={() => router.push(`/posts/${post.id}?focus=comments`)}
+              onPress={onCommentPress ?? (() => router.push(`/posts/${post.id}?focus=comments`))}
               {...commentPress.handlers}
               style={[styles.row, { gap: space(1) }]}
             >
               <ChatCircleIcon size={22} color={colors.text} weight="bold" />
-              <AppText variant="label">
-                {post.commentCount}
-              </AppText>
+              <AppText variant="label">{post.commentCount}</AppText>
             </Pressable>
           </Animated.View>
         </View>
