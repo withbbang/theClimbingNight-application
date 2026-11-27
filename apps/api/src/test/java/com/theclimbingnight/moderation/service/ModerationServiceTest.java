@@ -9,10 +9,15 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.theclimbingnight.auth.service.MutableClock;
+import com.theclimbingnight.comment.entity.Comment;
+import com.theclimbingnight.comment.entity.CommentStatus;
+import com.theclimbingnight.comment.repository.CommentRepository;
+import com.theclimbingnight.comment.service.CommentCounter;
 import com.theclimbingnight.common.BusinessException;
 import com.theclimbingnight.common.ErrorCode;
 import com.theclimbingnight.common.PageResponse;
@@ -63,10 +68,13 @@ class ModerationServiceTest {
 	private static final long ADMIN = 1L;
 	private static final long AUTHOR = 7L;
 	private static final long POST_ID = 50L;
+	private static final long COMMENT_ID = 80L;
 
 	@Mock ReportRepository reports;
 	@Mock PostRepository posts;
 	@Mock PostMediaRepository mediaRepository;
+	@Mock CommentRepository comments;
+	@Mock CommentCounter counter;
 	@Mock UserRepository users;
 	@Mock MediaJobRepository jobs;
 	@Mock MediaStorage storage;
@@ -78,7 +86,7 @@ class ModerationServiceTest {
 	void setUp() {
 		MediaUrls urls = new MediaUrls(new MediaProperties(true, "a", "k", "s", "in", "pub", "https://m.example", null));
 		MediaJobScheduler scheduler = new MediaJobScheduler(jobs, mediaRepository, clock);
-		service = new ModerationService(reports, posts, mediaRepository, users, jobs, scheduler, storage,
+		service = new ModerationService(reports, posts, comments, counter, mediaRepository, users, jobs, scheduler, storage,
 				new PostResponseMapper(urls), urls, clock);
 	}
 
@@ -271,11 +279,10 @@ class ModerationServiceTest {
 	}
 
 	@Test
-	void USER_대상에_HIDE는_400이다() {
+	void USER_대상에_HIDE와_RESTORE는_400이다() {
 		// when / then
 		assertValidationFailed(() -> service.act(ADMIN, ReportTargetType.USER, 9L, Action.HIDE));
 		assertValidationFailed(() -> service.act(ADMIN, ReportTargetType.USER, 9L, Action.RESTORE));
-		assertValidationFailed(() -> service.act(ADMIN, ReportTargetType.COMMENT, 9L, Action.DISMISS));
 		verifyNoInteractions(posts, reports, jobs);
 	}
 
@@ -454,6 +461,187 @@ class ModerationServiceTest {
 		// then
 		assertThat(target.targetStatus()).isEqualTo("DELETED");
 		assertThat(target.cleanupFailed()).isTrue();
+	}
+
+	private Comment givenComment(CommentStatus status) {
+		Comment comment = Comment.create(POST_ID, AUTHOR, null, null, "댓글 본문");
+		ReflectionTestUtils.setField(comment, "id", COMMENT_ID);
+		ReflectionTestUtils.setField(comment, "status", status);
+		given(comments.findLivePostIdById(COMMENT_ID)).willReturn(Optional.of(POST_ID));
+		given(comments.findByIdForUpdate(COMMENT_ID)).willReturn(Optional.of(comment));
+		return comment;
+	}
+
+	@Test
+	void 댓글을_숨기면_HIDDEN이고_수를_다시_센다() {
+		// given
+		Post post = givenPost(PostStatus.VISIBLE);
+		Comment comment = givenComment(CommentStatus.VISIBLE);
+		Report report = givenOpenReport(ReportTargetType.COMMENT, COMMENT_ID);
+
+		// when
+		service.act(ADMIN, ReportTargetType.COMMENT, COMMENT_ID, Action.HIDE);
+
+		// then
+		assertThat(comment.getStatus()).isEqualTo(CommentStatus.HIDDEN);
+		verify(counter).recount(post);
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.ACTIONED);
+		verifyNoInteractions(jobs);
+	}
+
+	@Test
+	void 자동_숨김_댓글을_기각하면_다시_보이고_수가_는다() {
+		// given
+		Post post = givenPost(PostStatus.VISIBLE);
+		Comment comment = givenComment(CommentStatus.HIDDEN_PENDING);
+		Report report = givenOpenReport(ReportTargetType.COMMENT, COMMENT_ID);
+
+		// when
+		service.act(ADMIN, ReportTargetType.COMMENT, COMMENT_ID, Action.DISMISS);
+
+		// then
+		assertThat(comment.getStatus()).isEqualTo(CommentStatus.VISIBLE);
+		verify(counter).recount(post);
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.DISMISSED);
+	}
+
+	@Test
+	void 확정_숨김_댓글은_기각해도_그대로다() {
+		// given
+		givenPost(PostStatus.VISIBLE);
+		Comment comment = givenComment(CommentStatus.HIDDEN);
+		Report report = givenOpenReport(ReportTargetType.COMMENT, COMMENT_ID);
+
+		// when
+		service.act(ADMIN, ReportTargetType.COMMENT, COMMENT_ID, Action.DISMISS);
+
+		// then
+		assertThat(comment.getStatus()).isEqualTo(CommentStatus.HIDDEN);
+		verify(counter, never()).recount(any());
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.DISMISSED);
+	}
+
+	@Test
+	void 지운_글의_댓글은_숨김이_404이고_기각은_된다() {
+		// given
+		Post deleted = givenPost(PostStatus.VISIBLE);
+		deleted.softDelete(NOW);
+		given(comments.findLivePostIdById(COMMENT_ID)).willReturn(Optional.of(POST_ID));
+
+		// when / then
+		assertThatThrownBy(() -> service.act(ADMIN, ReportTargetType.COMMENT, COMMENT_ID, Action.HIDE))
+				.isInstanceOfSatisfying(BusinessException.class,
+						e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+		assertThatThrownBy(() -> service.act(ADMIN, ReportTargetType.COMMENT, COMMENT_ID, Action.RESTORE))
+				.isInstanceOf(BusinessException.class);
+		verify(comments, never()).findByIdForUpdate(anyLong());
+
+		// given
+		Report report = givenOpenReport(ReportTargetType.COMMENT, COMMENT_ID);
+
+		// when
+		service.act(ADMIN, ReportTargetType.COMMENT, COMMENT_ID, Action.DISMISS);
+
+		// then
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.DISMISSED);
+		verify(counter, never()).recount(any());
+	}
+
+	@Test
+	void 지운_댓글은_숨김이_404이고_기각은_된다() {
+		// given
+		given(comments.findLivePostIdById(COMMENT_ID)).willReturn(Optional.empty());
+
+		// when / then
+		assertThatThrownBy(() -> service.act(ADMIN, ReportTargetType.COMMENT, COMMENT_ID, Action.HIDE))
+				.isInstanceOf(BusinessException.class);
+
+		// given
+		Report report = givenOpenReport(ReportTargetType.COMMENT, COMMENT_ID);
+
+		// when
+		service.act(ADMIN, ReportTargetType.COMMENT, COMMENT_ID, Action.DISMISS);
+
+		// then
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.DISMISSED);
+		verifyNoInteractions(posts);
+	}
+
+	@Test
+	void 숨겨진_글의_댓글도_숨기고_복원할_수_있다() {
+		// given
+		Post post = givenPost(PostStatus.HIDDEN);
+		Comment comment = givenComment(CommentStatus.VISIBLE);
+		givenOpenReport(ReportTargetType.COMMENT, COMMENT_ID);
+
+		// when
+		service.act(ADMIN, ReportTargetType.COMMENT, COMMENT_ID, Action.HIDE);
+
+		// then
+		assertThat(comment.getStatus()).isEqualTo(CommentStatus.HIDDEN);
+
+		// when
+		service.act(ADMIN, ReportTargetType.COMMENT, COMMENT_ID, Action.RESTORE);
+
+		// then
+		assertThat(comment.getStatus()).isEqualTo(CommentStatus.VISIBLE);
+		verify(counter, times(2)).recount(post);
+		assertThat(post.getStatus()).isEqualTo(PostStatus.HIDDEN);
+	}
+
+	@Test
+	void 신고_목록의_댓글_항목은_본문과_원_게시물을_준다() {
+		// given
+		given(reports.findOpenTargets(PageRequest.of(0, 20))).willReturn(new PageImpl<>(List.of(
+				new ReportTargetSummary(ReportTargetType.COMMENT, COMMENT_ID, 1L, NOW),
+				new ReportTargetSummary(ReportTargetType.COMMENT, 81L, 1L, NOW.minusSeconds(1))),
+				PageRequest.of(0, 20), 2));
+		given(reports.findAllByStatusAndTargetTypeAndTargetIdIn(ReportStatus.OPEN, ReportTargetType.COMMENT,
+				List.of(COMMENT_ID, 81L))).willReturn(List.of(
+						report(1L, 3L, ReportTargetType.COMMENT, COMMENT_ID, ReportReason.SPAM, "광고")));
+		Comment comment = givenCommentRow(COMMENT_ID, POST_ID, CommentStatus.HIDDEN_PENDING);
+		Comment onDeletedPost = givenCommentRow(81L, 51L, CommentStatus.VISIBLE);
+		given(comments.findAllById(List.of(COMMENT_ID, 81L))).willReturn(List.of(comment, onDeletedPost));
+		Post post = Post.draft(AUTHOR);
+		ReflectionTestUtils.setField(post, "id", POST_ID);
+		ReflectionTestUtils.setField(post, "status", PostStatus.HIDDEN);
+		Post gone = Post.draft(AUTHOR);
+		ReflectionTestUtils.setField(gone, "id", 51L);
+		gone.softDelete(NOW);
+		given(posts.findAllById(List.of(POST_ID, 51L))).willReturn(List.of(post, gone));
+		PostMedia ready = media(11L, 0);
+		ready.markReady("2026/11/11.jpg", 800, 600, 1000L);
+		given(mediaRepository.findAllByPostIdInOrderBySortOrder(List.of(POST_ID, 51L))).willReturn(List.of(ready));
+		given(users.findAllById(anyCollection())).willReturn(List.of(user(AUTHOR, "작성자")));
+
+		// when
+		PageResponse<ReportTargetResponse> page = service.list(0, 20);
+
+		// then
+		ReportTargetResponse target = page.items().get(0);
+		assertThat(target.targetType()).isEqualTo("COMMENT");
+		assertThat(target.targetStatus()).isEqualTo("HIDDEN_PENDING");
+		assertThat(target.comment().id()).isEqualTo(COMMENT_ID);
+		assertThat(target.comment().postId()).isEqualTo(POST_ID);
+		assertThat(target.comment().author().nickname()).isEqualTo("작성자");
+		assertThat(target.comment().body()).isEqualTo("댓글 본문");
+		assertThat(target.post().id()).isEqualTo(POST_ID);
+		assertThat(target.post().media()).allSatisfy(m -> assertThat(m.url()).isNull());
+		assertThat(target.quarantineUrls()).isEmpty();
+		assertThat(target.details()).containsExactly("광고");
+		assertThat(target.cleanupFailed()).isFalse();
+		ReportTargetResponse deleted = page.items().get(1);
+		assertThat(deleted.targetStatus()).isEqualTo("DELETED");
+		assertThat(deleted.comment()).isNull();
+		assertThat(deleted.post()).isNull();
+		verifyNoInteractions(storage);
+	}
+
+	private static Comment givenCommentRow(long id, long postId, CommentStatus status) {
+		Comment comment = Comment.create(postId, AUTHOR, null, null, "댓글 본문");
+		ReflectionTestUtils.setField(comment, "id", id);
+		ReflectionTestUtils.setField(comment, "status", status);
+		return comment;
 	}
 
 	private static Report report(long id, long reporter, ReportTargetType type, long targetId, ReportReason reason,

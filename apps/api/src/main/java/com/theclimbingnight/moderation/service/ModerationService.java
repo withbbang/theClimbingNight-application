@@ -1,8 +1,13 @@
 package com.theclimbingnight.moderation.service;
 
+import com.theclimbingnight.comment.entity.Comment;
+import com.theclimbingnight.comment.entity.CommentStatus;
+import com.theclimbingnight.comment.repository.CommentRepository;
+import com.theclimbingnight.comment.service.CommentCounter;
 import com.theclimbingnight.common.BusinessException;
 import com.theclimbingnight.common.ErrorCode;
 import com.theclimbingnight.common.PageResponse;
+import com.theclimbingnight.feed.dto.PostAuthorResponse;
 import com.theclimbingnight.feed.dto.PostResponse;
 import com.theclimbingnight.feed.entity.Post;
 import com.theclimbingnight.feed.entity.PostMedia;
@@ -15,6 +20,7 @@ import com.theclimbingnight.media.MediaUrls;
 import com.theclimbingnight.media.job.MediaJobRepository;
 import com.theclimbingnight.media.job.MediaJobScheduler;
 import com.theclimbingnight.media.storage.MediaStorage;
+import com.theclimbingnight.moderation.dto.ReportCommentResponse;
 import com.theclimbingnight.moderation.dto.ReportTargetActionRequest.Action;
 import com.theclimbingnight.moderation.dto.ReportTargetResponse;
 import com.theclimbingnight.moderation.entity.Report;
@@ -29,6 +35,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashSet;
@@ -45,7 +52,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 운영진의 신고 목록과 조치(숨김·복원·기각). 게시물 상태를 바꾸는 조치는 모두 게시물 행을 잠근 뒤 상태를 본다. */
+/**
+ * 운영진의 신고 목록과 조치(숨김·복원·기각). 게시물 상태를 바꾸는 조치는 모두 게시물 행을 잠근 뒤 상태를 보고,
+ * 댓글 조치는 게시물 행 다음 댓글 행을 잠근다. 댓글 조치는 사진 작업을 만들지 않는다.
+ */
 @Service
 @Transactional(readOnly = true)
 public class ModerationService {
@@ -55,6 +65,8 @@ public class ModerationService {
 
 	private final ReportRepository reports;
 	private final PostRepository posts;
+	private final CommentRepository comments;
+	private final CommentCounter counter;
 	private final PostMediaRepository mediaRepository;
 	private final UserRepository users;
 	private final MediaJobRepository jobs;
@@ -64,11 +76,13 @@ public class ModerationService {
 	private final MediaUrls urls;
 	private final Clock clock;
 
-	public ModerationService(ReportRepository reports, PostRepository posts, PostMediaRepository mediaRepository,
-			UserRepository users, MediaJobRepository jobs, MediaJobScheduler scheduler, MediaStorage storage,
+	public ModerationService(ReportRepository reports, PostRepository posts, CommentRepository comments,
+			CommentCounter counter, PostMediaRepository mediaRepository, UserRepository users, MediaJobRepository jobs, MediaJobScheduler scheduler, MediaStorage storage,
 			PostResponseMapper mapper, MediaUrls urls, Clock clock) {
 		this.reports = reports;
 		this.posts = posts;
+		this.comments = comments;
+		this.counter = counter;
 		this.mediaRepository = mediaRepository;
 		this.users = users;
 		this.jobs = jobs;
@@ -83,51 +97,123 @@ public class ModerationService {
 	public PageResponse<ReportTargetResponse> list(int page, int size) {
 		Page<ReportTargetSummary> summaries = reports.findOpenTargets(PageRequest.of(page, size));
 		List<Long> postIds = idsOf(summaries, ReportTargetType.POST);
+		List<Long> commentIds = idsOf(summaries, ReportTargetType.COMMENT);
 		List<Long> userIds = idsOf(summaries, ReportTargetType.USER);
 		Map<ReportTargetType, Map<Long, List<Report>>> open = new EnumMap<>(ReportTargetType.class);
 		open.put(ReportTargetType.POST, openReports(ReportTargetType.POST, postIds));
+		open.put(ReportTargetType.COMMENT, openReports(ReportTargetType.COMMENT, commentIds));
 		open.put(ReportTargetType.USER, openReports(ReportTargetType.USER, userIds));
-		Map<Long, Post> postById = postIds.isEmpty() ? Map.of()
-				: posts.findAllById(postIds).stream().collect(Collectors.toMap(Post::getId, Function.identity()));
-		Map<Long, List<PostMedia>> mediaByPost = postIds.isEmpty() ? Map.of()
-				: mediaRepository.findAllByPostIdInOrderBySortOrder(postIds).stream()
+		Map<Long, Comment> commentById = commentIds.isEmpty() ? Map.of()
+				: comments.findAllById(commentIds).stream().collect(Collectors.toMap(Comment::getId, Function.identity()));
+		// 댓글 대상은 원 게시물도 함께 보여 준다.
+		List<Long> shownPostIds = new ArrayList<>(postIds);
+		commentById.values().stream().map(Comment::getPostId).distinct().filter(id -> !postIds.contains(id))
+				.forEach(shownPostIds::add);
+		Map<Long, Post> postById = shownPostIds.isEmpty() ? Map.of()
+				: posts.findAllById(shownPostIds).stream().collect(Collectors.toMap(Post::getId, Function.identity()));
+		Map<Long, List<PostMedia>> mediaByPost = shownPostIds.isEmpty() ? Map.of()
+				: mediaRepository.findAllByPostIdInOrderBySortOrder(shownPostIds).stream()
 						.collect(Collectors.groupingBy(PostMedia::getPostId));
 		Set<Long> cleanupFailed = postIds.isEmpty() ? Set.of() : Set.copyOf(jobs.findPostIdsWithFailedCleanup(postIds));
 		Set<Long> wantedUsers = new HashSet<>(userIds);
 		postById.values().forEach(p -> wantedUsers.add(p.getAuthorId()));
+		commentById.values().forEach(c -> wantedUsers.add(c.getAuthorId()));
 		Map<Long, User> userById = wantedUsers.isEmpty() ? Map.of()
 				: users.findAllById(wantedUsers).stream().collect(Collectors.toMap(User::getId, Function.identity()));
 		return PageResponse.from(summaries, s -> {
 			List<Report> targetReports = open.get(s.targetType()).getOrDefault(s.targetId(), List.of());
-			return s.targetType() == ReportTargetType.POST
-					? postTarget(s, targetReports, postById.get(s.targetId()), mediaByPost, userById,
-							cleanupFailed.contains(s.targetId()))
-					: userTarget(s, targetReports, userById.get(s.targetId()));
+			return switch (s.targetType()) {
+				case POST -> postTarget(s, targetReports, postById.get(s.targetId()), mediaByPost, userById,
+						cleanupFailed.contains(s.targetId()));
+				case COMMENT -> commentTarget(s, targetReports, commentById.get(s.targetId()), postById,
+						mediaByPost, userById);
+				case USER -> userTarget(s, targetReports, userById.get(s.targetId()));
+			};
 		});
 	}
 
 	@Transactional
 	public void act(long adminId, ReportTargetType targetType, long targetId, Action action) {
-		if (targetType == ReportTargetType.COMMENT
-				|| (targetType == ReportTargetType.USER && action != Action.DISMISS)) {
+		if (targetType == ReportTargetType.USER && action != Action.DISMISS) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
+		boolean comment = targetType == ReportTargetType.COMMENT;
 		switch (action) {
 			case HIDE -> {
-				hide(lockedPost(targetId));
+				if (comment) {
+					hideComment(targetId);
+				}
+				else {
+					hide(lockedPost(targetId));
+				}
 				close(targetType, targetId, ReportStatus.ACTIONED, adminId);
 			}
 			case RESTORE -> {
-				restore(lockedPost(targetId));
+				if (comment) {
+					restoreComment(targetId);
+				}
+				else {
+					restore(lockedPost(targetId));
+				}
 				close(targetType, targetId, ReportStatus.DISMISSED, adminId);
 			}
 			case DISMISS -> {
 				if (targetType == ReportTargetType.POST) {
 					releaseAutoHidden(targetId);
 				}
+				else if (comment) {
+					releaseAutoHiddenComment(targetId);
+				}
 				close(targetType, targetId, ReportStatus.DISMISSED, adminId);
 			}
 		}
+	}
+
+	/** 잠근 게시물과 그 아래 잠근 댓글. */
+	private record LockedComment(Post post, Comment comment) {
+	}
+
+	/**
+	 * 잠금 순서는 게시물 행 다음 댓글 행이다. 게시물을 잠그려면 post_id가 필요해 엔티티를 올리지 않는 조회로 먼저 찾고,
+	 * 댓글 엔티티는 게시물을 잠근 뒤 처음 읽는다(그 전에 올리면 잠금 뒤 재확인이 낡은 값을 본다).
+	 * 지운 댓글이나 지운 글의 댓글이면 비어 있다.
+	 */
+	private Optional<LockedComment> lockComment(long commentId) {
+		return comments.findLivePostIdById(commentId)
+				.flatMap(postId -> posts.findByIdForUpdate(postId).filter(p -> p.getDeletedAt() == null))
+				.flatMap(post -> comments.findByIdForUpdate(commentId).filter(c -> c.getDeletedAt() == null)
+						.map(c -> new LockedComment(post, c)));
+	}
+
+	private LockedComment lockedComment(long commentId) {
+		return lockComment(commentId).orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
+	}
+
+	private void hideComment(long commentId) {
+		LockedComment locked = lockedComment(commentId);
+		if (locked.comment().getStatus() == CommentStatus.HIDDEN) {
+			return;
+		}
+		locked.comment().hide(false);
+		counter.recount(locked.post());
+	}
+
+	/** 숨긴 댓글만 되살린다. 숨기지 않은 댓글이면 신고만 기각된다. */
+	private void restoreComment(long commentId) {
+		LockedComment locked = lockedComment(commentId);
+		if (locked.comment().isHidden()) {
+			locked.comment().restore();
+			counter.recount(locked.post());
+		}
+	}
+
+	/** 기각하면 자동 숨김(HIDDEN_PENDING) 댓글은 되살린다. 확정 숨김은 그대로고, 지운 댓글·글이어도 404로 막지 않는다. */
+	private void releaseAutoHiddenComment(long commentId) {
+		lockComment(commentId).filter(l -> l.comment().getStatus() == CommentStatus.HIDDEN_PENDING)
+				.ifPresent(l -> {
+					l.comment().restore();
+					counter.recount(l.post());
+				});
 	}
 
 	/**
@@ -176,7 +262,7 @@ public class ModerationService {
 	private ReportTargetResponse postTarget(ReportTargetSummary s, List<Report> targetReports, Post post,
 			Map<Long, List<PostMedia>> mediaByPost, Map<Long, User> userById, boolean cleanupFailed) {
 		if (post == null || post.getDeletedAt() != null) {
-			return response(s, targetReports, DELETED, null, List.of(), null, cleanupFailed);
+			return response(s, targetReports, DELETED, null, List.of(), null, null, cleanupFailed);
 		}
 		List<PostMedia> media = mediaByPost.getOrDefault(post.getId(), List.of());
 		User author = userById.get(post.getAuthorId());
@@ -186,7 +272,7 @@ public class ModerationService {
 				.map(this::reviewUrl)
 				.flatMap(Optional::stream)
 				.toList() : List.of();
-		return response(s, targetReports, post.getStatus().name(), body, quarantineUrls, null, cleanupFailed);
+		return response(s, targetReports, post.getStatus().name(), body, quarantineUrls, null, null, cleanupFailed);
 	}
 
 	/**
@@ -205,14 +291,30 @@ public class ModerationService {
 		return Optional.empty();
 	}
 
+	private ReportTargetResponse commentTarget(ReportTargetSummary s, List<Report> targetReports, Comment comment,
+			Map<Long, Post> postById, Map<Long, List<PostMedia>> mediaByPost, Map<Long, User> userById) {
+		Post post = comment == null ? null : postById.get(comment.getPostId());
+		if (comment == null || comment.getDeletedAt() != null || post == null || post.getDeletedAt() != null) {
+			return response(s, targetReports, DELETED, null, List.of(), null, null, false);
+		}
+		User postAuthor = userById.get(post.getAuthorId());
+		PostResponse body = mapper.toResponse(post, postAuthor == null ? null : postAuthor.getNickname(),
+				mediaByPost.getOrDefault(post.getId(), List.of()), null, false);
+		User commentAuthor = userById.get(comment.getAuthorId());
+		ReportCommentResponse shown = new ReportCommentResponse(comment.getId(), comment.getPostId(),
+				new PostAuthorResponse(comment.getAuthorId(), commentAuthor == null ? null : commentAuthor.getNickname()),
+				comment.getBody());
+		return response(s, targetReports, comment.getStatus().name(), body, List.of(), shown, null, false);
+	}
+
 	private ReportTargetResponse userTarget(ReportTargetSummary s, List<Report> targetReports, User user) {
-		return response(s, targetReports, user == null ? DELETED : user.getStatus().name(), null, List.of(),
+		return response(s, targetReports, user == null ? DELETED : user.getStatus().name(), null, List.of(), null,
 				user == null ? null : user.getNickname(), false);
 	}
 
 	private static ReportTargetResponse response(ReportTargetSummary s, List<Report> targetReports,
-			String targetStatus, PostResponse post, List<String> quarantineUrls, String userNickname,
-			boolean cleanupFailed) {
+			String targetStatus, PostResponse post, List<String> quarantineUrls, ReportCommentResponse comment,
+			String userNickname, boolean cleanupFailed) {
 		Map<ReportReason, Integer> counts = new EnumMap<>(ReportReason.class);
 		targetReports.forEach(r -> counts.merge(r.getReason(), 1, Integer::sum));
 		Map<String, Integer> reasons = new LinkedHashMap<>();
@@ -221,7 +323,7 @@ public class ModerationService {
 				.map(Report::getDetail).filter(Objects::nonNull).toList();
 		return new ReportTargetResponse(s.targetType().name(), s.targetId(), targetStatus,
 				s.reportCount().intValue(), reasons, details, s.lastReportedAt().atOffset(ZoneOffset.UTC), post,
-				quarantineUrls, userNickname, cleanupFailed);
+				quarantineUrls, comment, userNickname, cleanupFailed);
 	}
 
 	private Map<Long, List<Report>> openReports(ReportTargetType type, List<Long> ids) {

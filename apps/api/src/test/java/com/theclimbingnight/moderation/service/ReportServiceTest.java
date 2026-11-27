@@ -8,6 +8,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.theclimbingnight.comment.entity.Comment;
+import com.theclimbingnight.comment.repository.CommentRepository;
+import com.theclimbingnight.comment.service.CommentCounter;
+import com.theclimbingnight.comment.entity.CommentStatus;
 import com.theclimbingnight.common.BusinessException;
 import com.theclimbingnight.common.ErrorCode;
 import com.theclimbingnight.feed.entity.Post;
@@ -41,9 +45,12 @@ class ReportServiceTest {
 	private static final long REPORTER = 3L;
 	private static final long AUTHOR = 7L;
 	private static final long POST_ID = 50L;
+	private static final long COMMENT_ID = 80L;
 
 	@Mock ReportRepository reports;
 	@Mock PostRepository posts;
+	@Mock CommentRepository comments;
+	@Mock CommentCounter counter;
 	@Mock UserRepository users;
 	@Mock UserBlockRepository blocks;
 	@Mock MediaJobScheduler scheduler;
@@ -53,7 +60,7 @@ class ReportServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new ReportService(reports, posts, users, blocks, scheduler, events);
+		service = new ReportService(reports, posts, comments, counter, users, blocks, scheduler, events);
 	}
 
 	private Post givenPost(PostStatus status) {
@@ -273,6 +280,104 @@ class ReportServiceTest {
 		// when / then
 		assertNotFound(() -> service.submit(REPORTER,
 				new ReportCreateRequest(ReportTargetType.USER, 9L, ReportReason.SPAM, null)));
+		verify(reports, never()).saveAndFlush(any());
+	}
+
+	private Comment givenComment(CommentStatus status) {
+		Comment comment = Comment.create(POST_ID, AUTHOR, null, null, "댓글");
+		ReflectionTestUtils.setField(comment, "id", COMMENT_ID);
+		ReflectionTestUtils.setField(comment, "status", status);
+		given(comments.findLivePostIdById(COMMENT_ID)).willReturn(Optional.of(POST_ID));
+		given(comments.findByIdForUpdate(COMMENT_ID)).willReturn(Optional.of(comment));
+		return comment;
+	}
+
+	private static ReportCreateRequest commentReport(ReportReason reason) {
+		return new ReportCreateRequest(ReportTargetType.COMMENT, COMMENT_ID, reason, null);
+	}
+
+	@Test
+	void 댓글은_세_명이_신고하면_자동으로_숨기고_수를_다시_센다() {
+		// given
+		Post post = givenPost(PostStatus.VISIBLE);
+		Comment comment = givenComment(CommentStatus.VISIBLE);
+		given(reports.countByTargetTypeAndTargetIdAndStatus(ReportTargetType.COMMENT, COMMENT_ID, ReportStatus.OPEN))
+				.willReturn(0L, 1L, 2L);
+
+		// when
+		service.submit(1L, commentReport(ReportReason.SPAM));
+		service.submit(2L, commentReport(ReportReason.ABUSE));
+
+		// then
+		assertThat(comment.getStatus()).isEqualTo(CommentStatus.VISIBLE);
+		verify(counter, never()).recount(any());
+
+		// when
+		service.submit(4L, commentReport(ReportReason.SEXUAL));
+
+		// then
+		assertThat(comment.getStatus()).isEqualTo(CommentStatus.HIDDEN_PENDING);
+		verify(counter, times(1)).recount(post);
+		verify(scheduler, never()).onPostHidden(any());
+	}
+
+	@Test
+	void 댓글은_초상권_신고_한_건으로_숨기지_않는다() {
+		// when / then: 초상권 사유는 검증 단계에서 400이다
+		ReportCreateRequest request = commentReport(ReportReason.PORTRAIT_PRIVACY);
+		assertThat(request.isReasonAllowedForTarget()).isFalse();
+		assertThat(commentReport(ReportReason.SPAM).isReasonAllowedForTarget()).isTrue();
+		assertThat(postReport(ReportReason.PORTRAIT_PRIVACY).isReasonAllowedForTarget()).isTrue();
+	}
+
+	@Test
+	void 내_댓글은_신고할_수_없다() {
+		// given
+		givenPost(PostStatus.VISIBLE);
+		givenComment(CommentStatus.VISIBLE);
+
+		// when / then
+		assertThatThrownBy(() -> service.submit(AUTHOR, commentReport(ReportReason.SPAM)))
+				.isInstanceOfSatisfying(BusinessException.class,
+						e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.REPORT_SELF));
+		verify(reports, never()).saveAndFlush(any());
+	}
+
+	@Test
+	void 지운_댓글이나_보이지_않는_글의_댓글은_404다() {
+		// given: 지운 댓글은 post_id를 못 찾는다
+		given(comments.findLivePostIdById(COMMENT_ID)).willReturn(Optional.empty());
+
+		// when / then
+		assertNotFound(() -> service.submit(REPORTER, commentReport(ReportReason.SPAM)));
+
+		// given: 글이 숨김 상태
+		givenPost(PostStatus.HIDDEN);
+		givenComment(CommentStatus.VISIBLE);
+
+		// when / then
+		assertNotFound(() -> service.submit(REPORTER, commentReport(ReportReason.SPAM)));
+
+		// given: 글을 지움
+		Post deleted = givenPost(PostStatus.VISIBLE);
+		deleted.softDelete(Instant.parse("2026-11-26T00:00:00Z"));
+
+		// when / then
+		assertNotFound(() -> service.submit(REPORTER, commentReport(ReportReason.SPAM)));
+
+		// given: 이미 숨긴 댓글, 차단 관계
+		givenPost(PostStatus.VISIBLE);
+		givenComment(CommentStatus.HIDDEN_PENDING);
+
+		// when / then
+		assertNotFound(() -> service.submit(REPORTER, commentReport(ReportReason.SPAM)));
+
+		// given
+		givenComment(CommentStatus.VISIBLE);
+		given(blocks.existsBetween(REPORTER, AUTHOR)).willReturn(true);
+
+		// when / then
+		assertNotFound(() -> service.submit(REPORTER, commentReport(ReportReason.SPAM)));
 		verify(reports, never()).saveAndFlush(any());
 	}
 

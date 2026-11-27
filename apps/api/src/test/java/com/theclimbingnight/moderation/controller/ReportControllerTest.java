@@ -109,12 +109,24 @@ class ReportControllerTest {
 	}
 
 	@Test
-	void COMMENT_대상은_400이다() throws Exception {
+	void 댓글_신고는_204다() throws Exception {
 		// given
 		String bearer = bearer(3L, Role.USER);
 
 		// when / then
 		report(bearer, "{\"targetType\":\"COMMENT\",\"targetId\":50,\"reason\":\"SPAM\"}")
+				.andExpect(status().isNoContent());
+		verify(reportService).submit(3L,
+				new ReportCreateRequest(ReportTargetType.COMMENT, 50L, ReportReason.SPAM, null));
+	}
+
+	@Test
+	void 댓글을_초상권_사유로_신고하면_400이고_대상_없는_요청도_400이다() throws Exception {
+		// given
+		String bearer = bearer(3L, Role.USER);
+
+		// when / then
+		report(bearer, "{\"targetType\":\"COMMENT\",\"targetId\":50,\"reason\":\"PORTRAIT_PRIVACY\"}")
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.error.code").value("COMMON_VALIDATION_FAILED"));
 		report(bearer, "{\"targetId\":50,\"reason\":\"SPAM\"}").andExpect(status().isBadRequest());

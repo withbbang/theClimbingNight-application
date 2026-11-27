@@ -1,5 +1,8 @@
 package com.theclimbingnight.moderation.service;
 
+import com.theclimbingnight.comment.entity.Comment;
+import com.theclimbingnight.comment.repository.CommentRepository;
+import com.theclimbingnight.comment.service.CommentCounter;
 import com.theclimbingnight.common.BusinessException;
 import com.theclimbingnight.common.ConstraintViolations;
 import com.theclimbingnight.common.ErrorCode;
@@ -41,15 +44,19 @@ public class ReportService {
 
 	private final ReportRepository reports;
 	private final PostRepository posts;
+	private final CommentRepository comments;
+	private final CommentCounter counter;
 	private final UserRepository users;
 	private final UserBlockRepository blocks;
 	private final MediaJobScheduler scheduler;
 	private final ApplicationEventPublisher events;
 
-	public ReportService(ReportRepository reports, PostRepository posts, UserRepository users,
-			UserBlockRepository blocks, MediaJobScheduler scheduler, ApplicationEventPublisher events) {
+	public ReportService(ReportRepository reports, PostRepository posts, CommentRepository comments,
+			CommentCounter counter, UserRepository users, UserBlockRepository blocks, MediaJobScheduler scheduler, ApplicationEventPublisher events) {
 		this.reports = reports;
 		this.posts = posts;
+		this.comments = comments;
+		this.counter = counter;
 		this.users = users;
 		this.blocks = blocks;
 		this.scheduler = scheduler;
@@ -60,8 +67,8 @@ public class ReportService {
 	public void submit(long reporterId, ReportCreateRequest request) {
 		switch (request.targetType()) {
 			case POST -> submitPost(reporterId, request);
+			case COMMENT -> submitComment(reporterId, request);
 			case USER -> submitUser(reporterId, request);
-			default -> throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
 	}
 
@@ -79,6 +86,30 @@ public class ReportService {
 		if (request.reason() == ReportReason.PORTRAIT_PRIVACY || openReports >= AUTO_HIDE_REPORTERS) {
 			post.hide(true);
 			scheduler.onPostHidden(post);
+		}
+	}
+
+	/**
+	 * 잠금 순서는 게시물 행 다음 댓글 행이다. 게시물을 잠그려면 post_id를 알아야 해서 엔티티를 올리지 않는 조회로 먼저 찾고,
+	 * 댓글 엔티티는 게시물을 잠근 뒤 처음 읽는다(그 전에 올리면 잠금 뒤 상태 재확인이 낡은 값을 본다).
+	 */
+	private void submitComment(long reporterId, ReportCreateRequest request) {
+		long postId = comments.findLivePostIdById(request.targetId()).orElseThrow(ReportService::notFound);
+		Post post = posts.findByIdForUpdate(postId)
+				.filter(p -> p.getDeletedAt() == null && REPORTABLE.contains(p.getStatus()))
+				.orElseThrow(ReportService::notFound);
+		Comment comment = comments.findByIdForUpdate(request.targetId()).filter(Comment::isShown)
+				.orElseThrow(ReportService::notFound);
+		if (comment.getAuthorId() == reporterId) {
+			throw new BusinessException(ErrorCode.REPORT_SELF);
+		}
+		if (blocks.existsBetween(reporterId, comment.getAuthorId())) {
+			throw notFound();
+		}
+		long openReports = save(reporterId, request);
+		if (openReports >= AUTO_HIDE_REPORTERS) {
+			comment.hide(true);
+			counter.recount(post);
 		}
 	}
 
