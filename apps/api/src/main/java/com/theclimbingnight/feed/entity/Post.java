@@ -92,4 +92,24 @@ public class Post extends BaseTimeEntity {
 	public void softDelete(Instant now) {
 		this.deletedAt = now;
 	}
+
+	public void addLike() {
+		this.likeCount++;
+	}
+
+	/** 0 아래로 내려가지 않는다. */
+	public void removeLike() {
+		if (this.likeCount > 0) {
+			this.likeCount--;
+		}
+	}
+
+	/** 실제 행 수로 다시 센 값을 넣는다. */
+	public void updateLikeCount(int count) {
+		this.likeCount = count;
+	}
+
+	public void updateCommentCount(int count) {
+		this.commentCount = count;
+	}
 }
