@@ -33,7 +33,8 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
 	/**
 	 * 최상위 댓글을 오래된 순으로 준다. 차단 관계인 작성자는 뺀다. 보이는 댓글, 작성자 본인의 숨긴 댓글,
-	 * 보이는 답글이 남은 지움·숨김 자리가 포함된다.
+	 * 보이는 답글이 남은 지움·숨김 자리가 포함된다. 자리를 남길 답글에서도 차단 관계인 작성자의 답글은 뺀다
+	 * (펼치면 빈 목록이 되어 차단한 사람의 활동이 드러나지 않게). 답글 수는 차단과 무관하게 센다.
 	 */
 	@Query("""
 			select c from Comment c
@@ -49,7 +50,11 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 			                            com.theclimbingnight.comment.entity.CommentStatus.HIDDEN))
 			       or exists (select 1 from Comment r
 			                  where r.parentId = c.id and r.deletedAt is null
-			                    and r.status = com.theclimbingnight.comment.entity.CommentStatus.VISIBLE))
+			                    and r.status = com.theclimbingnight.comment.entity.CommentStatus.VISIBLE
+			                    and not exists (
+			                         select 1 from UserBlock rb
+			                         where (rb.blockerId = :viewerId and rb.blockedId = r.authorId)
+			                            or (rb.blockerId = r.authorId and rb.blockedId = :viewerId))))
 			order by c.id asc
 			""")
 	List<Comment> findTopLevel(@Param("postId") long postId, @Param("viewerId") long viewerId,

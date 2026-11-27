@@ -3,6 +3,7 @@ package com.theclimbingnight.moderation.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -284,7 +285,11 @@ class ReportServiceTest {
 	}
 
 	private Comment givenComment(CommentStatus status) {
-		Comment comment = Comment.create(POST_ID, AUTHOR, null, null, "댓글");
+		return givenComment(status, AUTHOR);
+	}
+
+	private Comment givenComment(CommentStatus status, long authorId) {
+		Comment comment = Comment.create(POST_ID, authorId, null, null, "댓글");
 		ReflectionTestUtils.setField(comment, "id", COMMENT_ID);
 		ReflectionTestUtils.setField(comment, "status", status);
 		given(comments.findLivePostIdById(COMMENT_ID)).willReturn(Optional.of(POST_ID));
@@ -372,12 +377,27 @@ class ReportServiceTest {
 		// when / then
 		assertNotFound(() -> service.submit(REPORTER, commentReport(ReportReason.SPAM)));
 
-		// given
-		givenComment(CommentStatus.VISIBLE);
+		// given: 댓글 작성자(글 작성자 아님)와 차단 관계
+		long commenter = AUTHOR + 1;
+		givenComment(CommentStatus.VISIBLE, commenter);
+		given(blocks.existsBetween(REPORTER, AUTHOR)).willReturn(false);
+		given(blocks.existsBetween(REPORTER, commenter)).willReturn(true);
+
+		// when / then
+		assertNotFound(() -> service.submit(REPORTER, commentReport(ReportReason.SPAM)));
+		verify(reports, never()).saveAndFlush(any());
+	}
+
+	@Test
+	void 글_작성자와_차단_관계면_남의_댓글도_404다() {
+		// given: 댓글 작성자는 따로 있고, 신고자와 글 작성자만 차단 관계다(existsBetween은 양방향)
+		givenPost(PostStatus.VISIBLE);
+		given(comments.findLivePostIdById(COMMENT_ID)).willReturn(Optional.of(POST_ID));
 		given(blocks.existsBetween(REPORTER, AUTHOR)).willReturn(true);
 
 		// when / then
 		assertNotFound(() -> service.submit(REPORTER, commentReport(ReportReason.SPAM)));
+		verify(comments, never()).findByIdForUpdate(anyLong());
 		verify(reports, never()).saveAndFlush(any());
 	}
 

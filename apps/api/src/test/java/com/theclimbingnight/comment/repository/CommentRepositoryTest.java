@@ -175,6 +175,30 @@ class CommentRepositoryTest {
 	}
 
 	@Test
+	void 남은_답글이_차단_관계인_사람_것뿐이면_지운_부모_자리도_빠진다() {
+		// given
+		long author = user("작성자");
+		long postId = post(author);
+		long viewer = user("보는이");
+		long blockedByMe = user("내가차단");
+		long blockingMe = user("나를차단");
+		long other = user("남");
+		blocks.saveAndFlush(UserBlock.of(viewer, blockedByMe, T0));
+		blocks.saveAndFlush(UserBlock.of(blockingMe, viewer, T0));
+		Comment parentA = save(postId, author, null, "부모A");
+		save(postId, blockedByMe, parentA.getId(), "내가 차단한 사람 답글");
+		parentA.softDelete(T0);
+		Comment parentB = save(postId, author, null, "부모B");
+		save(postId, blockingMe, parentB.getId(), "나를 차단한 사람 답글");
+		parentB.hide(false);
+		comments.flush();
+
+		// when / then
+		assertThat(top(postId, viewer, null)).isEmpty();
+		assertThat(top(postId, other, null)).containsExactly(parentA.getId(), parentB.getId());
+	}
+
+	@Test
 	void 답글_수는_보이는_답글만_센다() {
 		long author = user("작성자");
 		long postId = post(author);

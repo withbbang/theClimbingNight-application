@@ -262,6 +262,22 @@ class CommentCommandServiceTest {
 	}
 
 	@Test
+	void 답글에_답할_때_부모_댓글_작성자와_차단_관계면_404다() {
+		// given: 답글 20의 작성자는 OTHER, 부모 10의 작성자는 parentAuthor
+		long parentAuthor = OTHER + 1;
+		givenPost(post(PostStatus.VISIBLE));
+		given(comments.findById(20L)).willReturn(Optional.of(comment(20L, POST, OTHER, 10L)));
+		given(comments.findAuthorIdById(10L)).willReturn(Optional.of(parentAuthor));
+		given(blocks.existsBetween(ME, POST_AUTHOR)).willReturn(false);
+		given(blocks.existsBetween(ME, OTHER)).willReturn(false);
+		given(blocks.existsBetween(ME, parentAuthor)).willReturn(true);
+
+		// when / then
+		assertNotFound(() -> service.create(ME, POST, new CommentCreateRequest("답", 20L)));
+		verify(comments, never()).save(any());
+	}
+
+	@Test
 	void 보이지_않는_글에는_댓글을_달_수_없다() {
 		// given
 		givenPost(post(PostStatus.HIDDEN));

@@ -67,6 +67,11 @@ public class CommentCommandService {
 				throw notFound();
 			}
 			parentId = target.getParentId() != null ? target.getParentId() : target.getId();
+			// 답글에 답하면 실제 부모(최상위 댓글) 작성자와의 차단도 본다. 부모 작성자는 INSERT가 참조하지 않아 잠그지 않는다.
+			if (target.getParentId() != null && comments.findAuthorIdById(parentId)
+					.map(parentAuthorId -> blocks.existsBetween(userId, parentAuthorId)).orElse(false)) {
+				throw notFound();
+			}
 			replyToUserId = target.getAuthorId();
 		}
 		Comment saved = comments.save(Comment.create(postId, userId, parentId, replyToUserId, request.body().strip()));

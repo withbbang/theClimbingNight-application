@@ -98,6 +98,10 @@ public class ReportService {
 		Post post = posts.findByIdForUpdate(postId)
 				.filter(p -> p.getDeletedAt() == null && REPORTABLE.contains(p.getStatus()))
 				.orElseThrow(ReportService::notFound);
+		// 글 작성자와 차단 관계면 글 자체가 404이므로 그 글의 댓글도 없는 것처럼 404다.
+		if (blocks.existsBetween(reporterId, post.getAuthorId())) {
+			throw notFound();
+		}
 		Comment comment = comments.findByIdForUpdate(request.targetId()).filter(Comment::isShown)
 				.orElseThrow(ReportService::notFound);
 		if (comment.getAuthorId() == reporterId) {
