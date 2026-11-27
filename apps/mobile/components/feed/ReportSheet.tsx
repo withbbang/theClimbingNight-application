@@ -70,6 +70,11 @@ export function ReportSheet({ targetType, targetId, onClose }: ReportSheetProps)
   const [detail, setDetail] = useState('');
   const [done, setDone] = useState(false);
 
+  // 댓글에는 초상권 사유가 없다.
+  const reasons =
+    targetType === 'COMMENT'
+      ? REASONS.filter((item) => item.value !== 'PORTRAIT_PRIVACY')
+      : REASONS;
   const trimmed = detail.trim();
   const ready = reason !== null && (reason !== 'OTHER' || trimmed.length > 0);
 
@@ -97,7 +102,7 @@ export function ReportSheet({ targetType, targetId, onClose }: ReportSheetProps)
         신고하는 이유를 골라 주세요
       </AppText>
       <View accessibilityRole="radiogroup">
-        {REASONS.map((item, i) => (
+        {reasons.map((item, i) => (
           <Animated.View
             key={item.value}
             entering={

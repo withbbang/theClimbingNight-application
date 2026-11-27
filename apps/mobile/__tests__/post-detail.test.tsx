@@ -3,7 +3,7 @@ import { screen } from 'expo-router/testing-library';
 import { fail, mockServer, ok, renderApp } from '@/test-utils/app';
 import { comment } from '@/test-utils/comments';
 import { media, post } from '@/test-utils/posts';
-import { press } from '@/test-utils/screen';
+import { press, type } from '@/test-utils/screen';
 import { startAs } from '@/test-utils/session';
 
 jest.mock('expo-secure-store', () =>
@@ -163,5 +163,116 @@ describe('comments', () => {
     // then
     expect(screen.getByText('로그인하고 댓글을 볼 수 있어요')).toBeOnTheScreen();
     expect(server.calls.some((c) => c.path.includes('/comments'))).toBe(false);
+  });
+
+  it('appends a new reply under its parent', async () => {
+    // given: 답글 하나가 달린 댓글을 펼쳐 둔다
+    await startAs('USER');
+    const server = mockServer({
+      '/posts/8': ok(post({ id: 8 })),
+      '/posts/8/comments?size=20': comments([comment({ id: 1, replyCount: 1 })]),
+      '/posts/8/comments?size=20&parentId=1': comments([
+        comment({
+          id: 3,
+          parentId: 1,
+          body: '먼저 온 답글',
+          replyToNickname: '바위',
+          author: { id: 9, nickname: '구름' },
+        }),
+      ]),
+      'POST /posts/8/comments': {
+        status: 201,
+        body: {
+          success: true,
+          data: comment({
+            id: 9,
+            parentId: 1,
+            body: '새 답글이에요',
+            replyToNickname: '바위',
+            mine: true,
+            deletable: true,
+            author: { id: 2, nickname: '나' },
+          }),
+        },
+      },
+    });
+    await renderApp('/posts/8');
+    await press('답글 1개 보기');
+
+    // when: 부모 댓글에 답글을 단다
+    await press('바위의 댓글에 답글');
+    expect(screen.getByText('바위님에게 답글')).toBeOnTheScreen();
+    await type('댓글 입력', ' 새 답글이에요 ');
+    await press('게시');
+
+    // then
+    expect(server.calls.find((c) => c.method === 'POST')?.body).toEqual({
+      body: '새 답글이에요',
+      replyToCommentId: 1,
+    });
+    const replies = screen.getAllByText(/먼저 온 답글|새 답글이에요/);
+    expect(replies).toHaveLength(2);
+    expect(screen.getByText(/먼저 온 답글/)).toBe(replies[0]);
+    expect(screen.getByText(/새 답글이에요/)).toBe(replies[1]);
+    expect(screen.queryByText('바위님에게 답글')).not.toBeOnTheScreen();
+    expect(screen.getByLabelText('댓글 입력').props.value).toBe('');
+  });
+
+  it('expands a collapsed parent after replying to it', async () => {
+    // given: 답글이 아직 없는 댓글
+    await startAs('USER');
+    mockServer({
+      '/posts/8': ok(post({ id: 8 })),
+      '/posts/8/comments?size=20': comments([comment({ id: 1, replyCount: 0 })]),
+      '/posts/8/comments?size=20&parentId=1': comments([
+        comment({ id: 9, parentId: 1, body: '첫 답글이에요', replyToNickname: '바위' }),
+      ]),
+      'POST /posts/8/comments': {
+        status: 201,
+        body: {
+          success: true,
+          data: comment({ id: 9, parentId: 1, body: '첫 답글이에요', replyToNickname: '바위' }),
+        },
+      },
+    });
+    await renderApp('/posts/8');
+
+    // when
+    await press('바위의 댓글에 답글');
+    await type('댓글 입력', '첫 답글이에요');
+    await press('게시');
+
+    // then
+    expect(screen.getByText(/첫 답글이에요/)).toBeOnTheScreen();
+  });
+
+  it('hides the input on a hidden post', async () => {
+    // given
+    await startAs('USER');
+    mockServer({
+      '/posts/8': ok(post({ id: 8, mine: true, status: 'HIDDEN' })),
+      '/posts/8/comments?size=20': comments([]),
+    });
+
+    // when
+    await renderApp('/posts/8');
+
+    // then
+    expect(screen.queryByLabelText('댓글 입력')).not.toBeOnTheScreen();
+  });
+
+  it('shows the input on a visible post', async () => {
+    // given
+    await startAs('USER');
+    mockServer({
+      '/posts/8': ok(post({ id: 8 })),
+      '/posts/8/comments?size=20': comments([]),
+    });
+
+    // when
+    await renderApp('/posts/8');
+
+    // then
+    expect(screen.getByLabelText('댓글 입력')).toBeOnTheScreen();
   });
 });

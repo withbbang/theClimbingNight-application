@@ -9,13 +9,24 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { useReplies } from '@/hooks/use-comments';
 import { useTheme } from '@/hooks/use-theme';
 import { errorMessage } from '@/lib/error-message';
+import type { CommentResponse } from '@/types/api/comment';
 
 const STAGGER_MS = 60;
 /** 한 번에 이만큼만 차례를 주고, 이어 받은 답글은 바로 보인다. */
 const STAGGERED = 6;
 
 /** 펼친 답글. 위에서 아래로 차례로 내려오며 나타난다. */
-export function ReplyList({ postId, parentId }: { postId: number; parentId: number }) {
+export function ReplyList({
+  postId,
+  parentId,
+  menu,
+  onReply,
+}: {
+  postId: number;
+  parentId: number;
+  menu?: boolean;
+  onReply?: (comment: CommentResponse) => void;
+}) {
   const { space, colors, motion } = useTheme();
   const reduced = useReducedMotion();
   const query = useReplies(postId, parentId, true);
@@ -43,7 +54,7 @@ export function ReplyList({ postId, parentId }: { postId: number; parentId: numb
                   .stiffness(motion.spring.stiffness)
           }
         >
-          <CommentItem postId={postId} comment={reply} />
+          <CommentItem postId={postId} comment={reply} menu={menu} onReply={onReply} />
         </Animated.View>
       ))}
       {isPending ? <AppText tone="muted">답글을 불러오는 중</AppText> : null}

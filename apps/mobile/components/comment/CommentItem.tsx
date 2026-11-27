@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { CaretDownIcon } from 'phosphor-react-native/src/icons/CaretDown';
+import { DotsThreeIcon } from 'phosphor-react-native/src/icons/DotsThree';
 import Animated, {
   FadeIn,
   useAnimatedStyle,
@@ -10,6 +11,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
+import { CommentMenu } from '@/components/comment/CommentMenu';
 import { ReplyList } from '@/components/comment/ReplyList';
 import { AppText } from '@/components/ui/AppText';
 import { Avatar } from '@/components/ui/Avatar';
@@ -21,8 +23,56 @@ import type { CommentResponse } from '@/types/api/comment';
 interface CommentItemProps {
   postId: number;
   comment: CommentResponse;
-  /** 오른쪽 끝 자리. ⋯ 메뉴가 들어온다. */
+  /** 오른쪽 끝 자리. */
   trailing?: ReactNode;
+  /** ⋯ 메뉴(삭제·신고·차단)를 붙인다. */
+  menu?: boolean;
+  /** 주면 "답글" 단추가 생긴다. */
+  onReply?: (comment: CommentResponse) => void;
+  /** 답글 펼침을 부모가 쥘 때. 없으면 스스로 쥔다. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+/** 댓글 줄의 ⋯ 단추. 누르면 점이 90도 돈다. */
+function MenuButton({
+  nickname,
+  open,
+  onToggle,
+}: {
+  nickname: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const { colors, motion } = useTheme();
+  const reduced = useReducedMotion();
+  const press = usePressScale(0.9);
+  const turn = useSharedValue(open ? 1 : 0);
+
+  useEffect(() => {
+    const target = open ? 1 : 0;
+    turn.set(reduced ? target : withSpring(target, motion.spring));
+  }, [motion.spring, open, reduced, turn]);
+
+  const spin = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.get() * 90}deg` }] }));
+
+  return (
+    <Animated.View style={press.style}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${nickname}의 댓글 메뉴`}
+        accessibilityState={{ expanded: open }}
+        hitSlop={8}
+        onPress={onToggle}
+        {...press.handlers}
+        style={styles.menuButton}
+      >
+        <Animated.View style={spin}>
+          <DotsThreeIcon size={20} color={colors.textMuted} weight="bold" />
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
+  );
 }
 
 /** 답글 줄 위에서 접고 펼치는 버튼. 화살표가 돌며 상태를 알린다. */
@@ -70,10 +120,21 @@ function RepliesToggle({
 }
 
 /** 댓글 한 줄. 삭제·숨김은 자리표시만, 최상위 댓글은 답글을 펼칠 수 있다. */
-export function CommentItem({ postId, comment, trailing }: CommentItemProps) {
+export function CommentItem({
+  postId,
+  comment,
+  trailing,
+  menu = false,
+  onReply,
+  open: controlledOpen,
+  onOpenChange,
+}: CommentItemProps) {
   const { space } = useTheme();
   const reduced = useReducedMotion();
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const open = controlledOpen ?? ownOpen;
+  const setOpen = (value: boolean) => (onOpenChange ? onOpenChange(value) : setOwnOpen(value));
   const isReply = comment.parentId !== null;
 
   const placeholder = comment.display === 'DELETED' || comment.display === 'HIDDEN';
@@ -121,19 +182,47 @@ export function CommentItem({ postId, comment, trailing }: CommentItemProps) {
               </Animated.View>
             ) : null}
           </View>
+          {menu ? (
+            <MenuButton
+              nickname={nickname}
+              open={menuOpen}
+              onToggle={() => setMenuOpen((value) => !value)}
+            />
+          ) : null}
           {trailing}
         </View>
       )}
-      {!isReply && comment.replyCount > 0 ? (
+      {menu && menuOpen && !placeholder ? (
+        <Animated.View
+          entering={reduced ? undefined : FadeIn.duration(180)}
+          style={{ paddingLeft: space(13) }}
+        >
+          <CommentMenu postId={postId} comment={comment} onClose={() => setMenuOpen(false)} />
+        </Animated.View>
+      ) : null}
+      {onReply && comment.display === 'VISIBLE' ? (
         <View style={{ paddingLeft: space(13) }}>
-          <RepliesToggle
-            count={comment.replyCount}
-            open={open}
-            onToggle={() => setOpen((value) => !value)}
-          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${nickname}의 댓글에 답글`}
+            hitSlop={space(2)}
+            onPress={() => onReply(comment)}
+            style={{ minHeight: 32, justifyContent: 'center', alignSelf: 'flex-start' }}
+          >
+            <AppText variant="caption" tone="muted" style={styles.strong}>
+              답글 달기
+            </AppText>
+          </Pressable>
         </View>
       ) : null}
-      {open ? <ReplyList postId={postId} parentId={comment.id} /> : null}
+      {!isReply && comment.replyCount > 0 ? (
+        <View style={{ paddingLeft: space(13) }}>
+          <RepliesToggle count={comment.replyCount} open={open} onToggle={() => setOpen(!open)} />
+        </View>
+      ) : null}
+      {open ? (
+        <ReplyList postId={postId} parentId={comment.id} menu={menu} onReply={onReply} />
+      ) : null}
     </View>
   );
 }
@@ -144,5 +233,6 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   shrink: { flexShrink: 1 },
   toggle: { alignSelf: 'flex-start' },
+  menuButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   strong: { fontFamily: 'Pretendard-SemiBold' },
 });

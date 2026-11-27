@@ -1,5 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
+
+import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -7,6 +9,7 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { ImageBrokenIcon } from 'phosphor-react-native/src/icons/ImageBroken';
 import { LockKeyIcon } from 'phosphor-react-native/src/icons/LockKey';
 
+import { CommentInput } from '@/components/comment/CommentInput';
 import { CommentItem } from '@/components/comment/CommentItem';
 import { LikeCountLink } from '@/components/feed/LikeCountLink';
 import { PostCard } from '@/components/feed/PostCard';
@@ -42,12 +45,18 @@ function Detail({
   focusComments: boolean;
   onRefresh: () => Promise<unknown>;
 }) {
-  const { space } = useTheme();
+  const { space, motion } = useTheme();
+  const reduced = useReducedMotion();
   const router = useRouter();
   const signedIn = useSession().status === 'authenticated';
   const listRef = useRef<FlashListRef<CommentResponse>>(null);
   const focused = useRef(false);
   const hidden = post.status !== null && HIDDEN.includes(post.status);
+  // 내 글이 숨겨졌거나 심사 중이면(VISIBLE이 아니면) 새 댓글을 받지 않는다. 남의 글은 status가 null이다.
+  const canComment = signedIn && (post.status === null || post.status === 'VISIBLE');
+  const [replyTo, setReplyTo] = useState<CommentResponse | null>(null);
+  const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set());
+  const [freshId, setFreshId] = useState<number | null>(null);
   // 비로그인은 댓글을 요청하지 않는다. 숨겨진 내 글의 기존 댓글은 볼 수 있고, 볼 수 있는지는 API가 판단한다.
   const query = useComments(post.id, signedIn);
   const { data: comments, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage } = query;
@@ -71,6 +80,27 @@ function Detail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusComments, loaded]);
 
+  const setOpen = (id: number, open: boolean) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (open) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+
+  // 답글은 부모 아래에 붙으니 부모를 펼친다. 최상위 댓글은 목록 끝으로 내려가 보여 준다.
+  const posted = (created: CommentResponse) => {
+    if (created.parentId !== null) {
+      setOpen(created.parentId, true);
+    } else {
+      setFreshId(created.id);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  };
+
   const empty = !signedIn ? (
     <Notice
       illustration={<FloatingIcon icon={LockKeyIcon} />}
@@ -89,52 +119,82 @@ function Detail({
   );
 
   return (
-    <FlashList
-      ref={listRef}
-      accessibilityLabel="댓글"
-      data={signedIn ? (comments ?? []) : []}
-      keyExtractor={(comment) => String(comment.id)}
-      renderItem={({ item }) => (
-        <View style={{ paddingBottom: space(4) }}>
-          <CommentItem key={item.id} postId={post.id} comment={item} />
-        </View>
-      )}
-      onEndReached={() => {
-        if (hasNextPage && !isFetching && !isFetchingNextPage) {
-          void fetchNextPage();
-        }
-      }}
-      ListHeaderComponent={
-        <View style={{ gap: space(4), paddingBottom: space(4) }}>
-          {hidden ? <PostHiddenNotice /> : null}
-          <FadeInItem index={hidden ? 1 : 0}>
-            <PostCard
-              post={post}
-              hideMedia={hidden}
+    <View style={{ flex: 1 }}>
+      <FlashList
+        ref={listRef}
+        accessibilityLabel="댓글"
+        data={signedIn ? (comments ?? []) : []}
+        keyExtractor={(comment) => String(comment.id)}
+        extraData={`${[...expanded].join(',')}|${freshId}`}
+        renderItem={({ item }) => (
+          // 방금 단 댓글만 들어오는 연출을 준다. 재활용되는 칸에 늘 붙이면 스크롤할 때마다 움직인다.
+          <Animated.View
+            entering={
+              reduced || item.id !== freshId
+                ? undefined
+                : FadeInDown.springify()
+                    .damping(motion.spring.damping)
+                    .stiffness(motion.spring.stiffness)
+            }
+            style={{ paddingBottom: space(4) }}
+          >
+            <CommentItem
+              key={item.id}
+              postId={post.id}
+              comment={item}
               menu
-              // 지우거나 차단하거나 숨긴 글은 더 볼 수 없으니 들어온 곳으로 돌아간다.
-              onGone={() => (router.canGoBack() ? router.back() : router.dismissTo('/feed'))}
-              onCommentPress={scrollToComments}
+              onReply={canComment ? setReplyTo : undefined}
+              open={expanded.has(item.id)}
+              onOpenChange={(open) => setOpen(item.id, open)}
             />
-          </FadeInItem>
-          <LikeCountLink postId={post.id} count={post.likeCount} />
-        </View>
-      }
-      ListEmptyComponent={empty}
-      ListFooterComponent={
-        query.isFetchNextPageError ? (
-          <Button label="다시 시도" variant="secondary" onPress={() => void fetchNextPage()} />
-        ) : null
-      }
-      contentContainerStyle={{ paddingBottom: space(4) }}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={
-        <PullToRefresh
-          onRefresh={() => Promise.all([onRefresh(), signedIn ? query.refetch() : null])}
+          </Animated.View>
+        )}
+        onEndReached={() => {
+          if (hasNextPage && !isFetching && !isFetchingNextPage) {
+            void fetchNextPage();
+          }
+        }}
+        ListHeaderComponent={
+          <View style={{ gap: space(4), paddingBottom: space(4) }}>
+            {hidden ? <PostHiddenNotice /> : null}
+            <FadeInItem index={hidden ? 1 : 0}>
+              <PostCard
+                post={post}
+                hideMedia={hidden}
+                menu
+                // 지우거나 차단하거나 숨긴 글은 더 볼 수 없으니 들어온 곳으로 돌아간다.
+                onGone={() => (router.canGoBack() ? router.back() : router.dismissTo('/feed'))}
+                onCommentPress={scrollToComments}
+              />
+            </FadeInItem>
+            <LikeCountLink postId={post.id} count={post.likeCount} />
+          </View>
+        }
+        ListEmptyComponent={empty}
+        ListFooterComponent={
+          query.isFetchNextPageError ? (
+            <Button label="다시 시도" variant="secondary" onPress={() => void fetchNextPage()} />
+          ) : null
+        }
+        contentContainerStyle={{ paddingBottom: space(4) }}
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <PullToRefresh
+            onRefresh={() => Promise.all([onRefresh(), signedIn ? query.refetch() : null])}
+          />
+        }
+      />
+      {canComment ? (
+        <CommentInput
+          postId={post.id}
+          replyTo={replyTo}
+          onCancelReply={() => setReplyTo(null)}
+          onPosted={posted}
         />
-      }
-    />
+      ) : null}
+    </View>
   );
 }
 

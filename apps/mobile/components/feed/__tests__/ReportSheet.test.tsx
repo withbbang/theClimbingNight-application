@@ -13,11 +13,11 @@ jest.mock('expo-haptics', () => jest.requireActual('@/test-utils/native-mocks').
 
 const REPORT = 'POST /reports';
 
-async function show() {
+async function show(targetType: 'POST' | 'COMMENT' = 'POST') {
   await startAs('USER');
   await render(
     <QueryClientProvider client={queryClient}>
-      <ReportSheet targetType="POST" targetId={5} onClose={() => {}} />
+      <ReportSheet targetType={targetType} targetId={5} onClose={() => {}} />
     </QueryClientProvider>,
   );
 }
@@ -85,4 +85,18 @@ it('treats a post that is already gone as success', async () => {
 
   // then
   expect(screen.getByText('신고를 접수했어요. 운영진이 확인할게요.')).toBeOnTheScreen();
+});
+
+it('hides the portrait reason for comments', async () => {
+  // given: 게시물에는 초상권 사유가 있다
+  await show('POST');
+  expect(screen.getByRole('radio', { name: '초상권·사생활 침해' })).toBeOnTheScreen();
+
+  // when: 댓글 신고
+  screen.unmount();
+  await show('COMMENT');
+
+  // then
+  expect(screen.queryByRole('radio', { name: '초상권·사생활 침해' })).toBeNull();
+  expect(screen.getByRole('radio', { name: '스팸·광고' })).toBeOnTheScreen();
 });
