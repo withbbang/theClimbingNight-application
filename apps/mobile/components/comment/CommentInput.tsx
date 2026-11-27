@@ -39,6 +39,8 @@ interface CommentInputProps {
   onCancelReply: () => void;
   /** 서버가 받아 준 댓글. */
   onPosted?: (created: CommentResponse) => void;
+  /** 입력창을 담은 화면 영역이 창 위에서 내려온 거리. 키보드와 겹침을 재는 데 쓴다. */
+  keyboardOffset?: number;
 }
 
 /** 게시 단추. 쓸 수 있게 되면 떠오르고, 보내면 종이비행기가 날아간다. */
@@ -107,7 +109,13 @@ function PostButton({
 }
 
 /** 화면 아래에 붙는 댓글 입력. 답글이면 위에 누구에게 쓰는지 머리가 달린다. */
-export function CommentInput({ postId, replyTo, onCancelReply, onPosted }: CommentInputProps) {
+export function CommentInput({
+  postId,
+  replyTo,
+  onCancelReply,
+  onPosted,
+  keyboardOffset = 0,
+}: CommentInputProps) {
   const { colors, motion, radius, space } = useTheme();
   const reduced = useReducedMotion();
   const create = useCreateComment(postId);
@@ -143,6 +151,9 @@ export function CommentInput({ postId, replyTo, onCancelReply, onPosted }: Comme
       // Android는 Screen이 밀어 올린다.
       enabled={Platform.OS === 'ios'}
       behavior="padding"
+      // KeyboardAvoidingView는 부모 기준 위치로 키보드와 겹침을 잰다. 부모가 창 위에서 내려온 만큼을
+      // 넘겨 주지 않으면 그만큼 덜 올라가 입력창이 키보드에 가린다.
+      keyboardVerticalOffset={keyboardOffset}
       style={{ gap: space(2), paddingTop: space(2) }}
     >
       {replyTo ? (
@@ -223,3 +234,4 @@ const styles = StyleSheet.create({
   send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   count: { textAlign: 'right' },
 });
+

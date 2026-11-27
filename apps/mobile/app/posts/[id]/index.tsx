@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ComponentRef, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
@@ -57,6 +57,9 @@ function Detail({
   const [replyTo, setReplyTo] = useState<CommentResponse | null>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set());
   const [freshId, setFreshId] = useState<number | null>(null);
+  // 입력창을 담은 이 영역이 창 위에서 내려온 거리. 입력창의 KeyboardAvoidingView가 쓴다.
+  const rootRef = useRef<ComponentRef<typeof View>>(null);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   // 비로그인은 댓글을 요청하지 않는다. 숨겨진 내 글의 기존 댓글은 볼 수 있고, 볼 수 있는지는 API가 판단한다.
   const query = useComments(post.id, signedIn);
   const { data: comments, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage } = query;
@@ -119,7 +122,11 @@ function Detail({
   );
 
   return (
-    <View style={{ flex: 1 }}>
+    <View
+      ref={rootRef}
+      style={{ flex: 1 }}
+      onLayout={() => rootRef.current?.measureInWindow((_x, y) => setKeyboardOffset(y))}
+    >
       <FlashList
         ref={listRef}
         accessibilityLabel="댓글"
@@ -192,6 +199,7 @@ function Detail({
           replyTo={replyTo}
           onCancelReply={() => setReplyTo(null)}
           onPosted={posted}
+          keyboardOffset={keyboardOffset}
         />
       ) : null}
     </View>
