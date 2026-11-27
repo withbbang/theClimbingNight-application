@@ -80,12 +80,18 @@ export function LikeButton({
   useEffect(() => {
     const celebrated = celebrate !== seenCelebrate.current;
     seenCelebrate.current = celebrate;
-    const play = celebrated || pendingPress.current;
-    pendingPress.current = false;
     if (first.current) {
       first.current = false;
+      pendingPress.current = false;
       return;
     }
+    if (celebrated && !liked) {
+      // 두 번 탭은 캐시 갱신(liked)보다 한 렌더 먼저 온다. 꺼짐 연출 없이, 다음에 켜지는 변경을 연출하도록 남긴다.
+      pendingPress.current = true;
+      return;
+    }
+    const play = celebrated || pendingPress.current;
+    pendingPress.current = false;
     if (reduced || !play) {
       fill.set(liked ? 1 : 0);
       return;

@@ -62,3 +62,30 @@ it('does not wait for an animation when the press changes nothing', async () => 
   // then
   expect(fillStyle()).toMatchObject({ opacity: 1, transform: [{ scale: 1 }] });
 });
+
+it('starts the pop from zero when a double tap arrives one render before liked', async () => {
+  // given
+  const view = await render(<LikeButton liked={false} count={1} onPress={() => {}} />);
+
+  // when: 두 번 탭으로 celebrate가 먼저 오르고, 캐시 갱신으로 liked는 다음 렌더에 켜진다.
+  await view.rerender(<LikeButton liked={false} count={1} celebrate={1} onPress={() => {}} />);
+  await view.rerender(<LikeButton liked count={2} celebrate={1} onPress={() => {}} />);
+
+  // then
+  const { opacity, transform } = fillStyle();
+  expect(opacity).toBeLessThan(0.5);
+  expect(transform[0].scale).toBeLessThan(0.5);
+});
+
+it('replays the pop when an already liked post is double tapped', async () => {
+  // given
+  const view = await render(<LikeButton liked count={2} onPress={() => {}} />);
+
+  // when
+  await view.rerender(<LikeButton liked count={2} celebrate={1} onPress={() => {}} />);
+
+  // then
+  const { opacity, transform } = fillStyle();
+  expect(opacity).toBeLessThan(0.5);
+  expect(transform[0].scale).toBeLessThan(0.5);
+});
