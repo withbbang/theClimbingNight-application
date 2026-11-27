@@ -19,6 +19,8 @@ import { useTheme } from '@/hooks/use-theme';
 const ICON = 22;
 const SPARKS = 6;
 const SPARK_REACH = 15;
+/** 누른 뒤 이 시간 안에 바뀐 값만 누른 결과로 본다. */
+const INTENT_MS = 1500;
 
 interface SparkProps {
   index: number;
@@ -47,6 +49,8 @@ interface LikeButtonProps {
   liked: boolean;
   count: number;
   onPress: () => void;
+  /** 값이 올라갈 때마다 눌림 없이도 켜짐 연출을 한 번 보인다(사진 두 번 탭). */
+  celebrate?: number;
   /** 켜지 못하게 막는다. 켜진 하트는 이 값과 상관없이 끌 수 있다. */
   disabled?: boolean;
 }
@@ -55,7 +59,13 @@ interface LikeButtonProps {
  * 하트와 좋아요 수. 켜지면 채운 하트가 작게 시작해 튕기며 커졌다 자리잡고 점이 번진다.
  * 꺼지면 채운 하트가 사라지며 윤곽만 남는다.
  */
-export function LikeButton({ liked, count, onPress, disabled = false }: LikeButtonProps) {
+export function LikeButton({
+  liked,
+  count,
+  onPress,
+  celebrate = 0,
+  disabled = false,
+}: LikeButtonProps) {
   const { colors, motion, space } = useTheme();
   const reduced = useReducedMotion();
   const press = usePressScale(0.82);
@@ -63,13 +73,20 @@ export function LikeButton({ liked, count, onPress, disabled = false }: LikeButt
   const bounce = useSharedValue(1);
   const pop = useSharedValue(0);
   const first = useRef(true);
+  // 이 카드에서 누른 직후에 바뀐 값만 연출한다. 재활용 셀의 새 글이나 서버 값은 끝 상태로 맞춘다.
+  const pressedAt = useRef(0);
+  const seenCelebrate = useRef(celebrate);
 
   useEffect(() => {
+    const celebrated = celebrate !== seenCelebrate.current;
+    seenCelebrate.current = celebrate;
+    const play = celebrated || Date.now() - pressedAt.current < INTENT_MS;
+    pressedAt.current = 0;
     if (first.current) {
       first.current = false;
       return;
     }
-    if (reduced) {
+    if (reduced || !play) {
       fill.set(liked ? 1 : 0);
       return;
     }
@@ -82,7 +99,7 @@ export function LikeButton({ liked, count, onPress, disabled = false }: LikeButt
     } else {
       fill.set(withTiming(0, { duration: 140 }));
     }
-  }, [bounce, fill, liked, motion.spring, pop, reduced]);
+  }, [bounce, celebrate, fill, liked, motion.spring, pop, reduced]);
 
   const filled = useAnimatedStyle(() => ({
     opacity: Math.min(1, fill.get() * 2),
@@ -98,13 +115,16 @@ export function LikeButton({ liked, count, onPress, disabled = false }: LikeButt
         accessibilityState={{ selected: liked, disabled: disabled && !liked }}
         disabled={disabled && !liked}
         hitSlop={space(2)}
-        onPress={onPress}
+        onPress={() => {
+          pressedAt.current = Date.now();
+          onPress();
+        }}
         {...press.handlers}
         style={[styles.row, { gap: space(1) }]}
       >
         <Animated.View style={[styles.icon, outer]}>
           <HeartIcon size={ICON} color={liked ? colors.accent : colors.text} weight="bold" />
-          <Animated.View style={[styles.layer, filled]} pointerEvents="none">
+          <Animated.View testID="like-fill" style={[styles.layer, filled]} pointerEvents="none">
             <HeartIcon size={ICON} color={colors.accent} weight="fill" />
           </Animated.View>
           <View style={styles.layer} pointerEvents="none">

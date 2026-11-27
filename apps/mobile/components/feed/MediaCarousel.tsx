@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Image } from 'expo-image';
 
 import {
   GestureDetector,
-  GestureHandlerRootView,
   useExclusiveGestures,
   useTapGesture,
 } from 'react-native-gesture-handler';
@@ -86,13 +85,16 @@ function Slide({ item, index, count, width, offset, onPress, onDoubleTap }: Slid
   );
 
   // 두 번 탭을 받는 사진은 제스처로 한 번 탭과 가른다. 두 번째 탭이 오지 않아야 한 번 탭이 된다.
+  // 로그인 여부로 트리 모양이 바뀌면 목록이 다시 마운트되므로 감지기는 항상 두고 enabled로 끈다.
   const doubleTap = useTapGesture({
+    enabled: Boolean(onDoubleTap),
     numberOfTaps: 2,
     runOnJS: true,
     testID: 'photo-double-tap',
     onActivate: () => onDoubleTap?.(),
   });
   const singleTap = useTapGesture({
+    enabled: Boolean(onPress),
     runOnJS: true,
     testID: 'photo-single-tap',
     onActivate: () => onPress?.(),
@@ -101,30 +103,17 @@ function Slide({ item, index, count, width, offset, onPress, onDoubleTap }: Slid
 
   return (
     <Animated.View style={[{ width }, styles.fill, animated]}>
-      {onDoubleTap ? (
-        <GestureDetector gesture={gesture}>
-          <View
-            accessible
-            accessibilityRole={onPress ? 'imagebutton' : 'image'}
-            accessibilityLabel={onPress ? `${label}, 게시물 열기` : label}
-            onAccessibilityTap={onPress}
-            style={styles.fill}
-          >
-            {content}
-          </View>
-        </GestureDetector>
-      ) : onPress ? (
-        <Pressable
-          onPress={onPress}
-          accessibilityRole="imagebutton"
-          accessibilityLabel={`${label}, 게시물 열기`}
+      <GestureDetector gesture={gesture}>
+        <View
+          accessible={Boolean(onPress)}
+          accessibilityRole={onPress ? 'imagebutton' : undefined}
+          accessibilityLabel={onPress ? `${label}, 게시물 열기` : undefined}
+          onAccessibilityTap={onPress}
           style={styles.fill}
         >
           {content}
-        </Pressable>
-      ) : (
-        content
-      )}
+        </View>
+      </GestureDetector>
     </Animated.View>
   );
 }
@@ -167,7 +156,7 @@ export function MediaCarousel({ media, onPress, onDoubleTap }: MediaCarouselProp
   });
   const ratio = mediaRatio(media[0]);
 
-  const body = (
+  return (
     <View>
       <View
         testID="media-carousel"
@@ -207,7 +196,7 @@ export function MediaCarousel({ media, onPress, onDoubleTap }: MediaCarouselProp
             )}
           />
         ) : null}
-        {onDoubleTap ? <HeartBurst trigger={burst} accent={colors.accent} /> : null}
+        <HeartBurst trigger={burst} accent={colors.accent} />
       </View>
       {media.length > 1 ? (
         <View
@@ -222,9 +211,6 @@ export function MediaCarousel({ media, onPress, onDoubleTap }: MediaCarouselProp
       ) : null}
     </View>
   );
-
-  // 제스처 감지기는 이 뿌리 안에서만 동작한다.
-  return onDoubleTap ? <GestureHandlerRootView>{body}</GestureHandlerRootView> : body;
 }
 
 const styles = StyleSheet.create({

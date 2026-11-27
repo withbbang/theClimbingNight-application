@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-import { useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useQueryClient, type Query, type QueryClient } from '@tanstack/react-query';
 
 import { notifyError } from '@/lib/haptics';
 import { likePost, unlikePost } from '@/lib/post-api';
@@ -54,8 +54,21 @@ function patch(data: unknown, id: number, change: (post: PostResponse) => PostRe
   return data;
 }
 
+/**
+ * 글을 담은 캐시만 고른다. 피드 ['posts'], 상세 ['posts', 글 id], 내 글 ['posts', 'mine', …].
+ * ['posts', 글 id, 'comments']처럼 글 아래 다른 목록은 항목 id가 우연히 같아도 건드리지 않는다.
+ */
+function holdsPosts({ queryKey }: Query) {
+  return (
+    queryKey[0] === 'posts' &&
+    (queryKey.length === 1 ||
+      (queryKey.length === 2 && typeof queryKey[1] === 'number') ||
+      queryKey[1] === 'mine')
+  );
+}
+
 function write(client: QueryClient, id: number, change: (post: PostResponse) => PostResponse) {
-  client.setQueriesData({ queryKey: ['posts'] }, (data: unknown) => patch(data, id, change));
+  client.setQueriesData({ predicate: holdsPosts }, (data: unknown) => patch(data, id, change));
 }
 
 /**

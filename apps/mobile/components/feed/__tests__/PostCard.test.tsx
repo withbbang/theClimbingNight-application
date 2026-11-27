@@ -1,5 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 
 import { PostCard } from '@/components/feed/PostCard';
@@ -35,9 +36,11 @@ async function show(initial: PostResponse, options: { onOpen?: () => void } = {}
     return <PostCard post={data ?? initial} onOpen={options.onOpen} />;
   }
   const view = await render(
-    <QueryClientProvider client={queryClient}>
-      <Connected />
-    </QueryClientProvider>,
+    <GestureHandlerRootView>
+      <QueryClientProvider client={queryClient}>
+        <Connected />
+      </QueryClientProvider>
+    </GestureHandlerRootView>,
   );
   return view;
 }
@@ -136,7 +139,6 @@ it('likes but never unlikes on double tap', async () => {
   await show(post({ id: 1, likeCount: 4, likedByMe: false }));
 
   await layoutPhotos();
-  expect(screen.getByTestId('heart-burst', { includeHiddenElements: true })).toBeOnTheScreen();
 
   // when
   await fireGestureHandler(getByGestureTestId('photo-double-tap'));
@@ -183,7 +185,9 @@ it('only allows unliking on my hidden post', async () => {
   await fireEvent.press(heart(false));
   expect(likePost).not.toHaveBeenCalled();
   await layoutPhotos();
-  expect(screen.queryByTestId('heart-burst', { includeHiddenElements: true })).toBeNull();
+  await fireGestureHandler(getByGestureTestId('photo-double-tap'));
+  await flush();
+  expect(likePost).not.toHaveBeenCalled();
 
   // when: 이미 켜 둔 하트는 끌 수 있다.
   await view.unmount();

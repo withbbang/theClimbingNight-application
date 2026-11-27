@@ -140,3 +140,26 @@ it('does not send anything when the post is already in the wanted state', async 
   // then
   expect(unlikePost).not.toHaveBeenCalled();
 });
+
+it('leaves other lists under the post key alone even when an item id matches', async () => {
+  // given: 댓글 id가 글 id와 같다.
+  jest.mocked(likePost).mockReturnValue(deferred().promise);
+  const { result } = await setup();
+  const comment = { id: 5, body: '댓글' };
+  client.setQueryData(['posts', 5, 'comments'], { pages: [{ items: [comment] }], pageParams: [null] });
+  client.setQueryData(['posts', 5, 'comments', 3], { pages: [{ items: [comment] }], pageParams: [null] });
+  client.setQueryData(['posts', 5, 'likes'], { pages: [{ items: [{ id: 5 }] }], pageParams: [null] });
+
+  // when
+  await act(async () => {
+    result.current.setLiked(target, true);
+  });
+
+  // then
+  const items = (key: unknown[]) =>
+    client.getQueryData<{ pages: { items: unknown[] }[] }>(key)?.pages[0].items;
+  expect(items(['posts', 5, 'comments'])).toEqual([comment]);
+  expect(items(['posts', 5, 'comments', 3])).toEqual([comment]);
+  expect(items(['posts', 5, 'likes'])).toEqual([{ id: 5 }]);
+  expect(inFeed(5)).toMatchObject({ likedByMe: true });
+});

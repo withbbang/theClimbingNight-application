@@ -150,6 +150,7 @@ export function PostCard({ post, onOpen, hideMedia = false, menu = false, onGone
   const commentPress = usePressScale(0.88);
   const signedIn = useSession().status === 'authenticated';
   const { setLiked } = useLikePost();
+  const [celebrate, setCelebrate] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const showMedia = !hideMedia && post.media.length > 0;
   // status는 작성자 본인에게만 있다. 보이지 않는 내 글은 좋아요를 켤 수 없고 끌 수만 있다.
@@ -226,12 +227,21 @@ export function PostCard({ post, onOpen, hideMedia = false, menu = false, onGone
         <MediaCarousel
           media={post.media}
           onPress={onOpen}
-          onDoubleTap={signedIn && !likeBlocked ? () => setLiked(post, true) : undefined}
+          onDoubleTap={
+            signedIn && !likeBlocked
+              ? () => {
+                  setLiked(post, true);
+                  setCelebrate((n) => n + 1);
+                }
+              : undefined
+          }
         />
       ) : null}
       <View style={{ gap: space(2), paddingHorizontal: space(4), paddingTop: space(3) }}>
         <View style={[styles.row, { gap: space(4) }]}>
           <LikeButton
+            key={post.id}
+            celebrate={celebrate}
             liked={post.likedByMe}
             count={post.likeCount}
             disabled={likeBlocked}
