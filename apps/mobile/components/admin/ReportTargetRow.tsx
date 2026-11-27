@@ -15,6 +15,7 @@ import type { ReportTargetAction, ReportTargetResponse } from '@/types/api/moder
 
 const THUMB = 64;
 const SHOWN_DETAILS = 3;
+const BADGES = { USER: '사용자', COMMENT: '댓글', POST: '게시물' } as const;
 const HIDDEN = ['HIDDEN', 'HIDDEN_PENDING'];
 
 // 지운 글(DELETED) 말고도 서버가 숨김·복원을 404로 거절하는 상태(ModerationService.lockedPost). 기각만 할 수 있다.
@@ -37,6 +38,9 @@ export function targetName(target: ReportTargetResponse) {
   if (target.targetType === 'USER') {
     return `${target.userNickname ?? '탈퇴한 회원'} 사용자`;
   }
+  if (target.targetType === 'COMMENT') {
+    return target.comment ? `${target.comment.author.nickname}의 댓글` : `${target.targetId}번 댓글`;
+  }
   return target.post ? `${target.post.author.nickname}의 게시물` : `${target.targetId}번 게시물`;
 }
 
@@ -54,13 +58,15 @@ interface ActionSpec {
 
 function actionsOf(target: ReportTargetResponse): ActionSpec[] {
   const dismiss = (message: string): ActionSpec => ({ action: 'DISMISS', label: '기각', message });
-  if (target.targetType !== 'POST') {
+  if (target.targetType === 'USER') {
     return [dismiss('신고를 모두 기각해요.')];
   }
+  const comment = target.targetType === 'COMMENT';
+  const noun = comment ? '댓글' : '글';
   if (target.targetStatus === 'DELETED') {
-    return [dismiss('이미 지워진 글이에요. 신고를 닫아요.')];
+    return [dismiss(`이미 지워진 ${noun}이에요. 신고를 닫아요.`)];
   }
-  if (LOCKED.includes(target.targetStatus)) {
+  if (!comment && LOCKED.includes(target.targetStatus)) {
     return [dismiss('숨기거나 복원할 수 없는 글이에요. 신고를 닫아요.')];
   }
   const autoHidden = target.targetStatus === 'HIDDEN_PENDING';
@@ -71,22 +77,24 @@ function actionsOf(target: ReportTargetResponse): ActionSpec[] {
       action: 'HIDE',
       label: '숨기기',
       message: autoHidden
-        ? '자동으로 숨긴 글을 그대로 숨겨 두고 신고를 처리해요.'
-        : '피드에서 내리고 사진을 격리해요. 신고는 모두 처리돼요.',
+        ? `자동으로 숨긴 ${noun}을 그대로 숨겨 두고 신고를 처리해요.`
+        : comment
+          ? '댓글을 숨겨요. 신고는 모두 처리돼요.'
+          : '피드에서 내리고 사진을 격리해요. 신고는 모두 처리돼요.',
     });
   }
   if (hidden) {
     actions.push({
       action: 'RESTORE',
       label: '복원',
-      message: '다시 피드에 올려요. 신고는 모두 기각돼요.',
+      message: comment ? '다시 보이게 해요. 신고는 모두 기각돼요.' : '다시 피드에 올려요. 신고는 모두 기각돼요.',
     });
   }
   actions.push(
     dismiss(
       autoHidden
-        ? '신고를 모두 기각하고 자동으로 숨긴 글을 다시 올려요.'
-        : '신고를 모두 기각해요. 글은 그대로 둬요.',
+        ? `신고를 모두 기각하고 자동으로 숨긴 ${noun}을 다시 ${comment ? '보이게' : '올려'}요.`
+        : `신고를 모두 기각해요. ${noun}은 그대로 둬요.`,
     ),
   );
   return actions;
@@ -141,12 +149,15 @@ export function ReportTargetRow({ target, index, sending, locked, onAct }: Repor
   const { colors, radius, space } = useTheme();
   const reduced = useReducedMotion();
   const name = targetName(target);
-  const { post } = target;
-  // 숨긴 글은 공개본이 격리돼 있으니 격리본을 본다.
-  const urls =
-    target.quarantineUrls.length > 0
+  const { post, comment } = target;
+  const isComment = target.targetType === 'COMMENT';
+  // 숨긴 글은 공개본이 격리돼 있으니 격리본을 본다. 댓글은 원 게시물 첫 사진만 맥락으로 보인다.
+  const postUrls = post?.media.flatMap((m) => (m.thumbnailUrl ? [m.thumbnailUrl] : [])) ?? [];
+  const urls = isComment
+    ? postUrls.slice(0, 1)
+    : target.quarantineUrls.length > 0
       ? target.quarantineUrls
-      : (post?.media.flatMap((m) => (m.thumbnailUrl ? [m.thumbnailUrl] : [])) ?? []);
+      : postUrls;
   const more = target.details.length - SHOWN_DETAILS;
 
   return (
@@ -169,7 +180,7 @@ export function ReportTargetRow({ target, index, sending, locked, onAct }: Repor
             { borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: space(2) },
           ]}
         >
-          <AppText variant="caption">{target.targetType === 'USER' ? '사용자' : '게시물'}</AppText>
+          <AppText variant="caption">{BADGES[target.targetType]}</AppText>
         </View>
         <AppText variant="caption" tone="muted" style={styles.fill}>
           {STATUS_LABELS[target.targetStatus] ?? target.targetStatus}
@@ -198,6 +209,14 @@ export function ReportTargetRow({ target, index, sending, locked, onAct }: Repor
 
       {target.targetType === 'USER' ? (
         <AppText>{target.userNickname ?? '탈퇴한 회원'}</AppText>
+      ) : isComment ? (
+        comment || post ? (
+          <View style={{ gap: space(2) }}>
+            {comment ? <AppText variant="label">{comment.author.nickname}</AppText> : null}
+            {urls.length > 0 ? <Photos urls={urls} name={name} /> : null}
+            {comment ? <AppText numberOfLines={3}>{comment.body}</AppText> : null}
+          </View>
+        ) : null
       ) : post ? (
         <View style={{ gap: space(2) }}>
           <AppText variant="label">{post.author.nickname}</AppText>

@@ -24,6 +24,7 @@ const target = (over: Partial<ReportTargetResponse> = {}): ReportTargetResponse 
   lastReportedAt: '2026-11-24T02:00:00Z',
   post: post({ id: 5, media: [media(51)] }),
   quarantineUrls: [],
+  comment: null,
   userNickname: null,
   cleanupFailed: false,
   ...over,
@@ -113,5 +114,55 @@ it.each([
   // then
   expect(screen.getByText(label)).toBeOnTheScreen();
   expect(screen.getByRole('button', { name: '달이의 게시물 기각' })).toBeOnTheScreen();
+  expect(screen.queryByRole('button', { name: /숨기기|복원/ })).toBeNull();
+});
+
+const commentTarget = (status: string, withComment = true) =>
+  target({
+    targetType: 'COMMENT',
+    targetId: 9,
+    targetStatus: status,
+    post: withComment ? post({ id: 5, media: [media(51)] }) : null,
+    comment: withComment
+      ? { id: 9, postId: 5, author: { id: 3, nickname: '별이' }, body: '신고된 댓글 내용' }
+      : null,
+  });
+
+it('shows comment body and hide/dismiss for a visible comment', async () => {
+  // given
+  mockServer({ [LIST]: list([commentTarget('VISIBLE')]) });
+
+  // when
+  await renderApp('/admin/reports');
+
+  // then
+  expect(screen.getByText('신고된 댓글 내용')).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: '별이의 댓글 숨기기' })).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: '별이의 댓글 기각' })).toBeOnTheScreen();
+  expect(screen.queryByRole('button', { name: /복원/ })).toBeNull();
+});
+
+it('offers restore for an auto-hidden comment', async () => {
+  // given
+  mockServer({ [LIST]: list([commentTarget('HIDDEN_PENDING')]) });
+
+  // when
+  await renderApp('/admin/reports');
+
+  // then
+  expect(screen.getByRole('button', { name: '별이의 댓글 숨기기' })).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: '별이의 댓글 복원' })).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: '별이의 댓글 기각' })).toBeOnTheScreen();
+});
+
+it('offers only dismiss for a deleted comment', async () => {
+  // given
+  mockServer({ [LIST]: list([commentTarget('DELETED', false)]) });
+
+  // when
+  await renderApp('/admin/reports');
+
+  // then
+  expect(screen.getByRole('button', { name: '9번 댓글 기각' })).toBeOnTheScreen();
   expect(screen.queryByRole('button', { name: /숨기기|복원/ })).toBeNull();
 });
