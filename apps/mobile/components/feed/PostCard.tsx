@@ -241,9 +241,9 @@ export function PostCard({
             onPress={() => {
               if (!signedIn) {
                 router.push('/login');
-              } else {
-                setLiked(post, !post.likedByMe);
+                return false;
               }
+              setLiked(post, !post.likedByMe);
             }}
           />
           <Animated.View style={commentPress.style}>

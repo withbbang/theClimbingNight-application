@@ -30,5 +30,35 @@ it('starts the pop from zero after a press', async () => {
 
   // then
   expect(onPress).toHaveBeenCalled();
-  expect(fillStyle()).toMatchObject({ opacity: 0, transform: [{ scale: 0 }] });
+  // 스프링은 실제 프레임 시간으로 진행하므로 정확히 0이 아닐 수 있다. 끝 상태(1)와 멀기만 하면 된다.
+  const { opacity, transform } = fillStyle();
+  expect(opacity).toBeLessThan(0.5);
+  expect(transform[0].scale).toBeLessThan(0.5);
+});
+
+it('animates only the first change after a press, not a later rollback', async () => {
+  // given: 누르고 켜진 뒤 연출이 끝난 상태
+  const onPress = jest.fn();
+  const view = await render(<LikeButton liked={false} count={1} onPress={onPress} />);
+  await fireEvent.press(screen.getByRole('button', { name: '좋아요' }));
+  await view.rerender(<LikeButton liked count={2} onPress={onPress} />);
+
+  // when: 서버 실패로 되돌아가고 다시 외부에서 켜진다.
+  await view.rerender(<LikeButton liked={false} count={1} onPress={onPress} />);
+  await view.rerender(<LikeButton liked count={2} onPress={onPress} />);
+
+  // then: 두 번째 이후 변경은 끝 상태로 바로 간다.
+  expect(fillStyle()).toMatchObject({ opacity: 1, transform: [{ scale: 1 }] });
+});
+
+it('does not wait for an animation when the press changes nothing', async () => {
+  // given: 값이 바뀌지 않는 누름(false)
+  const view = await render(<LikeButton liked={false} count={1} onPress={() => false} />);
+  await fireEvent.press(screen.getByRole('button', { name: '좋아요' }));
+
+  // when: 나중에 외부에서 켜진다.
+  await view.rerender(<LikeButton liked count={2} onPress={() => false} />);
+
+  // then
+  expect(fillStyle()).toMatchObject({ opacity: 1, transform: [{ scale: 1 }] });
 });

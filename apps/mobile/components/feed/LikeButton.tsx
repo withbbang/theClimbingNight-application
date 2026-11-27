@@ -19,8 +19,6 @@ import { useTheme } from '@/hooks/use-theme';
 const ICON = 22;
 const SPARKS = 6;
 const SPARK_REACH = 15;
-/** 누른 뒤 이 시간 안에 바뀐 값만 누른 결과로 본다. */
-const INTENT_MS = 1500;
 
 interface SparkProps {
   index: number;
@@ -48,7 +46,8 @@ function Spark({ index, pop }: SparkProps) {
 interface LikeButtonProps {
   liked: boolean;
   count: number;
-  onPress: () => void;
+  /** false를 돌려주면 값이 바뀌지 않는 누름(로그인 화면으로 보냄 등)이라 연출을 기다리지 않는다. */
+  onPress: () => void | boolean;
   /** 값이 올라갈 때마다 눌림 없이도 켜짐 연출을 한 번 보인다(사진 두 번 탭). */
   celebrate?: number;
   /** 켜지 못하게 막는다. 켜진 하트는 이 값과 상관없이 끌 수 있다. */
@@ -73,15 +72,16 @@ export function LikeButton({
   const bounce = useSharedValue(1);
   const pop = useSharedValue(0);
   const first = useRef(true);
-  // 이 카드에서 누른 직후에 바뀐 값만 연출한다. 재활용 셀의 새 글이나 서버 값은 끝 상태로 맞춘다.
-  const pressedAt = useRef(0);
+  // 이 카드에서 누른 뒤 처음 바뀌는 값만 연출한다. 재활용 셀의 새 글, 서버 응답, 되돌림은 끝 상태로 맞춘다.
+  // 시계에 기대지 않고 누름 한 번이 값 변경 한 번을 소비한다.
+  const pendingPress = useRef(false);
   const seenCelebrate = useRef(celebrate);
 
   useEffect(() => {
     const celebrated = celebrate !== seenCelebrate.current;
     seenCelebrate.current = celebrate;
-    const play = celebrated || Date.now() - pressedAt.current < INTENT_MS;
-    pressedAt.current = 0;
+    const play = celebrated || pendingPress.current;
+    pendingPress.current = false;
     if (first.current) {
       first.current = false;
       return;
@@ -116,8 +116,7 @@ export function LikeButton({
         disabled={disabled && !liked}
         hitSlop={space(2)}
         onPress={() => {
-          pressedAt.current = Date.now();
-          onPress();
+          pendingPress.current = onPress() !== false;
         }}
         {...press.handlers}
         style={[styles.row, { gap: space(1) }]}
