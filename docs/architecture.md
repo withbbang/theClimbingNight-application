@@ -140,7 +140,7 @@ k-drinker와 같은 패턴: `master` 푸시 → GitHub Actions가 이미지 빌�
 - 카카오·네이버 SDK는 네이티브 모듈이라 Expo Go로는 실행할 수 없다. 개발은 처음부터 EAS development build로 한다. 각 제공자 개발자 콘솔에 앱 등록(번들 ID, 키 해시, 리다이렉트)이 필요하다.
 - 네이버 SDK는 Client Secret을 앱에 넣어야 초기화된다. 앱 번들에서 꺼낼 수 있으므로 비밀로 취급하지 않고, 서버 인증에 쓰지 않는다.
 - 토큰 (제안): access token JWT 30분, refresh token 30일 회전 방식(사용할 때마다 새로 발급, 이전 것 폐기), DB에는 해시로 저장. 앱은 `expo-secure-store`에 보관.
-- 첫 로그인 시 닉네임을 입력받아 USER로 가입한다. 프로필 사진은 1단계에 없다 (닉네임 첫 글자 아바타). 업로드 경로가 2단계에 생기면 함께 넣는다 (제안). 같은 사람이 여러 소셜 계정으로 로그인하면 별개 계정으로 본다 (제안. 계정 연결은 3단계). 제공자가 이메일을 주더라도 이메일로 자동 병합하지 않는다 (다른 사람 계정에 붙는 사고 방지).
+- 첫 로그인 시 닉네임을 입력받아 USER로 가입한다. 프로필 사진은 1단계에 없었고(닉네임 첫 글자 아바타) 2단계 프로필 작업에서 넣었다. 사진이 없으면 첫 글자 아바타를 그대로 쓴다. 같은 사람이 여러 소셜 계정으로 로그인하면 별개 계정으로 본다 (제안. 계정 연결은 3단계). 제공자가 이메일을 주더라도 이메일로 자동 병합하지 않는다 (다른 사람 계정에 붙는 사고 방지).
 - 앱 탈퇴: 계정을 비활성화하고 개인정보(닉네임, 프로필 사진, 제공자 ID)를 지운다. 인증 신청, 문의와 답변, 로그인 토큰, 기기 알림 토큰과 전송 기록, 알림 설정도 함께 지운다. 사용자 행은 다른 기록이 가리키므로 회원 번호와 탈퇴 시각만 남긴다. 명부의 참석 기록은 통계 보존을 위해 남기되 앱 계정과의 연결을 끊는다.
 
 ### 동호회원 명부와 인증
@@ -345,10 +345,10 @@ reports        id, reporter_id, target_type, target_id, reason, detail, status(O
                UNIQUE(reporter_id, target_type, target_id)
 user_blocks    blocker_id, blocked_id  PK(blocker_id, blocked_id)
 comments, post_likes   -- 2번 계획(좋아요·댓글)에서 추가됨
-profile_images         -- 프로필 계획에서 추가
+profile_images         id, user_id, status(UPLOADING, PROCESSING, READY, FAILED, REMOVED), upload_key, public_key, original_path, byte_size   -- 프로필 계획에서 추가. users.profile_image_id가 현재 사진, users.bio는 자기소개
 ```
 
-작업 종류는 설계 문서 8장을 따른다. 우선순위는 `QUARANTINE`·`DELETE_MEDIA` > `RELEASE` > `PROCESS` > `PURGE_ORIGINAL`이다.
+`media_jobs`에는 `target_type`(POST_MEDIA, PROFILE_IMAGE)이 있다. 작업 종류는 설계 문서 8장을 따른다. 우선순위는 `QUARANTINE`·`DELETE_MEDIA` > `RELEASE` > `PROCESS` > `PURGE_ORIGINAL`이다.
 
 3단계 DM(`dm_rooms`, `dm_messages`, `dm_reads`)은 그때 설계한다.
 

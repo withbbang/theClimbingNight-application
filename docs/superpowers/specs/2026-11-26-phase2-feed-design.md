@@ -135,7 +135,7 @@
 |---|---|
 | 사진 | WebP 긴 변 1080px(상세), 480px(피드 격자·썸네일). EXIF(위치 포함)는 지운다 |
 | 영상 | H.264 MP4 720p(VAAPI, 실패 시 소프트웨어 인코딩), AAC, `faststart`. 첫 프레임 WebP 썸네일 480px |
-| 프로필 사진 | WebP 정사각 320px·96px. 같은 경로(초안 없이 `profile_images` 단일 업로드) |
+| 프로필 사진 | WebP 정사각 320px(`a/{hex}/l.webp`)·96px(`a/{hex}/s.webp`). 같은 경로(초안 없이 `profile_images` 단일 업로드, 업로드 키 `uploads/{hex}.jpg`) |
 
 - 원본 EXIF 회전값은 변환 시 반영한 뒤 제거한다.
 - NAS 원본은 받은 그대로(EXIF 포함) 둔다. 외부에 나가지 않는다.
@@ -158,7 +158,7 @@ post_media      id, post_id, type(IMAGE, VIDEO), status(UPLOADING, PROCESSING, R
                 width, height, duration_ms, byte_size
 media_jobs      id, kind(PROCESS, QUARANTINE, RELEASE, DELETE_MEDIA, PURGE_ORIGINAL), target_type(POST_MEDIA, PROFILE_IMAGE), target_id,
                 status(QUEUED, RUNNING, DONE, FAILED), attempts, next_run_at, locked_at, last_error
-profile_images  id, user_id, status, incoming_key, original_path, large_key, small_key   -- users.profile_image_id로 현재 것 지정
+profile_images  id, user_id, status, upload_key, public_key(`a/{hex}`, 뒤에 `/l.webp`·`/s.webp`), original_path, byte_size   -- users.profile_image_id로 현재 것 지정
 comments        id, post_id, author_id, parent_id(nullable), body, status(VISIBLE, HIDDEN_PENDING, HIDDEN), deleted_at
 post_likes      post_id, user_id, created_at   PK(post_id, user_id)
 reports         id, reporter_id, target_type(POST, COMMENT, USER), target_id, reason, detail,
@@ -186,7 +186,7 @@ user_blocks     blocker_id, blocked_id, created_at   PK(blocker_id, blocked_id)
 
 1. **사진 피드 + 신고·차단 + 워커(사진만)** — 게시물 작성·목록·상세·삭제·본문 수정, 비로그인 3개 제한, 신고·차단·운영진 숨김·신고 목록, 워커 컨테이너와 R2 두 버킷, 탈퇴 연동. 이 단계가 끝나면 출시할 수 있다. 신고 대상 COMMENT는 2번에서 붙인다.
 2. **좋아요·댓글·대댓글(댓글 신고·숨김 포함)** — 설계: `2026-11-27-phase2-likes-comments-design.md`.
-3. **프로필(격자·프로필 사진)** — 별도 계획.
+3. **프로필(격자·프로필 사진)** — 설계: `2026-11-28-phase2-profile-design.md`.
 4. **영상** — 앱 압축, VAAPI 변환, 재생(`expo-video`), 썸네일.
 5. **이미지 편집** — 자르기·필터. 그 전까지 작성 화면은 원본 비율 그대로 올린다.
 

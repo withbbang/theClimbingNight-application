@@ -94,20 +94,20 @@
 
 ```
 profile_images  id, user_id, status(UPLOADING, PROCESSING, READY, FAILED, REMOVED),
-                incoming_key, original_path, public_key, created_at, updated_at
+                upload_key, original_path, public_key, byte_size, created_at, updated_at
 users           + profile_image_id (nullable, FK profile_images.id), + bio
 media_jobs      + target_type(POST_MEDIA, PROFILE_IMAGE) NOT NULL DEFAULT 'POST_MEDIA'
 ```
 
-- 공개본 키: `profile/{UUID}` + `_l.webp`(320px) / `_s.webp`(96px). 게시물과 같이 무작위 키, URL은 응답 때 `MEDIA_PUBLIC_BASE_URL` + 키.
-- 업로드 키: `uploads/profile/{UUID}.jpg` (`media-incoming`, 기존 1일 수명 주기 규칙에 걸림).
-- NAS 원본: `/volume1/<프로젝트>/media/originals/profile/{yyyy}/{mm}/{profile_image_id}.jpg`.
+- 공개본 키: `a/{hex}` + `/l.webp`(320px) / `/s.webp`(96px). 게시물 사진(`p/{hex}` + `/d.webp`·`/t.webp`)과 같은 모양의 무작위 키, URL은 응답 때 `MEDIA_PUBLIC_BASE_URL` + 키.
+- 업로드 키: `uploads/{hex}.jpg` (`media-incoming`, 게시물과 같다. 기존 1일 수명 주기 규칙이 `uploads/` 전체에 걸린다).
+- NAS 원본: 원본 루트 기준 `profile/yyyy/MM/{profile_image_id}.jpg`. 게시물 원본과 이름이 겹치지 않게 `profile/` 아래에 둔다.
 - `REMOVED`: 바꾸기·되돌리기·운영진 내리기·탈퇴로 더 쓰지 않는 사진.
-- 피드 설계 9장의 `large_key`·`small_key`는 `public_key` 하나 + 접미사로 바꾼다(게시물 `display_key`와 같은 방식이 아니라 `PostMedia`의 공개 키 + 접미사 방식을 따른다).
+- 피드 설계 9장의 `large_key`·`small_key`는 `public_key` 하나 + 접미사(`/l.webp`·`/s.webp`)로 바꾼다. `PostMedia`의 공개 키 + 접미사 방식과 같다.
 
 ### 흐름
 
-1. 앱 → `POST /api/v1/users/me/profile-images` → `profile_images`(UPLOADING) + presigned PUT(15분, `image/jpeg`, 최대 5MB).
+1. 앱 → `POST /api/v1/users/me/profile-images` → `profile_images`(UPLOADING) + presigned PUT(15분, `image/jpeg`, 1바이트~5MB). 앱은 1:1로 자른 뒤 긴 변 1024px JPEG 0.85로 올린다.
 2. 앱이 `media-incoming`에 올린다 → `POST /api/v1/users/me/profile-images/{id}/confirm` → API가 HEAD로 존재·크기 확인 → PROCESSING, `media_jobs`(PROCESS, PROFILE_IMAGE) 생성.
 3. 워커: 업로드 다운로드 → NAS 원본 저장 → 가운데를 정사각으로 잘라 WebP 320px·96px(EXIF·프레임 메타데이터 제거, 기존 `ImageTranscoder` 규칙 재사용) → `media-public` 업로드 → 업로드 객체 삭제 → 한 트랜잭션에서 사용자 행을 잠그고:
    - 이 사진이 그 사용자의 **가장 최근에 확정한 사진**이면 READY로 바꾸고 `users.profile_image_id`를 이것으로 바꾼다. 예전 사진은 REMOVED + `DELETE_MEDIA` 작업.
@@ -122,6 +122,7 @@ media_jobs      + target_type(POST_MEDIA, PROFILE_IMAGE) NOT NULL DEFAULT 'POST_
   - 새 업로드를 시작하면 그 사용자의 예전 `UPLOADING` 행을 바로 지운다. 올리다 그만둔 사진 때문에 막히는 일이 없다. 업로드 객체가 남았으면 1일 수명 주기가 지운다.
   - `PROCESSING`은 최대 2개까지만 둔다. 넘으면 기존 검증 오류 코드로 거절한다(`api-conventions`의 코드 중 맞는 것을 쓴다). 재시도 대기 중인 사진도 센다.
 - 지금 `target_id`로만 작업을 찾는 곳(`MediaJobScheduler.cancelQueued`, `MediaJobProcessor.failMedia`, `findPostIdsWithFailedCleanup` 등)은 모두 `target_type`도 조건에 넣는다. 게시물 사진 id와 프로필 사진 id가 겹치기 때문이다.
+- 만든 뒤 달라진 점: `MediaJobRepository.cancelQueued`는 더 이상 영속성 컨텍스트를 비우지 않는다. 호출한 쪽이 이미 읽어 둔 `MediaJob` 엔티티는 취소가 반영되지 않은 채일 수 있다. 워커가 프로필 처리를 확정할 때 잠그는 순서는 사용자 행 → 프로필 사진 행이다(탈퇴가 사용자 행을 먼저 잠그는 것과 같다).
 - 작업 처리기는 `(kind, target_type)`으로 나눈다. 프로필 사진은 `PROCESS`·`QUARANTINE`·`DELETE_MEDIA`·`PURGE_ORIGINAL`만 쓰고 `RELEASE`는 없다(7장).
 
 ## 7. 운영진 조치 (제안)
@@ -129,9 +130,9 @@ media_jobs      + target_type(POST_MEDIA, PROFILE_IMAGE) NOT NULL DEFAULT 'POST_
 - 사용자 신고(`USER`) 대상에 조치 두 개를 연다: `REMOVE_PROFILE_IMAGE`, `CLEAR_BIO`. 지금은 `USER`에 `DISMISS`만 된다.
   - `REMOVE_PROFILE_IMAGE`: `profile_image_id = null`, 사진 REMOVED + `QUARANTINE`(공개본을 격리하고 캐시를 비움). 신고는 ACTIONED로 닫는다.
   - `CLEAR_BIO`: `bio = null`. 신고는 ACTIONED로 닫는다.
-  - 둘 다 하려면 먼저 하나를 하고 신고가 닫힌 뒤 같은 사람의 다른 신고를 처리하거나, 앱에서 두 조치를 연달아 보낸다. (제안: 앱은 체크 두 개 + "조치" 버튼 하나로 두 요청을 차례로 보낸다. 두 번째 요청은 신고가 이미 닫혀 있어도 조치는 하고 404를 주지 않는다.)
+  - 사진과 자기소개가 다 있으면 카드에 "둘 다 내리기" 버튼을 하나 더 두고, 앱이 `REMOVE_PROFILE_IMAGE` → `CLEAR_BIO`를 차례로 보낸다. 두 번째 요청은 신고가 이미 닫혀 있어도 조치하고 200을 준다(`close()`는 열린 신고가 없으면 아무것도 안 한다).
 - 복원은 없다. 내린 사진은 본인이 다시 올린다.
-- 보존 (검토 뒤 추가, 설계자 결정): 숨긴 게시물과 같은 기준을 쓴다. 운영진이 내린 사진은 격리본과 NAS 원본을 모두 남기고 `PURGE_ORIGINAL`을 예약하지 않는다. 탈퇴할 때 함께 지운다. 본인이 바꾸거나 되돌린 사진만 30일 뒤 원본을 지운다. 보존 기간 문구는 `content-todo.md`의 신고 기록 보관 항목에 넣는다.
+- 보존 (검토 뒤 추가, 설계자 결정): 숨긴 게시물과 같은 기준을 쓴다. 운영진이 내린 사진은 `QUARANTINE`만 걸고 격리본과 NAS 원본을 모두 남기며 `PURGE_ORIGINAL`을 예약하지 않는다. 탈퇴할 때 그 사람의 모든 프로필 사진에 `DELETE_MEDIA` + 30일 뒤 `PURGE_ORIGINAL`을 걸어 함께 지운다. 본인이 바꾸거나 되돌린 사진만 30일 뒤 원본을 지운다. 보존 기간 문구는 `content-todo.md`의 신고 기록 보관 항목에 넣는다.
 - 신고 목록의 사용자 대상 카드에는 지금 프로필 사진(공개 URL, 96px)과 자기소개만 보여 준다. 조치해 신고가 닫히면 카드가 목록에서 빠지므로, 예전에 내린 사진은 보여 주지 않는다. 격리본은 분쟁에 대비한 기록이고, 그 사진을 보는 화면은 이번 범위 밖이다. (설계자 결정)
 - 자동 임시조치는 하지 않는다: 사용자 신고는 사유가 사진인지 자기소개인지 닉네임인지 알 수 없고, 자동으로 다 내리면 장난 신고로 프로필을 지울 수 있다. 신고가 들어오면 기존대로 ADMIN에게 푸시가 가고 운영진이 판단한다. 초상권 사유에 대한 법적 기준은 `docs/content-todo.md`의 임시조치 항목에 "프로필 사진 포함 여부"를 덧붙인다.
 
@@ -141,19 +142,19 @@ media_jobs      + target_type(POST_MEDIA, PROFILE_IMAGE) NOT NULL DEFAULT 'POST_
 |---|---|---|
 | `GET /api/v1/users/{id}/profile` | USER | `{ id, nickname, bio, profileImage: { largeUrl, smallUrl } \| null, postCount, mine }`. 차단·탈퇴·없음은 404 |
 | `GET /api/v1/users/{id}/posts?cursor&size` | USER | 격자 항목 `{ id, thumbnailUrl, mediaCount, status(본인만) }` 커서 페이지. 기본 18, 최대 30 |
-| `PATCH /api/v1/users/me/profile` | USER | `{ bio }` |
+| `PATCH /api/v1/users/me/profile` | USER | `{ bio }`. 닉네임은 기존 `PATCH /users/me` |
 | `POST /api/v1/users/me/profile-images` | USER | `{ id, uploadUrl, headers, expiresAt }` |
 | `POST /api/v1/users/me/profile-images/{id}/confirm` | USER | 처리 시작. 202 |
 | `GET /api/v1/users/me/profile-images/{id}` | USER | `{ id, status }`. 본인 것만, 아니면 404 |
 | `DELETE /api/v1/users/me/profile-image` | USER | 기본 이미지로 |
 | `POST /api/v1/report-targets/USER/{id}/actions` | ADMIN | `action`에 `REMOVE_PROFILE_IMAGE`, `CLEAR_BIO` 추가 |
 
-- 작성자·사용자를 담는 응답에 작은 사진 URL을 넣는다: `PostAuthorResponse`·`LikerResponse`·`BlockedUserResponse`에 `profileImageUrl`(96px, nullable), `UserResponse`(`/users/me`)에 `bio`·`profileImage`(두 크기). 응답 만들 때 사용자 id 묶음으로 한 번에 읽어 N+1을 피한다.
+- 작성자·사용자를 담는 응답에 작은 사진 URL을 넣는다: `PostAuthorResponse`·`LikerResponse`·`BlockedUserResponse`에 `profileImageUrl`(96px, nullable), `UserResponse`(`/users/me`)는 그대로 둔다(토큰·벙 주최자·인증 신청에도 쓰여서). 마이 탭과 편집 화면은 `GET /users/{내 id}/profile`로 받는다. 응답 만들 때 사용자 id 묶음으로 한 번에 읽어 N+1을 피한다.
 - 비로그인 피드 맛보기 3개의 작성자 아바타도 사진 URL을 준다(공개 버킷이라 어차피 공개, 프로필 자체는 401).
 
 ## 9. 탈퇴·자격 변경 (제안)
 
-- 탈퇴(`UserWithdrawnEvent`): `bio = null`, `profile_image_id = null`, 그 사람의 모든 프로필 사진 REMOVED + `DELETE_MEDIA`, 진행 중인 `PROCESS`는 취소. 아키텍처 문서의 "개인정보(닉네임, 프로필 사진 …)를 지운다"와 맞춘다.
+- 탈퇴(`UserWithdrawnEvent`): `bio = null`, `profile_image_id = null`, 그 사람의 모든 프로필 사진 REMOVED + `DELETE_MEDIA` + 30일 뒤 `PURGE_ORIGINAL`(운영진이 내린 사진 포함), 진행 중인 `PROCESS`는 취소. 아키텍처 문서의 "개인정보(닉네임, 프로필 사진 …)를 지운다"와 맞춘다.
 - 자격 해제(MEMBER→USER)는 영향 없음.
 
 ## 10. 앱 공통 변경 (제안)
@@ -165,6 +166,7 @@ media_jobs      + target_type(POST_MEDIA, PROFILE_IMAGE) NOT NULL DEFAULT 'POST_
 ## 11. 인프라·문서 변경
 
 - 새 환경변수 없음(기존 미디어 버킷·토큰·경로 재사용).
+- 새 오류 코드: `USER_BIO_INVALID`(400), `PROFILE_IMAGE_BUSY`(409, 처리 중 2개 초과), `PROFILE_IMAGE_UPLOAD_INCOMPLETE`(409, 확정 때 객체 없음·크기 다름). `api-conventions` 스킬 표에 있다. 6장의 "기존 검증 오류 코드"는 `PROFILE_IMAGE_BUSY`로 정했다.
 - 마이그레이션 V10: `users.bio`, `users.profile_image_id`, `profile_images`, `media_jobs.target_type`(기존 행은 `POST_MEDIA`), 프로필 격자용 인덱스 `posts(author_id, status, published_at, id)`.
 - `architecture.md` 10장 2단계 요약의 `profile_images` 줄, 피드 설계 9장 `profile_images` 컬럼, 11장 3번에 이 문서 링크.
 - `docs/content-todo.md`: 개인정보처리방침에 자기소개·프로필 사진 항목(수집·공개 범위·탈퇴 시 삭제), 임시조치 항목에 프로필 사진 포함 여부.
