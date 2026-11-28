@@ -4,6 +4,7 @@ import com.theclimbingnight.profile.entity.ProfileImage;
 import com.theclimbingnight.profile.entity.ProfileImageStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -29,4 +30,15 @@ public interface ProfileImageRepository extends JpaRepository<ProfileImage, Long
 			@Param("createdBefore") Instant createdBefore);
 
 	boolean existsByUserIdAndStatusAndIdGreaterThan(long userId, ProfileImageStatus status, long id);
+
+	record CurrentImage(Long userId, String publicKey) {
+	}
+
+	/** 사용자의 지금 프로필 사진 중 READY인 것만. */
+	@Query("""
+			select new com.theclimbingnight.profile.repository.ProfileImageRepository$CurrentImage(u.id, i.publicKey)
+			from User u join ProfileImage i on i.id = u.profileImageId
+			where u.id in :userIds and i.status = com.theclimbingnight.profile.entity.ProfileImageStatus.READY
+			""")
+	List<CurrentImage> findCurrentReady(@Param("userIds") Collection<Long> userIds);
 }

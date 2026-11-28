@@ -65,4 +65,20 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 	/** 지워지지 않은 내 글 id(초안·실패 포함). 탈퇴 정리용. */
 	@Query("select p.id from Post p where p.authorId = :authorId and p.deletedAt is null")
 	List<Long> findLiveIdsByAuthorId(@Param("authorId") long authorId);
+
+	/** 한 사람의 격자. statuses에 해당하고 지워지지 않은 글을 게시 시각·id 내림차순으로 준다. */
+	@Query("""
+			select p from Post p
+			where p.authorId = :authorId
+			  and p.status in :statuses
+			  and p.deletedAt is null
+			  and (:cursorPublishedAt is null
+			       or p.publishedAt < :cursorPublishedAt
+			       or (p.publishedAt = :cursorPublishedAt and p.id < :cursorId))
+			order by p.publishedAt desc, p.id desc
+			""")
+	List<Post> findProfileGrid(@Param("authorId") long authorId, @Param("statuses") Collection<PostStatus> statuses,
+			@Param("cursorPublishedAt") Instant cursorPublishedAt, @Param("cursorId") Long cursorId, Pageable limit);
+
+	long countByAuthorIdAndStatusAndDeletedAtIsNull(long authorId, PostStatus status);
 }

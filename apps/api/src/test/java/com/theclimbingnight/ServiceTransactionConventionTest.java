@@ -16,7 +16,7 @@ import org.springframework.util.ClassUtils;
 class ServiceTransactionConventionTest {
 
 	private static final List<String> PACKAGES = List.of("com.theclimbingnight.feed", "com.theclimbingnight.moderation",
-			"com.theclimbingnight.media", "com.theclimbingnight.comment");
+			"com.theclimbingnight.media", "com.theclimbingnight.comment", "com.theclimbingnight.profile");
 
 	@Test
 	void 피드_신고_미디어_서비스는_클래스에_읽기_전용_트랜잭션을_건다() throws Exception {
