@@ -14,11 +14,14 @@ import com.theclimbingnight.common.ErrorCode;
 import com.theclimbingnight.moderation.dto.BlockedUserResponse;
 import com.theclimbingnight.moderation.entity.UserBlock;
 import com.theclimbingnight.moderation.repository.UserBlockRepository;
+import com.theclimbingnight.profile.dto.ProfileImageUrls;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,12 +40,13 @@ class BlockServiceTest {
 
 	@Mock UserBlockRepository blocks;
 	@Mock UserRepository users;
+	@Mock UserAvatars avatars;
 
 	private BlockService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new BlockService(blocks, users, new MutableClock(NOW));
+		service = new BlockService(blocks, users, avatars, new MutableClock(NOW));
 	}
 
 	private static User user(long id, String nickname) {
@@ -78,7 +82,7 @@ class BlockServiceTest {
 		verify(blocks).save(saved.capture());
 		assertThat(saved.getValue().getBlockerId()).isEqualTo(ME);
 		assertThat(saved.getValue().getBlockedId()).isEqualTo(TARGET);
-		assertThat(response).isEqualTo(new BlockedUserResponse(TARGET, "대상", NOW.atOffset(ZoneOffset.UTC)));
+		assertThat(response).isEqualTo(new BlockedUserResponse(TARGET, "대상", null, NOW.atOffset(ZoneOffset.UTC)));
 	}
 
 	@Test
@@ -135,6 +139,24 @@ class BlockServiceTest {
 		List<BlockedUserResponse> list = service.list(ME);
 
 		// then
-		assertThat(list).containsExactly(new BlockedUserResponse(TARGET, "대상", NOW.atOffset(ZoneOffset.UTC)));
+		assertThat(list).containsExactly(new BlockedUserResponse(TARGET, "대상", null, NOW.atOffset(ZoneOffset.UTC)));
+	}
+
+	@Test
+	void blockedUserHasProfileImageUrl() {
+		// given
+		String small = "https://m.example/a/ab12/s.webp";
+		ProfileImageUrls urls = new ProfileImageUrls("https://m.example/a/ab12/l.webp", small);
+		givenUsers();
+		given(blocks.findByBlockerIdAndBlockedId(ME, TARGET)).willReturn(Optional.empty());
+		given(avatars.of(List.of(TARGET))).willReturn(Map.of(TARGET, urls));
+		given(blocks.findAllByBlockerIdOrderByCreatedAtDesc(ME)).willReturn(List.of(
+				UserBlock.of(ME, TARGET, NOW), UserBlock.of(ME, 10L, NOW.minusSeconds(60))));
+		given(users.findAllById(List.of(TARGET, 10L))).willReturn(List.of(user(TARGET, "대상"), user(10L, "다른")));
+		given(avatars.of(List.of(TARGET, 10L))).willReturn(Map.of(TARGET, urls));
+
+		// when / then
+		assertThat(service.block(ME, TARGET).profileImageUrl()).isEqualTo(small);
+		assertThat(service.list(ME)).extracting(BlockedUserResponse::profileImageUrl).containsExactly(small, null);
 	}
 }

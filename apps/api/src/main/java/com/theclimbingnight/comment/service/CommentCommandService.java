@@ -14,8 +14,10 @@ import com.theclimbingnight.moderation.repository.UserBlockRepository;
 import com.theclimbingnight.user.entity.Role;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.time.Clock;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import org.springframework.stereotype.Service;
@@ -34,15 +36,17 @@ public class CommentCommandService {
 	private final UserRepository users;
 	private final CommentCounter counter;
 	private final UserBlockRepository blocks;
+	private final UserAvatars avatars;
 	private final Clock clock;
 
 	public CommentCommandService(PostAccess access, CommentRepository comments, UserRepository users,
-			CommentCounter counter, UserBlockRepository blocks, Clock clock) {
+			CommentCounter counter, UserBlockRepository blocks, UserAvatars avatars, Clock clock) {
 		this.access = access;
 		this.comments = comments;
 		this.users = users;
 		this.counter = counter;
 		this.blocks = blocks;
+		this.avatars = avatars;
 		this.clock = clock;
 	}
 
@@ -79,8 +83,9 @@ public class CommentCommandService {
 		String nickname = users.findById(userId).map(User::getNickname).orElse(null);
 		String replyToNickname = replyToUserId == null ? null
 				: users.findById(replyToUserId).map(User::getNickname).orElse(null);
-		return new CommentResponse(saved.getId(), parentId, new PostAuthorResponse(userId, nickname), saved.getBody(),
-				replyToNickname, saved.getCreatedAt().atOffset(ZoneOffset.UTC), CommentDisplay.VISIBLE, 0, true, true);
+		return new CommentResponse(saved.getId(), parentId, new PostAuthorResponse(userId, nickname,
+				UserAvatars.smallUrl(avatars.of(List.of(userId)), userId)),
+				saved.getBody(), replyToNickname, saved.getCreatedAt().atOffset(ZoneOffset.UTC), CommentDisplay.VISIBLE, 0, true, true);
 	}
 
 	@Transactional

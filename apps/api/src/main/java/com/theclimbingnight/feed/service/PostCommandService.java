@@ -19,6 +19,7 @@ import com.theclimbingnight.media.storage.PresignedUpload;
 import com.theclimbingnight.user.entity.Role;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
@@ -45,13 +46,13 @@ public class PostCommandService {
 	private final MediaJobScheduler scheduler;
 	private final PostResponseMapper mapper;
 	private final PostLikeRepository likes;
+	private final UserAvatars avatars;
 	private final SecureRandom random;
 	private final Clock clock;
 
 	public PostCommandService(PostRepository posts, PostMediaRepository mediaRepository, UserRepository users,
 			MediaStorage storage, MediaJobScheduler scheduler, PostResponseMapper mapper, PostLikeRepository likes,
-			SecureRandom random,
-			Clock clock) {
+			UserAvatars avatars, SecureRandom random, Clock clock) {
 		this.posts = posts;
 		this.mediaRepository = mediaRepository;
 		this.users = users;
@@ -59,6 +60,7 @@ public class PostCommandService {
 		this.scheduler = scheduler;
 		this.mapper = mapper;
 		this.likes = likes;
+		this.avatars = avatars;
 		this.random = random;
 		this.clock = clock;
 	}
@@ -136,7 +138,9 @@ public class PostCommandService {
 
 	private PostResponse toResponse(Post post, List<PostMedia> media, long viewerId) {
 		String nickname = users.findById(post.getAuthorId()).map(User::getNickname).orElse("");
-		return mapper.toResponse(post, nickname, media, viewerId, likes.existsByPostIdAndUserId(post.getId(), viewerId));
+		String imageUrl = UserAvatars.smallUrl(avatars.of(List.of(post.getAuthorId())), post.getAuthorId());
+		return mapper.toResponse(post, nickname, imageUrl, media, viewerId,
+				likes.existsByPostIdAndUserId(post.getId(), viewerId));
 	}
 
 	private String randomHex() {

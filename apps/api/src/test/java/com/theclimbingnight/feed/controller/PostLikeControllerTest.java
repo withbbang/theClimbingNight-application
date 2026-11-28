@@ -81,7 +81,7 @@ class PostLikeControllerTest {
 		// given
 		String bearer = bearer(1L);
 		given(postLikeService.likers(eq(1L), eq(5L), isNull(), eq(20)))
-				.willReturn(new CursorResponse<>(List.of(new LikerResponse(7L, "민수")), "next"));
+				.willReturn(new CursorResponse<>(List.of(new LikerResponse(7L, "민수", null)), "next"));
 
 		// when / then
 		mockMvc.perform(get("/api/v1/posts/5/likes").header("Authorization", bearer)).andExpect(status().isOk())

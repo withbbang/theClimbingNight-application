@@ -9,8 +9,10 @@ import com.theclimbingnight.feed.dto.LikerResponse;
 import com.theclimbingnight.feed.entity.Post;
 import com.theclimbingnight.feed.entity.PostLike;
 import com.theclimbingnight.feed.repository.PostLikeRepository;
+import com.theclimbingnight.profile.dto.ProfileImageUrls;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
@@ -27,12 +29,15 @@ public class PostLikeService {
 	private final PostAccess access;
 	private final PostLikeRepository likes;
 	private final UserRepository users;
+	private final UserAvatars avatars;
 	private final Clock clock;
 
-	public PostLikeService(PostAccess access, PostLikeRepository likes, UserRepository users, Clock clock) {
+	public PostLikeService(PostAccess access, PostLikeRepository likes, UserRepository users, UserAvatars avatars,
+			Clock clock) {
 		this.access = access;
 		this.likes = likes;
 		this.users = users;
+		this.avatars = avatars;
 		this.clock = clock;
 	}
 
@@ -73,13 +78,17 @@ public class PostLikeService {
 		String nextCursor = hasNext ? Cursor.encode(page.get(size - 1).getCreatedAt(), page.get(size - 1).getUserId())
 				: null;
 		Map<Long, String> nicknames = new HashMap<>();
+		Map<Long, ProfileImageUrls> images = Map.of();
 		if (!page.isEmpty()) {
-			for (User user : users.findAllById(page.stream().map(PostLike::getUserId).toList())) {
+			List<Long> userIds = page.stream().map(PostLike::getUserId).toList();
+			for (User user : users.findAllById(userIds)) {
 				nicknames.put(user.getId(), user.getNickname());
 			}
+			images = avatars.of(userIds);
 		}
-		return new CursorResponse<>(page.stream()
-				.map(l -> new LikerResponse(l.getUserId(), nicknames.getOrDefault(l.getUserId(), ""))).toList(),
+		Map<Long, ProfileImageUrls> likerImages = images;
+		return new CursorResponse<>(page.stream().map(l -> new LikerResponse(l.getUserId(),
+				nicknames.getOrDefault(l.getUserId(), ""), UserAvatars.smallUrl(likerImages, l.getUserId()))).toList(),
 				nextCursor);
 	}
 }

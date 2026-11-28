@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -12,20 +13,25 @@ import static org.mockito.Mockito.verify;
 
 import com.theclimbingnight.common.BusinessException;
 import com.theclimbingnight.common.ErrorCode;
+import com.theclimbingnight.common.CursorResponse;
 import com.theclimbingnight.feed.dto.LikeResponse;
+import com.theclimbingnight.feed.dto.LikerResponse;
 import com.theclimbingnight.feed.entity.Post;
 import com.theclimbingnight.feed.entity.PostLike;
 import com.theclimbingnight.feed.entity.PostStatus;
 import com.theclimbingnight.feed.repository.PostLikeRepository;
 import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.moderation.repository.UserBlockRepository;
+import com.theclimbingnight.profile.dto.ProfileImageUrls;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,12 +53,14 @@ class PostLikeServiceTest {
 	@Mock UserBlockRepository blocks;
 	@Mock PostLikeRepository likes;
 	@Mock UserRepository users;
+	@Mock UserAvatars avatars;
 
 	private PostLikeService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new PostLikeService(new PostAccess(posts, blocks), likes, users, Clock.fixed(NOW, ZoneOffset.UTC));
+		service = new PostLikeService(new PostAccess(posts, blocks), likes, users, avatars,
+				Clock.fixed(NOW, ZoneOffset.UTC));
 		lenient().when(users.findAllByIdForShare(anyCollection())).thenAnswer(inv -> {
 			Collection<Long> ids = inv.getArgument(0);
 			return ids.stream().map(PostLikeServiceTest::user).toList();
@@ -75,6 +83,25 @@ class PostLikeServiceTest {
 
 	private void givenPost(Post post) {
 		given(posts.findByIdForUpdate(POST)).willReturn(Optional.of(post));
+	}
+
+	@Test
+	void likerHasProfileImageUrl() {
+		// given
+		Post post = post(PostStatus.VISIBLE, 2);
+		given(posts.findById(POST)).willReturn(Optional.of(post));
+		given(likes.findLikers(eq(POST), eq(ME), any(), any(), any()))
+				.willReturn(List.of(PostLike.of(POST, 7L, NOW), PostLike.of(POST, 8L, NOW)));
+		given(users.findAllById(anyCollection())).willReturn(List.of(user(7L), user(8L)));
+		String small = "https://m.example/a/ab12/s.webp";
+		given(avatars.of(anyCollection()))
+				.willReturn(Map.of(7L, new ProfileImageUrls("https://m.example/a/ab12/l.webp", small)));
+
+		// when
+		CursorResponse<LikerResponse> result = service.likers(ME, POST, null, 10);
+
+		// then
+		assertThat(result.items()).extracting(LikerResponse::profileImageUrl).containsExactly(small, null);
 	}
 
 	@Test

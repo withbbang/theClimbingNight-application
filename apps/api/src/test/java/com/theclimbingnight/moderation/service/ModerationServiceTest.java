@@ -43,8 +43,10 @@ import com.theclimbingnight.moderation.entity.ReportStatus;
 import com.theclimbingnight.moderation.entity.ReportTargetType;
 import com.theclimbingnight.moderation.repository.ReportRepository;
 import com.theclimbingnight.moderation.repository.ReportTargetSummary;
+import com.theclimbingnight.profile.dto.ProfileImageUrls;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
@@ -79,6 +81,7 @@ class ModerationServiceTest {
 	@Mock UserRepository users;
 	@Mock MediaJobRepository jobs;
 	@Mock MediaStorage storage;
+	@Mock UserAvatars avatars;
 
 	private final MutableClock clock = new MutableClock(NOW);
 	private ModerationService service;
@@ -88,7 +91,7 @@ class ModerationServiceTest {
 		MediaUrls urls = new MediaUrls(new MediaProperties(true, "a", "k", "s", "in", "pub", "https://m.example", null));
 		MediaJobScheduler scheduler = new MediaJobScheduler(jobs, mediaRepository, clock);
 		service = new ModerationService(reports, posts, comments, counter, mediaRepository, users, jobs, scheduler, storage,
-				new PostResponseMapper(urls), urls, clock);
+				new PostResponseMapper(urls), urls, avatars, clock);
 	}
 
 	private Post givenPost(PostStatus status) {
@@ -358,6 +361,8 @@ class ModerationServiceTest {
 		PostMedia processing = media(12L, 1);
 		given(mediaRepository.findAllByPostIdInOrderBySortOrder(List.of(POST_ID))).willReturn(List.of(ready, processing));
 		given(users.findAllById(anyCollection())).willReturn(List.of(user(AUTHOR, "작성자"), user(9L, "대상")));
+		given(avatars.of(anyCollection())).willReturn(Map.of(AUTHOR,
+				new ProfileImageUrls("https://m.example/a/ab12/l.webp", "https://m.example/a/ab12/s.webp")));
 		given(storage.quarantineExists("p/k11/d.webp")).willReturn(true);
 		given(storage.presignQuarantineGet(eq("p/k11/d.webp"), eq(Duration.ofMinutes(5))))
 				.willReturn(URI.create("https://in.example/quarantine/p/k11/d.webp?sig"));
@@ -375,6 +380,7 @@ class ModerationServiceTest {
 		assertThat(postTarget.details()).containsExactly("기타 사유", "광고");
 		assertThat(postTarget.lastReportedAt()).isEqualTo(last.atOffset(ZoneOffset.UTC));
 		assertThat(postTarget.post().author().nickname()).isEqualTo("작성자");
+		assertThat(postTarget.post().author().profileImageUrl()).isEqualTo("https://m.example/a/ab12/s.webp");
 		assertThat(postTarget.post().media()).allSatisfy(m -> assertThat(m.url()).isNull());
 		assertThat(postTarget.quarantineUrls()).containsExactly("https://in.example/quarantine/p/k11/d.webp?sig");
 		assertThat(postTarget.userNickname()).isNull();
@@ -614,6 +620,8 @@ class ModerationServiceTest {
 		ready.markReady("2026/11/11.jpg", 800, 600, 1000L);
 		given(mediaRepository.findAllByPostIdInOrderBySortOrder(List.of(POST_ID, 51L))).willReturn(List.of(ready));
 		given(users.findAllById(anyCollection())).willReturn(List.of(user(AUTHOR, "작성자")));
+		given(avatars.of(anyCollection())).willReturn(Map.of(AUTHOR,
+				new ProfileImageUrls("https://m.example/a/ab12/l.webp", "https://m.example/a/ab12/s.webp")));
 
 		// when
 		PageResponse<ReportTargetResponse> page = service.list(0, 20);
@@ -625,6 +633,8 @@ class ModerationServiceTest {
 		assertThat(target.comment().id()).isEqualTo(COMMENT_ID);
 		assertThat(target.comment().postId()).isEqualTo(POST_ID);
 		assertThat(target.comment().author().nickname()).isEqualTo("작성자");
+		assertThat(target.comment().author().profileImageUrl()).isEqualTo("https://m.example/a/ab12/s.webp");
+		assertThat(target.post().author().profileImageUrl()).isEqualTo("https://m.example/a/ab12/s.webp");
 		assertThat(target.comment().body()).isEqualTo("댓글 본문");
 		assertThat(target.post().id()).isEqualTo(POST_ID);
 		assertThat(target.post().media()).allSatisfy(m -> assertThat(m.url()).isNull());

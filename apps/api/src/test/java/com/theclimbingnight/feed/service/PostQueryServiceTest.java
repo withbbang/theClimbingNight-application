@@ -27,10 +27,13 @@ import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.media.MediaProperties;
 import com.theclimbingnight.media.MediaUrls;
 import com.theclimbingnight.moderation.repository.UserBlockRepository;
+import com.theclimbingnight.profile.dto.ProfileImageUrls;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +55,7 @@ class PostQueryServiceTest {
 	@Mock UserRepository users;
 	@Mock UserBlockRepository blocks;
 	@Mock PostLikeRepository likes;
+	@Mock UserAvatars avatars;
 
 	private PostQueryService service;
 
@@ -59,7 +63,7 @@ class PostQueryServiceTest {
 	void setUp() {
 		MediaUrls urls = new MediaUrls(new MediaProperties(true, "a", "k", "s", "in", "pub", "https://m.example", null));
 		service = new PostQueryService(posts, mediaRepository, users, likes, new PostAccess(posts, blocks),
-				new PostResponseMapper(urls));
+				new PostResponseMapper(urls), avatars);
 	}
 
 	private Post post(long id, long authorId, PostStatus status) {
@@ -81,6 +85,30 @@ class PostQueryServiceTest {
 		User user = User.create(nickname);
 		ReflectionTestUtils.setField(user, "id", id);
 		return user;
+	}
+
+	@Test
+	void authorHasProfileImageUrl() {
+		// given
+		String small = "https://m.example/a/ab12/s.webp";
+		given(avatars.of(anyCollection()))
+				.willReturn(Map.of(OTHER, new ProfileImageUrls("https://m.example/a/ab12/l.webp", small)));
+		given(users.findAllById(anyCollection())).willReturn(List.of(user(OTHER, "남")));
+		given(mediaRepository.findAllByPostIdInOrderBySortOrder(anyCollection())).willReturn(List.of());
+		given(posts.findFeed(eq(ME), any(), any(), any())).willReturn(List.of(post(5, OTHER, PostStatus.VISIBLE)));
+		given(posts.findById(5L)).willReturn(Optional.of(post(5, OTHER, PostStatus.VISIBLE)));
+		given(blocks.existsBetween(ME, OTHER)).willReturn(false);
+		given(posts.findLatestVisibleIds(3)).willReturn(List.of(8L));
+		given(posts.findById(8L)).willReturn(Optional.of(post(8, OTHER, PostStatus.VISIBLE)));
+
+		// when / then
+		assertThat(service.feed(ME, null, 10).items().get(0).author().profileImageUrl()).isEqualTo(small);
+		assertThat(service.detail(ME, 5L).author().profileImageUrl()).isEqualTo(small);
+		assertThat(service.detail(null, 8L).author().profileImageUrl()).isEqualTo(small);
+
+		// 사진이 없으면 null
+		given(avatars.of(anyCollection())).willReturn(Map.of());
+		assertThat(service.detail(ME, 5L).author().profileImageUrl()).isNull();
 	}
 
 	@Test

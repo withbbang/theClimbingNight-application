@@ -1,4 +1,4 @@
 package com.theclimbingnight.feed.dto;
 
-public record LikerResponse(long userId, String nickname) {
+public record LikerResponse(long userId, String nickname, String profileImageUrl) {
 }

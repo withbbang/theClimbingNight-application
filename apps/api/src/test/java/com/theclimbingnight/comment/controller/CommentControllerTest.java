@@ -72,7 +72,7 @@ class CommentControllerTest {
 	void 작성은_201이다() throws Exception {
 		// given
 		String bearer = bearer(1L);
-		CommentResponse response = new CommentResponse(9L, null, new PostAuthorResponse(1L, "climber"), "안녕", null,
+		CommentResponse response = new CommentResponse(9L, null, new PostAuthorResponse(1L, "climber", null), "안녕", null,
 				OffsetDateTime.now(), CommentDisplay.VISIBLE, 0, true, true);
 		given(commentCommandService.create(eq(1L), eq(5L), any(CommentCreateRequest.class))).willReturn(response);
 

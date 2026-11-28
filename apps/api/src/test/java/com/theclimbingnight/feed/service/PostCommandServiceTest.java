@@ -38,6 +38,7 @@ import com.theclimbingnight.media.storage.PresignedUpload;
 import com.theclimbingnight.user.entity.Role;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -66,6 +67,7 @@ class PostCommandServiceTest {
 	@Mock MediaStorage storage;
 	@Mock MediaJobRepository jobs;
 	@Mock MediaJobScheduler scheduler;
+	@Mock UserAvatars avatars;
 
 	private final MutableClock clock = new MutableClock(NOW);
 	private PostCommandService service;
@@ -78,7 +80,7 @@ class PostCommandServiceTest {
 	private PostCommandService newService(MediaStorage mediaStorage, MediaJobScheduler mediaJobScheduler) {
 		MediaUrls urls = new MediaUrls(new MediaProperties(true, "a", "k", "s", "in", "pub", "https://m.example", null));
 		return new PostCommandService(posts, mediaRepository, users, mediaStorage, mediaJobScheduler,
-				new PostResponseMapper(urls), likes, new SecureRandom(), clock);
+				new PostResponseMapper(urls), likes, avatars, new SecureRandom(), clock);
 	}
 
 	private Post post(long id, long authorId, PostStatus status) {

@@ -5,8 +5,10 @@ import com.theclimbingnight.common.ErrorCode;
 import com.theclimbingnight.moderation.dto.BlockedUserResponse;
 import com.theclimbingnight.moderation.entity.UserBlock;
 import com.theclimbingnight.moderation.repository.UserBlockRepository;
+import com.theclimbingnight.profile.dto.ProfileImageUrls;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -22,11 +24,14 @@ public class BlockService {
 
 	private final UserBlockRepository blocks;
 	private final UserRepository users;
+	private final UserAvatars avatars;
 	private final Clock clock;
 
-	public BlockService(UserBlockRepository blocks, UserRepository users, Clock clock) {
+	public BlockService(UserBlockRepository blocks, UserRepository users, UserAvatars avatars,
+			Clock clock) {
 		this.blocks = blocks;
 		this.users = users;
+		this.avatars = avatars;
 		this.clock = clock;
 	}
 
@@ -47,7 +52,8 @@ public class BlockService {
 			block = UserBlock.of(blockerId, userId, clock.instant());
 			blocks.save(block);
 		}
-		return new BlockedUserResponse(userId, target.getNickname(), block.getCreatedAt().atOffset(ZoneOffset.UTC));
+		return new BlockedUserResponse(userId, target.getNickname(),
+				UserAvatars.smallUrl(avatars.of(List.of(userId)), userId), block.getCreatedAt().atOffset(ZoneOffset.UTC));
 	}
 
 	@Transactional
@@ -63,10 +69,12 @@ public class BlockService {
 		}
 		Map<Long, User> byId = users.findAllById(mine.stream().map(UserBlock::getBlockedId).toList()).stream()
 				.collect(Collectors.toMap(User::getId, Function.identity()));
-		return mine.stream().filter(b -> {
+		List<UserBlock> shown = mine.stream().filter(b -> {
 			User user = byId.get(b.getBlockedId());
 			return user != null && user.isActive();
-		}).map(b -> new BlockedUserResponse(b.getBlockedId(), byId.get(b.getBlockedId()).getNickname(),
-				b.getCreatedAt().atOffset(ZoneOffset.UTC))).toList();
+		}).toList();
+		Map<Long, ProfileImageUrls> images = avatars.of(shown.stream().map(UserBlock::getBlockedId).toList());
+		return shown.stream().map(b -> new BlockedUserResponse(b.getBlockedId(), byId.get(b.getBlockedId()).getNickname(),
+				UserAvatars.smallUrl(images, b.getBlockedId()), b.getCreatedAt().atOffset(ZoneOffset.UTC))).toList();
 	}
 }

@@ -11,8 +11,10 @@ import com.theclimbingnight.feed.entity.PostStatus;
 import com.theclimbingnight.feed.repository.PostLikeRepository;
 import com.theclimbingnight.feed.repository.PostMediaRepository;
 import com.theclimbingnight.feed.repository.PostRepository;
+import com.theclimbingnight.profile.dto.ProfileImageUrls;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,15 +41,17 @@ public class PostQueryService {
 	private final PostLikeRepository likes;
 	private final PostAccess access;
 	private final PostResponseMapper mapper;
+	private final UserAvatars avatars;
 
 	public PostQueryService(PostRepository posts, PostMediaRepository mediaRepository, UserRepository users,
-			PostLikeRepository likes, PostAccess access, PostResponseMapper mapper) {
+			PostLikeRepository likes, PostAccess access, PostResponseMapper mapper, UserAvatars avatars) {
 		this.posts = posts;
 		this.mediaRepository = mediaRepository;
 		this.users = users;
 		this.likes = likes;
 		this.access = access;
 		this.mapper = mapper;
+		this.avatars = avatars;
 	}
 
 	/** viewerId가 null이면 비로그인이다. */
@@ -94,7 +98,7 @@ public class PostQueryService {
 		return toResponses(ids.stream().map(byId::get).filter(p -> p != null).toList(), null);
 	}
 
-	/** 한 페이지의 사진과 작성자를 IN 조회 두 번으로 모은다. */
+	/** 한 페이지의 사진과 작성자·프로필 사진을 IN 조회로 모은다. */
 	private List<PostResponse> toResponses(List<Post> page, Long viewerId) {
 		if (page.isEmpty()) {
 			return List.of();
@@ -102,12 +106,15 @@ public class PostQueryService {
 		Collection<Long> postIds = page.stream().map(Post::getId).toList();
 		Map<Long, List<PostMedia>> media = mediaRepository.findAllByPostIdInOrderBySortOrder(postIds).stream()
 				.collect(Collectors.groupingBy(PostMedia::getPostId));
+		List<Long> authorIds = page.stream().map(Post::getAuthorId).distinct().toList();
 		Map<Long, String> nicknames = new HashMap<>();
-		for (User user : users.findAllById(page.stream().map(Post::getAuthorId).distinct().toList())) {
+		for (User user : users.findAllById(authorIds)) {
 			nicknames.put(user.getId(), user.getNickname());
 		}
+		Map<Long, ProfileImageUrls> images = avatars.of(authorIds);
 		Set<Long> liked = viewerId == null ? Set.of() : new HashSet<>(likes.findLikedPostIds(viewerId, postIds));
 		return page.stream().map(post -> mapper.toResponse(post, nicknames.getOrDefault(post.getAuthorId(), ""),
+				UserAvatars.smallUrl(images, post.getAuthorId()),
 				media.getOrDefault(post.getId(), List.of()), viewerId, liked.contains(post.getId()))).toList();
 	}
 }

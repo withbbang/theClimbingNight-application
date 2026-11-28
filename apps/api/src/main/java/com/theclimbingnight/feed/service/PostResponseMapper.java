@@ -22,11 +22,12 @@ public class PostResponseMapper {
 		this.mediaUrls = mediaUrls;
 	}
 
-	public PostResponse toResponse(Post post, String authorNickname, List<PostMedia> media, Long viewerId,
+	public PostResponse toResponse(Post post, String authorNickname, String authorImageUrl,
+			List<PostMedia> media, Long viewerId,
 			boolean likedByMe) {
 		boolean mine = viewerId != null && post.getAuthorId().equals(viewerId);
 		boolean hidden = post.getStatus() == PostStatus.HIDDEN || post.getStatus() == PostStatus.HIDDEN_PENDING;
-		return new PostResponse(post.getId(), new PostAuthorResponse(post.getAuthorId(), authorNickname),
+		return new PostResponse(post.getId(), new PostAuthorResponse(post.getAuthorId(), authorNickname, authorImageUrl),
 				post.getBody(), media.stream().map(m -> toMedia(m, hidden)).toList(), post.getLikeCount(),
 				post.getCommentCount(), likedByMe,
 				post.getPublishedAt() == null ? null : post.getPublishedAt().atOffset(ZoneOffset.UTC),

@@ -64,7 +64,7 @@ class BlockControllerTest {
 	void 차단은_두_번_해도_201이다() throws Exception {
 		// given
 		String bearer = bearer(3L);
-		given(blockService.block(3L, 9L)).willReturn(new BlockedUserResponse(9L, "대상", AT));
+		given(blockService.block(3L, 9L)).willReturn(new BlockedUserResponse(9L, "대상", null, AT));
 
 		// when / then
 		for (int i = 0; i < 2; i++) {
@@ -94,7 +94,7 @@ class BlockControllerTest {
 	void 차단_해제는_204고_목록은_배열이다() throws Exception {
 		// given
 		String bearer = bearer(3L);
-		given(blockService.list(3L)).willReturn(List.of(new BlockedUserResponse(9L, "대상", AT)));
+		given(blockService.list(3L)).willReturn(List.of(new BlockedUserResponse(9L, "대상", null, AT)));
 
 		// when / then
 		mockMvc.perform(delete("/api/v1/blocks/9").header("Authorization", bearer))

@@ -23,14 +23,17 @@ import com.theclimbingnight.feed.entity.PostStatus;
 import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.feed.service.PostAccess;
 import com.theclimbingnight.moderation.repository.UserBlockRepository;
+import com.theclimbingnight.profile.dto.ProfileImageUrls;
 import com.theclimbingnight.user.entity.Role;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,13 +57,14 @@ class CommentCommandServiceTest {
 	@Mock CommentRepository comments;
 	@Mock UserRepository users;
 	@Mock CommentCounter counter;
+	@Mock UserAvatars avatars;
 
 	private CommentCommandService service;
 
 	@BeforeEach
 	void setUp() {
 		service = new CommentCommandService(new PostAccess(posts, blocks), comments, users, counter, blocks,
-				Clock.fixed(NOW, ZoneOffset.UTC));
+				avatars, Clock.fixed(NOW, ZoneOffset.UTC));
 		lenient().when(users.findAllByIdForShare(anyCollection())).thenAnswer(inv -> {
 			Collection<Long> ids = inv.getArgument(0);
 			return ids.stream().map(CommentCommandServiceTest::user).toList();
@@ -105,6 +109,8 @@ class CommentCommandServiceTest {
 			return c;
 		});
 		given(users.findById(ME)).willReturn(Optional.of(User.create("나")));
+		lenient().when(avatars.of(anyCollection())).thenReturn(Map.of(ME,
+				new ProfileImageUrls("https://m.example/a/ab12/l.webp", "https://m.example/a/ab12/s.webp")));
 	}
 
 	@Test
@@ -122,6 +128,7 @@ class CommentCommandServiceTest {
 		assertThat(response.id()).isEqualTo(100L);
 		assertThat(response.parentId()).isNull();
 		assertThat(response.author().nickname()).isEqualTo("나");
+		assertThat(response.author().profileImageUrl()).isEqualTo("https://m.example/a/ab12/s.webp");
 		assertThat(response.display()).isEqualTo(CommentDisplay.VISIBLE);
 		assertThat(response.replyCount()).isZero();
 		assertThat(response.mine()).isTrue();

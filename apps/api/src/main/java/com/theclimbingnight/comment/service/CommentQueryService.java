@@ -13,9 +13,11 @@ import com.theclimbingnight.feed.dto.PostAuthorResponse;
 import com.theclimbingnight.feed.entity.Post;
 import com.theclimbingnight.feed.service.PostAccess;
 import com.theclimbingnight.moderation.repository.UserBlockRepository;
+import com.theclimbingnight.profile.dto.ProfileImageUrls;
 import com.theclimbingnight.user.entity.Role;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,13 +38,15 @@ public class CommentQueryService {
 	private final CommentRepository comments;
 	private final UserRepository users;
 	private final UserBlockRepository blocks;
+	private final UserAvatars avatars;
 
 	public CommentQueryService(PostAccess access, CommentRepository comments, UserRepository users,
-			UserBlockRepository blocks) {
+			UserBlockRepository blocks, UserAvatars avatars) {
 		this.access = access;
 		this.comments = comments;
 		this.users = users;
 		this.blocks = blocks;
+		this.avatars = avatars;
 	}
 
 	/** parentId가 있으면 그 최상위 댓글의 답글을, 없으면 최상위 댓글을 준다. */
@@ -68,6 +72,7 @@ public class CommentQueryService {
 
 		Map<Long, Long> replyCounts = new HashMap<>();
 		Map<Long, User> authors = new HashMap<>();
+		Map<Long, ProfileImageUrls> images = Map.of();
 		if (!page.isEmpty()) {
 			if (parentId == null) {
 				for (ReplyCount rc : comments.countShownReplies(page.stream().map(Comment::getId).toList())) {
@@ -84,14 +89,16 @@ public class CommentQueryService {
 			for (User user : users.findAllById(userIds)) {
 				authors.put(user.getId(), user);
 			}
+			images = avatars.of(userIds);
 		}
+		Map<Long, ProfileImageUrls> authorImages = images;
 		return new CursorResponse<>(
-				page.stream().map(c -> toResponse(c, viewerId, role, post, authors, replyCounts)).toList(),
+				page.stream().map(c -> toResponse(c, viewerId, role, post, authors, authorImages, replyCounts)).toList(),
 				nextCursor);
 	}
 
 	private CommentResponse toResponse(Comment c, long viewerId, Role role, Post post, Map<Long, User> users,
-			Map<Long, Long> replyCounts) {
+			Map<Long, ProfileImageUrls> images, Map<Long, Long> replyCounts) {
 		boolean mine = c.getAuthorId().equals(viewerId);
 		CommentDisplay display;
 		if (c.isShown()) {
@@ -114,7 +121,9 @@ public class CommentQueryService {
 				.map(User::getNickname).orElse(null);
 		boolean deletable = mine || post.getAuthorId().equals(viewerId) || role == Role.ADMIN;
 		return new CommentResponse(c.getId(), c.getParentId(),
-				new PostAuthorResponse(c.getAuthorId(), author == null ? "" : author.getNickname()), c.getBody(),
+				new PostAuthorResponse(c.getAuthorId(), author == null ? "" : author.getNickname(),
+						UserAvatars.smallUrl(images, c.getAuthorId())),
+				c.getBody(),
 				replyToNickname, createdAt, display, replyCount, mine, deletable);
 	}
 

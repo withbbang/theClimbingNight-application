@@ -20,11 +20,14 @@ import com.theclimbingnight.feed.entity.PostStatus;
 import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.feed.service.PostAccess;
 import com.theclimbingnight.moderation.repository.UserBlockRepository;
+import com.theclimbingnight.profile.dto.ProfileImageUrls;
 import com.theclimbingnight.user.entity.Role;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,12 +49,13 @@ class CommentQueryServiceTest {
 	@Mock UserBlockRepository blocks;
 	@Mock CommentRepository comments;
 	@Mock UserRepository users;
+	@Mock UserAvatars avatars;
 
 	private CommentQueryService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new CommentQueryService(new PostAccess(posts, blocks), comments, users, blocks);
+		service = new CommentQueryService(new PostAccess(posts, blocks), comments, users, blocks, avatars);
 	}
 
 	private Post givenPost(long authorId, PostStatus status) {
@@ -80,6 +84,21 @@ class CommentQueryServiceTest {
 		if (found.length > 0) {
 			given(comments.countShownReplies(anyCollection())).willReturn(List.of());
 		}
+	}
+
+	@Test
+	void authorHasProfileImageUrl() {
+		givenPost(POST_AUTHOR, PostStatus.VISIBLE);
+		givenTop(comment(10, OTHER, null, null), comment(11, ME, null, null));
+		given(users.findAllById(anyCollection())).willReturn(List.of(user(OTHER, "남"), user(ME, "나")));
+		String small = "https://m.example/a/ab12/s.webp";
+		given(avatars.of(anyCollection()))
+				.willReturn(Map.of(OTHER, new ProfileImageUrls("https://m.example/a/ab12/l.webp", small)));
+
+		CursorResponse<CommentResponse> result = service.list(ME, Role.USER, POST, null, null, 20);
+
+		assertThat(result.items().get(0).author().profileImageUrl()).isEqualTo(small);
+		assertThat(result.items().get(1).author().profileImageUrl()).isNull();
 	}
 
 	@Test

@@ -29,8 +29,10 @@ import com.theclimbingnight.moderation.entity.ReportStatus;
 import com.theclimbingnight.moderation.entity.ReportTargetType;
 import com.theclimbingnight.moderation.repository.ReportRepository;
 import com.theclimbingnight.moderation.repository.ReportTargetSummary;
+import com.theclimbingnight.profile.dto.ProfileImageUrls;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
+import com.theclimbingnight.user.service.UserAvatars;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -74,11 +76,12 @@ public class ModerationService {
 	private final MediaStorage storage;
 	private final PostResponseMapper mapper;
 	private final MediaUrls urls;
+	private final UserAvatars avatars;
 	private final Clock clock;
 
 	public ModerationService(ReportRepository reports, PostRepository posts, CommentRepository comments,
 			CommentCounter counter, PostMediaRepository mediaRepository, UserRepository users, MediaJobRepository jobs, MediaJobScheduler scheduler, MediaStorage storage,
-			PostResponseMapper mapper, MediaUrls urls, Clock clock) {
+			PostResponseMapper mapper, MediaUrls urls, UserAvatars avatars, Clock clock) {
 		this.reports = reports;
 		this.posts = posts;
 		this.comments = comments;
@@ -90,6 +93,7 @@ public class ModerationService {
 		this.storage = storage;
 		this.mapper = mapper;
 		this.urls = urls;
+		this.avatars = avatars;
 		this.clock = clock;
 	}
 
@@ -120,13 +124,14 @@ public class ModerationService {
 		commentById.values().forEach(c -> wantedUsers.add(c.getAuthorId()));
 		Map<Long, User> userById = wantedUsers.isEmpty() ? Map.of()
 				: users.findAllById(wantedUsers).stream().collect(Collectors.toMap(User::getId, Function.identity()));
+		Map<Long, ProfileImageUrls> images = avatars.of(wantedUsers);
 		return PageResponse.from(summaries, s -> {
 			List<Report> targetReports = open.get(s.targetType()).getOrDefault(s.targetId(), List.of());
 			return switch (s.targetType()) {
 				case POST -> postTarget(s, targetReports, postById.get(s.targetId()), mediaByPost, userById,
-						cleanupFailed.contains(s.targetId()));
+						images, cleanupFailed.contains(s.targetId()));
 				case COMMENT -> commentTarget(s, targetReports, commentById.get(s.targetId()), postById,
-						mediaByPost, userById);
+						mediaByPost, userById, images);
 				case USER -> userTarget(s, targetReports, userById.get(s.targetId()));
 			};
 		});
@@ -260,13 +265,15 @@ public class ModerationService {
 	}
 
 	private ReportTargetResponse postTarget(ReportTargetSummary s, List<Report> targetReports, Post post,
-			Map<Long, List<PostMedia>> mediaByPost, Map<Long, User> userById, boolean cleanupFailed) {
+			Map<Long, List<PostMedia>> mediaByPost, Map<Long, User> userById,
+			Map<Long, ProfileImageUrls> images, boolean cleanupFailed) {
 		if (post == null || post.getDeletedAt() != null) {
 			return response(s, targetReports, DELETED, null, List.of(), null, null, cleanupFailed);
 		}
 		List<PostMedia> media = mediaByPost.getOrDefault(post.getId(), List.of());
 		User author = userById.get(post.getAuthorId());
-		PostResponse body = mapper.toResponse(post, author == null ? null : author.getNickname(), media, null, false);
+		PostResponse body = mapper.toResponse(post, author == null ? null : author.getNickname(),
+				UserAvatars.smallUrl(images, post.getAuthorId()), media, null, false);
 		List<String> quarantineUrls = isHidden(post) ? media.stream()
 				.filter(m -> m.getStatus() != PostMediaStatus.UPLOADING)
 				.map(this::reviewUrl)
@@ -292,17 +299,19 @@ public class ModerationService {
 	}
 
 	private ReportTargetResponse commentTarget(ReportTargetSummary s, List<Report> targetReports, Comment comment,
-			Map<Long, Post> postById, Map<Long, List<PostMedia>> mediaByPost, Map<Long, User> userById) {
+			Map<Long, Post> postById, Map<Long, List<PostMedia>> mediaByPost, Map<Long, User> userById,
+			Map<Long, ProfileImageUrls> images) {
 		Post post = comment == null ? null : postById.get(comment.getPostId());
 		if (comment == null || comment.getDeletedAt() != null || post == null || post.getDeletedAt() != null) {
 			return response(s, targetReports, DELETED, null, List.of(), null, null, false);
 		}
 		User postAuthor = userById.get(post.getAuthorId());
 		PostResponse body = mapper.toResponse(post, postAuthor == null ? null : postAuthor.getNickname(),
-				mediaByPost.getOrDefault(post.getId(), List.of()), null, false);
+				UserAvatars.smallUrl(images, post.getAuthorId()), mediaByPost.getOrDefault(post.getId(), List.of()), null, false);
 		User commentAuthor = userById.get(comment.getAuthorId());
 		ReportCommentResponse shown = new ReportCommentResponse(comment.getId(), comment.getPostId(),
-				new PostAuthorResponse(comment.getAuthorId(), commentAuthor == null ? null : commentAuthor.getNickname()),
+				new PostAuthorResponse(comment.getAuthorId(), commentAuthor == null ? null : commentAuthor.getNickname(),
+						UserAvatars.smallUrl(images, comment.getAuthorId())),
 				comment.getBody());
 		return response(s, targetReports, comment.getStatus().name(), body, List.of(), shown, null, false);
 	}
