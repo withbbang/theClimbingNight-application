@@ -16,6 +16,8 @@ paths:
 - 트랜잭션: Service 클래스에 `@Transactional(readOnly = true)`, 쓰기 메서드만 `@Transactional`.
 - 동시성: 벙 정원처럼 동시에 몰리는 쓰기는 DB 유니크 제약·락으로 막는다. 애플리케이션에서 "조회 후 비교"만으로 막지 않는다.
 - 테스트: Service는 Mockito 단위 테스트, Controller는 `@WebMvcTest`, Repository는 `@DataJpaTest`. `@SpringBootTest`는 꼭 필요할 때만.
+- 잠금·상태 전이가 여러 서비스에 걸친 흐름(교체·되돌리기·탈퇴 등)은 Mockito와 별도로 실제 DB 테스트를 하나 둔다: `@Transactional(propagation = NOT_SUPPORTED)` + `TransactionTemplate`으로 커밋한 뒤 새로 읽어 확인한다.
+- 벌크 `@Modifying` 쿼리는 `flushAutomatically = true`만 쓰고 `clearAutomatically`는 쓰지 않는다 (영속성 컨텍스트가 비워지면 그 뒤에 바꾼 엔티티 값이 저장되지 않는다).
 - 시간·난수: `Clock`과 `java.security.SecureRandom`을 빈으로 등록해 주입. `LocalDateTime.now()`·`new Random()` 직접 호출 금지 → 테스트에서 고정 불가.
 - 개인정보를 저장하는 테이블을 늘리면 탈퇴 처리(`UserWithdrawnEvent` 리스너)와 `apps/web/content/privacy.ts`를 함께 고친다.
 - Flyway 마이그레이션은 적용된 버전을 고치지 말고 새 버전을 만든다.

@@ -21,6 +21,8 @@ paths:
 - 애니메이션은 Reanimated로 `transform`·`opacity`만 움직이고, `useReducedMotion`이면 끝 상태로 둔다.
 - 미디어 업로드: API에서 presigned URL을 받아 R2로 직접 PUT. 업로드 전에 앱에서 리사이즈·압축한다. API 서버로 파일 본문을 보내지 않는다.
 - 이미지 표시는 `expo-image` (캐시·placeholder). 피드 같은 긴 목록은 `FlatList`가 아닌 FlashList를 쓴다.
+- FlashList 안의 `expo-image`에는 `recyclingKey`를 주고 `transition`(크로스페이드)은 기본으로 끈다. 등장 애니메이션은 한 번 나온 항목 id를 기억해, 재활용으로 다시 마운트될 때는 끝 상태에서 시작한다.
+- 내 글을 만들거나 지우는 변경은 `['posts']`와 함께 `['users', 내 id]` 접두 키(프로필·격자)도 무효화한다.
 - 웹뷰 화면은 `WebPage`로 `apps/web`의 `/app/*` 페이지를 연다 (주소는 `EXPO_PUBLIC_WEB_URL`, 비우면 API 주소). 안에서 열 주소는 `lib/web-url.ts`의 `decideLink`로만 판정한다. 지금은 웹뷰와 앱이 주고받는 메시지가 없다. 필요해지면 `postMessage` 메시지 타입을 `types/bridge.ts` 한 곳에 정의한다.
 - 디렉토리: `app/`(라우트) · `components/ui/`(범용) · `components/<feature>/`(도메인) · `hooks/` · `lib/` · `types/api/`.
 - 파일명: 컴포넌트 `PascalCase.tsx`, 훅 `use-xxx.ts`, 그 외 `kebab-case.ts`. 라우트 파일은 Expo Router 규칙을 따른다.
