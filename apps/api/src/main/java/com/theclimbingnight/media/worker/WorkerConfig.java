@@ -135,8 +135,8 @@ public class WorkerConfig {
 	@Bean
 	MediaJobProcessor mediaJobProcessor(MediaJobRepository jobs, List<JobHandler> handlers, RetryPolicy retryPolicy,
 			PostRepository posts, PostMediaRepository mediaRepository, ProfileImageRepository profileImages,
-			TransactionTemplate workerTransactionTemplate, Clock clock) {
-		return new MediaJobProcessor(jobs, handlers, retryPolicy, posts, mediaRepository, profileImages,
+			UserRepository users, TransactionTemplate workerTransactionTemplate, Clock clock) {
+		return new MediaJobProcessor(jobs, handlers, retryPolicy, posts, mediaRepository, profileImages, users,
 				workerTransactionTemplate, clock);
 	}
 

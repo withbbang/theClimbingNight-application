@@ -18,6 +18,10 @@ public interface ProfileImageRepository extends JpaRepository<ProfileImage, Long
 	@Query("select i from ProfileImage i where i.id = :id")
 	Optional<ProfileImage> findByIdForUpdate(@Param("id") long id);
 
+	/** 엔티티를 올리지 않고 주인 id만 읽는다. 사용자 행을 먼저 잠근 뒤 사진 행을 잠가 읽을 때 쓴다. */
+	@Query("select i.userId from ProfileImage i where i.id = :id")
+	Optional<Long> findUserIdById(@Param("id") long id);
+
 	long countByUserIdAndStatus(long userId, ProfileImageStatus status);
 
 	List<ProfileImage> findAllByUserIdAndStatus(long userId, ProfileImageStatus status);

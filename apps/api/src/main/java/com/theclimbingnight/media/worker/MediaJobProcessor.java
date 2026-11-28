@@ -10,6 +10,7 @@ import com.theclimbingnight.media.job.MediaTargetType;
 import com.theclimbingnight.profile.entity.ProfileImage;
 import com.theclimbingnight.profile.entity.ProfileImageStatus;
 import com.theclimbingnight.profile.repository.ProfileImageRepository;
+import com.theclimbingnight.user.repository.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.HashMap;
@@ -38,12 +39,13 @@ public class MediaJobProcessor {
 	private final PostRepository posts;
 	private final PostMediaRepository mediaRepository;
 	private final ProfileImageRepository profileImages;
+	private final UserRepository users;
 	private final TransactionTemplate tx;
 	private final Clock clock;
 
 	public MediaJobProcessor(MediaJobRepository jobs, List<JobHandler> handlers, RetryPolicy retryPolicy,
 			PostRepository posts, PostMediaRepository mediaRepository, ProfileImageRepository profileImages,
-			TransactionTemplate tx, Clock clock) {
+			UserRepository users, TransactionTemplate tx, Clock clock) {
 		this.jobs = jobs;
 		for (JobHandler h : handlers) {
 			HandlerKey key = new HandlerKey(h.kind(), h.targetType());
@@ -55,6 +57,7 @@ public class MediaJobProcessor {
 		this.posts = posts;
 		this.mediaRepository = mediaRepository;
 		this.profileImages = profileImages;
+		this.users = users;
 		this.tx = tx;
 		this.clock = clock;
 	}
@@ -119,10 +122,16 @@ public class MediaJobProcessor {
 		});
 	}
 
-	/** 사진 행을 잠가 읽어, 그새 되돌리기·탈퇴가 바꾼 REMOVED를 덮어쓰지 않는다. */
+	/**
+	 * 사용자 행 → 사진 행 순서로 잠가 읽어(전역 잠금 순서), 그새 되돌리기·탈퇴가 바꾼 REMOVED를 덮어쓰지 않는다.
+	 * 사진 엔티티를 잠그기 전에 올리지 않도록 주인 id만 먼저 읽는다.
+	 */
 	private void failProfileImage(long imageId) {
-		profileImages.findByIdForUpdate(imageId).filter(i -> i.getStatus() == ProfileImageStatus.PROCESSING)
-				.ifPresent(ProfileImage::markFailed);
+		profileImages.findUserIdById(imageId).ifPresent(userId -> {
+			users.findByIdForUpdate(userId);
+			profileImages.findByIdForUpdate(imageId).filter(i -> i.getStatus() == ProfileImageStatus.PROCESSING)
+					.ifPresent(ProfileImage::markFailed);
+		});
 	}
 
 	private void failMedia(long mediaId) {

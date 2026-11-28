@@ -37,8 +37,12 @@ public interface MediaJobRepository extends JpaRepository<MediaJob, Long> {
 			""")
 	int requeueStale(@Param("lockedBefore") Instant lockedBefore);
 
-	/** 아직 시작 안 한(QUEUED) 해당 종류 작업만 취소한다. */
-	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	/**
+	 * 아직 시작 안 한(QUEUED) 해당 종류 작업만 취소한다. 호출한 쪽은 같은 트랜잭션에서 사용자·사진 행을 계속 고치므로
+	 * 영속성 컨텍스트를 비우지 않는다(비우면 그 뒤의 변경이 저장되지 않는다). 앞선 변경은 먼저 flush한다.
+	 * 이 UPDATE 결과를 이미 올린 MediaJob 엔티티로 다시 읽는 호출자는 없다.
+	 */
+	@Modifying(flushAutomatically = true)
 	@Query("""
 			update MediaJob j set j.status = com.theclimbingnight.media.job.MediaJobStatus.CANCELED
 			where j.targetId in :targetIds and j.targetType = :targetType and j.kind = :kind

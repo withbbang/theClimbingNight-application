@@ -47,6 +47,7 @@ class MediaJobProcessorTest {
 	@Mock JobHandler quarantineHandler;
 	@Mock JobHandler profileProcessHandler;
 	@Mock ProfileImageRepository profileImages;
+	@Mock com.theclimbingnight.user.repository.UserRepository users;
 
 	private MediaJobProcessor processor;
 
@@ -59,7 +60,7 @@ class MediaJobProcessorTest {
 		lenient().when(profileProcessHandler.kind()).thenReturn(MediaJobKind.PROCESS);
 		lenient().when(profileProcessHandler.targetType()).thenReturn(MediaTargetType.PROFILE_IMAGE);
 		processor = new MediaJobProcessor(jobs, List.of(processHandler, quarantineHandler, profileProcessHandler),
-				new RetryPolicy(), posts, mediaRepository, profileImages, WorkerFixtures.tx(),
+				new RetryPolicy(), posts, mediaRepository, profileImages, users, WorkerFixtures.tx(),
 				Clock.fixed(NOW, ZoneOffset.UTC));
 	}
 
@@ -229,7 +230,7 @@ class MediaJobProcessorTest {
 		// when / then
 		org.assertj.core.api.Assertions.assertThatThrownBy(() -> new MediaJobProcessor(jobs,
 				List.of(processHandler, processHandler), new RetryPolicy(), posts, mediaRepository, profileImages,
-				WorkerFixtures.tx(), Clock.fixed(NOW, ZoneOffset.UTC)))
+				users, WorkerFixtures.tx(), Clock.fixed(NOW, ZoneOffset.UTC)))
 				.isInstanceOf(IllegalStateException.class);
 	}
 
@@ -241,12 +242,16 @@ class MediaJobProcessorTest {
 		PostMedia media = WorkerFixtures.media(7L, PostMediaStatus.PROCESSING, "p/k7");
 		lenient().when(mediaRepository.findById(7L)).thenReturn(Optional.of(media));
 		ProfileImage image = WorkerFixtures.profileImage(7L, ProfileImageStatus.PROCESSING);
+		given(profileImages.findUserIdById(7L)).willReturn(Optional.of(WorkerFixtures.USER_ID));
 		given(profileImages.findByIdForUpdate(7L)).willReturn(Optional.of(image));
 
 		// when
 		processor.runNext();
 
-		// then
+		// then: 사용자 행을 먼저 잠근다
+		org.mockito.InOrder order = org.mockito.Mockito.inOrder(users, profileImages);
+		order.verify(users).findByIdForUpdate(WorkerFixtures.USER_ID);
+		order.verify(profileImages).findByIdForUpdate(7L);
 		assertThat(job.getStatus()).isEqualTo(MediaJobStatus.FAILED);
 		assertThat(image.getStatus()).isEqualTo(ProfileImageStatus.FAILED);
 		assertThat(media.getStatus()).isEqualTo(PostMediaStatus.PROCESSING);
@@ -259,6 +264,7 @@ class MediaJobProcessorTest {
 		MediaJob job = givenClaimed(WorkerFixtures.profileJob(MediaJobKind.PROCESS, 7L, 2));
 		willThrow(new IllegalStateException("업로드 없음")).given(profileProcessHandler).handle(job);
 		ProfileImage image = WorkerFixtures.profileImage(7L, ProfileImageStatus.REMOVED);
+		given(profileImages.findUserIdById(7L)).willReturn(Optional.of(WorkerFixtures.USER_ID));
 		given(profileImages.findByIdForUpdate(7L)).willReturn(Optional.of(image));
 
 		// when

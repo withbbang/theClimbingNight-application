@@ -102,4 +102,21 @@ class ProfileQuarantineJobHandlerTest {
 		// then
 		verifyNoInteractions(storage, purger);
 	}
+
+	@Test
+	void 공개본이_한_장만_남았으면_그_장만_격리하고_둘_다_지우고_캐시를_비운다() throws Exception {
+		// given
+		givenImage(ProfileImageStatus.REMOVED);
+		org.mockito.Mockito.lenient().when(storage.publicExists("a/k11/s.webp")).thenReturn(true);
+
+		// when
+		handler.handle(WorkerFixtures.profileJob(MediaJobKind.QUARANTINE, 11L, 1));
+
+		// then
+		verify(storage).copyPublicToQuarantine("a/k11/s.webp");
+		verify(storage, never()).copyPublicToQuarantine("a/k11/l.webp");
+		verify(storage).deletePublic("a/k11/l.webp");
+		verify(storage).deletePublic("a/k11/s.webp");
+		verify(purger).purge(List.of("https://m.example/a/k11/l.webp", "https://m.example/a/k11/s.webp"));
+	}
 }

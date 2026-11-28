@@ -28,12 +28,15 @@ class MediaJobRepositoryTest {
 	@Autowired PostRepository posts;
 	@Autowired PostMediaRepository mediaRepository;
 	@Autowired UserRepository users;
+	@Autowired jakarta.persistence.EntityManager em;
 
 	private MediaJob queue(MediaJobKind kind, long target, Instant runAt) {
 		return jobs.saveAndFlush(MediaJob.queue(kind, target, runAt));
 	}
 
+	/** 벌크 UPDATE는 영속성 컨텍스트를 비우지 않으므로 비운 뒤 DB에서 다시 읽는다. */
 	private MediaJob reload(MediaJob job) {
+		em.clear();
 		return jobs.findById(job.getId()).orElseThrow();
 	}
 
