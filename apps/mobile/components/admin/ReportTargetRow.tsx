@@ -12,7 +12,7 @@ import { ConfirmAction } from '@/components/ui/ConfirmAction';
 import { FadeInItem } from '@/components/ui/FadeInItem';
 import { useTheme } from '@/hooks/use-theme';
 import { formatRelative } from '@/lib/kst';
-import type { ReportRowAction, ReportTargetResponse } from '@/types/api/moderation';
+import type { ReportTargetAction, ReportTargetResponse } from '@/types/api/moderation';
 
 const THUMB = 64;
 const SHOWN_DETAILS = 3;
@@ -52,7 +52,7 @@ function reasonSummary(reasons: ReportTargetResponse['reasons']) {
 }
 
 interface ActionSpec {
-  action: ReportRowAction;
+  action: ReportTargetAction;
   label: string;
   message: string;
 }
@@ -79,7 +79,7 @@ function actionsOf(target: ReportTargetResponse): ActionSpec[] {
     }
     if (photo && bio) {
       actions.push({
-        action: 'REMOVE_BOTH',
+        action: 'REMOVE_PROFILE',
         label: '둘 다 내리기',
         message: '프로필 사진을 내리고 자기소개를 지워요. 신고는 모두 처리돼요.',
       });
@@ -165,9 +165,9 @@ interface ReportTargetRowProps {
   target: ReportTargetResponse;
   index: number;
   /** 이 대상에 보내는 중인 조치. */
-  sending: ReportRowAction | null;
+  sending: ReportTargetAction | null;
   locked: boolean;
-  onAct: (action: ReportRowAction) => Promise<boolean>;
+  onAct: (action: ReportTargetAction) => Promise<boolean>;
 }
 
 /** 신고가 들어온 대상 하나. 무엇이 왜 신고됐는지 보여 주고 숨김·복원·기각을 고른다. */

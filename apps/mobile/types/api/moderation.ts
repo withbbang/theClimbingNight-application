@@ -7,9 +7,9 @@ export type ReportTargetAction =
   | 'RESTORE'
   | 'DISMISS'
   | 'REMOVE_PROFILE_IMAGE'
-  | 'CLEAR_BIO';
-/** 화면의 조치. REMOVE_BOTH는 API 동작이 아니라 사진 내리기 뒤 자기소개 지우기를 차례로 보낸다. */
-export type ReportRowAction = ReportTargetAction | 'REMOVE_BOTH';
+  | 'CLEAR_BIO'
+  /** 사진과 자기소개를 API가 한 번에 내린다. */
+  | 'REMOVE_PROFILE';
 
 /** 탈퇴한 사용자는 nickname이 null이다. */
 export interface BlockedUserResponse {

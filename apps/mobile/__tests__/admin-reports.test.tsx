@@ -222,7 +222,7 @@ it('offers 프로필 사진 내리기 only when the user has a photo', async () 
 const both = () =>
   userTarget({ userProfileImageUrl: 'https://r2.test/p.jpg', userBio: '벽 타는 밤이 좋아요' });
 
-it('sends both actions in order for 둘 다 내리기', async () => {
+it('sends one REMOVE_PROFILE action for 둘 다 내리기', async () => {
   const server = mockServer({ [LIST]: list([both()]), [ACT]: { status: 204 } });
   await renderApp('/admin/reports');
 
@@ -230,13 +230,12 @@ it('sends both actions in order for 둘 다 내리기', async () => {
   await press('달이 사용자 둘 다 내리기 확정');
 
   expect(server.calls.filter((c) => c.method === 'POST').map((c) => c.body)).toEqual([
-    { action: 'REMOVE_PROFILE_IMAGE' },
-    { action: 'CLEAR_BIO' },
+    { action: 'REMOVE_PROFILE' },
   ]);
   expect(screen.getByRole('button', { name: '달이 사용자 기각' })).toBeOnTheScreen();
 });
 
-it('does not send CLEAR_BIO when the first request fails', async () => {
+it('does not send anything more when 둘 다 내리기 fails', async () => {
   const server = mockServer({ [LIST]: list([both()]), [ACT]: { status: 500 } });
   await renderApp('/admin/reports');
 
@@ -244,6 +243,6 @@ it('does not send CLEAR_BIO when the first request fails', async () => {
   await press('달이 사용자 둘 다 내리기 확정');
 
   expect(server.calls.filter((c) => c.method === 'POST').map((c) => c.body)).toEqual([
-    { action: 'REMOVE_PROFILE_IMAGE' },
+    { action: 'REMOVE_PROFILE' },
   ]);
 });
