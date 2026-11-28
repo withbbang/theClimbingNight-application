@@ -151,6 +151,72 @@ class ProfileImagePersistenceTest {
 				.containsExactlyInAnyOrder(MediaJobKind.DELETE_MEDIA, MediaJobKind.PURGE_ORIGINAL);
 	}
 
+	private ProfileProcessJobHandler handler() throws Exception {
+		MediaStorage storage = mock(MediaStorage.class);
+		OriginalStore originals = mock(OriginalStore.class);
+		ImageTranscoder transcoder = mock(ImageTranscoder.class);
+		given(storage.openUpload(anyString())).willAnswer(inv -> new ByteArrayInputStream(new byte[10]));
+		given(originals.saveProfile(anyLong(), any(), any()))
+				.willAnswer(inv -> "profile/2026/11/" + inv.getArgument(0, Long.class) + ".jpg");
+		given(transcoder.transcodeSquare(any(), any()))
+				.willAnswer(inv -> WorkerFixtures.square(inv.getArgument(1, Path.class)));
+		return new ProfileProcessJobHandler(storage, originals, transcoder, users, images, scheduler, tx, clock);
+	}
+
+	@Test
+	void 더_새_사진이_처리_중이면_먼저_끝난_사진이_지금_사진이_되고_새_사진이_끝나면_넘겨준다() throws Exception {
+		// given: 지금 사진 A(READY), 처리 중 B·C(C가 더 새것)
+		User user = user("처리순서");
+		ProfileImage a = image(user.getId(), "pa3", ProfileImageStatus.READY);
+		useImage(user.getId(), a.getId());
+		ProfileImage b = image(user.getId(), "pb3", ProfileImageStatus.PROCESSING);
+		ProfileImage c = image(user.getId(), "pc3", ProfileImageStatus.PROCESSING);
+		MediaJob processB = queueProcess(b.getId());
+		MediaJob processC = queueProcess(c.getId());
+		ProfileProcessJobHandler handler = handler();
+
+		// when: B가 먼저 끝난다
+		handler.handle(processB);
+
+		// then: C가 아직 처리 중이어도 B가 지금 사진이 된다
+		assertThat(users.findById(user.getId()).orElseThrow().getProfileImageId()).isEqualTo(b.getId());
+		assertThat(statusOf(b.getId())).isEqualTo(ProfileImageStatus.READY);
+		assertThat(statusOf(a.getId())).isEqualTo(ProfileImageStatus.REMOVED);
+		assertThat(statusOf(c.getId())).isEqualTo(ProfileImageStatus.PROCESSING);
+
+		// when: C가 끝난다
+		handler.handle(processC);
+
+		// then: C가 지금 사진이 되고 B는 정리 작업과 함께 내려간다
+		assertThat(users.findById(user.getId()).orElseThrow().getProfileImageId()).isEqualTo(c.getId());
+		assertThat(statusOf(c.getId())).isEqualTo(ProfileImageStatus.READY);
+		assertThat(statusOf(b.getId())).isEqualTo(ProfileImageStatus.REMOVED);
+		assertThat(jobsOf(b.getId())).extracting(MediaJob::getKind).filteredOn(k -> k != MediaJobKind.PROCESS)
+				.containsExactlyInAnyOrder(MediaJobKind.DELETE_MEDIA, MediaJobKind.PURGE_ORIGINAL);
+	}
+
+	@Test
+	void 더_새_사진이_이미_READY면_늦게_끝난_사진은_내려간다() throws Exception {
+		// given: B·C 처리 중, C가 먼저 끝났다
+		User user = user("늦은완료");
+		ProfileImage b = image(user.getId(), "pb4", ProfileImageStatus.PROCESSING);
+		ProfileImage c = image(user.getId(), "pc4", ProfileImageStatus.PROCESSING);
+		MediaJob processB = queueProcess(b.getId());
+		MediaJob processC = queueProcess(c.getId());
+		ProfileProcessJobHandler handler = handler();
+		handler.handle(processC);
+
+		// when
+		handler.handle(processB);
+
+		// then
+		assertThat(users.findById(user.getId()).orElseThrow().getProfileImageId()).isEqualTo(c.getId());
+		assertThat(statusOf(c.getId())).isEqualTo(ProfileImageStatus.READY);
+		assertThat(statusOf(b.getId())).isEqualTo(ProfileImageStatus.REMOVED);
+		assertThat(jobsOf(b.getId())).extracting(MediaJob::getKind).filteredOn(k -> k != MediaJobKind.PROCESS)
+				.containsExactlyInAnyOrder(MediaJobKind.DELETE_MEDIA, MediaJobKind.PURGE_ORIGINAL);
+	}
+
 	@Test
 	void 되돌리면_지금_사진과_처리_중인_사진이_모두_내려가고_처리_작업이_취소된다() {
 		// given: 지금 사진 A(READY), 처리 중 B·C

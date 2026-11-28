@@ -28,9 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ProfileQueryService {
 
-	private static final List<PostStatus> OTHERS_VIEW = List.of(PostStatus.VISIBLE);
-	private static final List<PostStatus> OWNER_VIEW = List.of(PostStatus.VISIBLE, PostStatus.HIDDEN_PENDING,
+	/** 본인 격자와 글 수가 세는 상태. 남에게는 VISIBLE만. */
+	static final List<PostStatus> OWNER_VIEW = List.of(PostStatus.VISIBLE, PostStatus.HIDDEN_PENDING,
 			PostStatus.HIDDEN);
+	private static final List<PostStatus> OTHERS_VIEW = List.of(PostStatus.VISIBLE);
 
 	private final UserRepository users;
 	private final UserBlockRepository blocks;
@@ -51,9 +52,10 @@ public class ProfileQueryService {
 
 	public ProfileResponse profile(long viewerId, long userId) {
 		User user = accessible(viewerId, userId);
+		boolean mine = viewerId == userId;
 		return new ProfileResponse(user.getId(), user.getNickname(), user.getBio(),
 				avatars.of(List.of(userId)).get(userId),
-				posts.countByAuthorIdAndStatusAndDeletedAtIsNull(userId, PostStatus.VISIBLE), viewerId == userId);
+				posts.countByAuthorIdAndStatusInAndDeletedAtIsNull(userId, mine ? OWNER_VIEW : OTHERS_VIEW), mine);
 	}
 
 	public CursorResponse<GridPostResponse> posts(long viewerId, long userId, String cursor, int size) {

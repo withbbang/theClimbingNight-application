@@ -128,6 +128,32 @@ class ProfileWithdrawalListenerTest {
 	}
 
 	@Test
+	void 이미_원본까지_정리된_사진은_다시_정리_작업을_만들지_않는다() {
+		// given: 바꾸기로 내려가 30일 뒤 원본까지 지운 사진
+		ProfileImage cleaned = image(leaving.getId(), "w7", ProfileImageStatus.REMOVED, null);
+
+		// when
+		userService.withdraw(leaving.getId());
+
+		// then
+		assertThat(images.findById(cleaned.getId()).orElseThrow().getStatus()).isEqualTo(ProfileImageStatus.REMOVED);
+		assertThat(jobsOf(cleaned.getId())).isEmpty();
+	}
+
+	@Test
+	void 운영진이_내려_원본이_남은_사진은_탈퇴할_때_정리_작업을_만든다() {
+		// given: 운영진이 내린 사진은 원본 경로가 남아 있다
+		ProfileImage takenDown = image(leaving.getId(), "w8", ProfileImageStatus.REMOVED, "profile/2026/11/8.jpg");
+		Instant before = clock.instant();
+
+		// when
+		userService.withdraw(leaving.getId());
+
+		// then
+		assertDropped(takenDown, before);
+	}
+
+	@Test
 	void withdrawDropsFailedImageAndKeepsNothingOpen() {
 		// given
 		ProfileImage failed = image(leaving.getId(), "w6", ProfileImageStatus.FAILED, null);

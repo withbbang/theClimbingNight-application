@@ -300,6 +300,7 @@ class ModerationServiceTest {
 		for (ReportTargetType type : List.of(ReportTargetType.POST, ReportTargetType.COMMENT)) {
 			assertValidationFailed(() -> service.act(ADMIN, type, 9L, Action.REMOVE_PROFILE_IMAGE));
 			assertValidationFailed(() -> service.act(ADMIN, type, 9L, Action.CLEAR_BIO));
+			assertValidationFailed(() -> service.act(ADMIN, type, 9L, Action.REMOVE_PROFILE));
 		}
 		verifyNoInteractions(posts, reports, jobs, users, profileImages);
 	}
@@ -377,25 +378,46 @@ class ModerationServiceTest {
 	}
 
 	@Test
-	void 신고가_이미_닫힌_뒤의_두_번째_조치도_실행된다() {
-		// given: 둘 다 내리기. 첫 조치가 신고를 닫아 두 번째는 열린 신고가 없다.
+	void 둘_다_내리면_사용자_행을_한_번_잠그고_사진과_자기소개를_함께_내린다() {
+		// given
 		User user = user(9L, "대상");
 		user.useProfileImage(30L);
 		user.changeBio("광고");
 		given(users.findByIdForUpdate(9L)).willReturn(Optional.of(user));
-		given(profileImages.findByIdForUpdate(30L)).willReturn(Optional.of(profileImage(30L, ProfileImageStatus.READY)));
+		ProfileImage image = profileImage(30L, ProfileImageStatus.READY);
+		given(profileImages.findByIdForUpdate(30L)).willReturn(Optional.of(image));
 		Report report = givenOpenReport(ReportTargetType.USER, 9L);
 
 		// when
-		service.act(ADMIN, ReportTargetType.USER, 9L, Action.REMOVE_PROFILE_IMAGE);
-		given(reports.findAllByTargetTypeAndTargetIdAndStatus(ReportTargetType.USER, 9L, ReportStatus.OPEN))
-				.willReturn(List.of());
-		service.act(ADMIN, ReportTargetType.USER, 9L, Action.CLEAR_BIO);
+		service.act(ADMIN, ReportTargetType.USER, 9L, Action.REMOVE_PROFILE);
+
+		// then
+		verify(users, times(1)).findByIdForUpdate(9L);
+		assertThat(user.getBio()).isNull();
+		assertThat(user.getProfileImageId()).isNull();
+		assertThat(image.getStatus()).isEqualTo(ProfileImageStatus.REMOVED);
+		ArgumentCaptor<MediaJob> saved = ArgumentCaptor.forClass(MediaJob.class);
+		verify(jobs).save(saved.capture());
+		assertThat(saved.getValue().getKind()).isEqualTo(MediaJobKind.QUARANTINE);
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.ACTIONED);
+		assertThat(report.getHandledBy()).isEqualTo(ADMIN);
+	}
+
+	@Test
+	void 둘_다_내리기는_사진이_없어도_자기소개를_지운다() {
+		// given
+		User user = user(9L, "대상");
+		user.changeBio("광고");
+		given(users.findByIdForUpdate(9L)).willReturn(Optional.of(user));
+		Report report = givenOpenReport(ReportTargetType.USER, 9L);
+
+		// when
+		service.act(ADMIN, ReportTargetType.USER, 9L, Action.REMOVE_PROFILE);
 
 		// then
 		assertThat(user.getBio()).isNull();
-		assertThat(user.getProfileImageId()).isNull();
 		assertThat(report.getStatus()).isEqualTo(ReportStatus.ACTIONED);
+		verifyNoInteractions(jobs, profileImages);
 	}
 
 	private static ProfileImage profileImage(long id, ProfileImageStatus status) {

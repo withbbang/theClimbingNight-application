@@ -2,7 +2,6 @@ package com.theclimbingnight.profile.service;
 
 import com.theclimbingnight.common.BusinessException;
 import com.theclimbingnight.common.ErrorCode;
-import com.theclimbingnight.feed.entity.PostStatus;
 import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.profile.dto.ProfileResponse;
 import com.theclimbingnight.user.entity.User;
@@ -36,6 +35,6 @@ public class BioService {
 		user.changeBio(bio);
 		return new ProfileResponse(user.getId(), user.getNickname(), user.getBio(),
 				avatars.of(List.of(userId)).get(userId),
-				posts.countByAuthorIdAndStatusAndDeletedAtIsNull(userId, PostStatus.VISIBLE), true);
+				posts.countByAuthorIdAndStatusInAndDeletedAtIsNull(userId, ProfileQueryService.OWNER_VIEW), true);
 	}
 }

@@ -88,7 +88,7 @@ class ProfileQueryServiceTest {
 		// given
 		given(users.findById(OTHER)).willReturn(Optional.of(user(OTHER, true)));
 		given(blocks.existsBetween(ME, OTHER)).willReturn(false);
-		given(posts.countByAuthorIdAndStatusAndDeletedAtIsNull(OTHER, PostStatus.VISIBLE)).willReturn(2L);
+		given(posts.countByAuthorIdAndStatusInAndDeletedAtIsNull(OTHER, List.of(PostStatus.VISIBLE))).willReturn(2L);
 		given(posts.findProfileGrid(eq(OTHER), eq(List.of(PostStatus.VISIBLE)), isNull(), isNull(), any(Pageable.class)))
 				.willReturn(List.of(post(1, OTHER, PostStatus.VISIBLE), post(2, OTHER, PostStatus.VISIBLE)));
 		given(mediaRepository.findAllByPostIdInOrderBySortOrder(anyCollection())).willReturn(List.of());
@@ -114,7 +114,8 @@ class ProfileQueryServiceTest {
 						post(3, ME, PostStatus.HIDDEN_PENDING)));
 		given(mediaRepository.findAllByPostIdInOrderBySortOrder(anyCollection()))
 				.willReturn(List.of(media(11, 1, 0), media(12, 2, 0), media(13, 3, 0)));
-		given(posts.countByAuthorIdAndStatusAndDeletedAtIsNull(ME, PostStatus.VISIBLE)).willReturn(1L);
+		given(posts.countByAuthorIdAndStatusInAndDeletedAtIsNull(ME,
+				List.of(PostStatus.VISIBLE, PostStatus.HIDDEN_PENDING, PostStatus.HIDDEN))).willReturn(3L);
 
 		// when
 		List<GridPostResponse> items = service.posts(ME, ME, null, 18).items();
@@ -124,7 +125,7 @@ class ProfileQueryServiceTest {
 		assertThat(items.get(0).thumbnailUrl()).isEqualTo("https://m.example/p/k11/t.webp");
 		assertThat(items.get(1).thumbnailUrl()).isNull();
 		assertThat(items.get(2).thumbnailUrl()).isNull();
-		assertThat(service.profile(ME, ME).postCount()).isEqualTo(1);
+		assertThat(service.profile(ME, ME).postCount()).isEqualTo(3);
 		assertThat(service.profile(ME, ME).mine()).isTrue();
 	}
 

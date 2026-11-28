@@ -80,5 +80,5 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 	List<Post> findProfileGrid(@Param("authorId") long authorId, @Param("statuses") Collection<PostStatus> statuses,
 			@Param("cursorPublishedAt") Instant cursorPublishedAt, @Param("cursorId") Long cursorId, Pageable limit);
 
-	long countByAuthorIdAndStatusAndDeletedAtIsNull(long authorId, PostStatus status);
+	long countByAuthorIdAndStatusInAndDeletedAtIsNull(long authorId, Collection<PostStatus> statuses);
 }

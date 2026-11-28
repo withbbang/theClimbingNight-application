@@ -28,8 +28,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <ul>
  * <li>사진이 이미 PROCESSING이 아니면(되돌리기·탈퇴가 REMOVED로 바꾸고 정리 작업을 만들었다) 그 정리 작업이 이미 돌았을 수
  * 있으므로 방금 올린 두 장을 직접 지운다.</li>
- * <li>사용자가 활성이 아니거나 더 새 사진이 있으면 이 사진을 내리고 정리를 작업에 맡긴다. 늦게 끝난 예전 업로드가 새 사진을
- * 덮지 않게 한다.</li>
+ * <li>사용자가 활성이 아니거나 더 새 사진이 이미 READY면 이 사진을 내리고 정리를 작업에 맡긴다. 늦게 끝난 예전 업로드가
+ * 새 사진을 덮지 않게 한다. 더 새 사진이 아직 처리 중이면 이 사진을 먼저 쓴다(그 사진이 실패해도 사진이 남게).</li>
  * <li>그 밖이면 READY로 두고 지금 사진으로 바꾼다. 예전 지금 사진은 내리고 정리 작업을 만든다.</li>
  * </ul>
  */
@@ -137,7 +137,7 @@ public class ProfileProcessJobHandler implements JobHandler {
 		if (image == null || image.getStatus() != ProfileImageStatus.PROCESSING) {
 			return Outcome.STALE;
 		}
-		if (user == null || !user.isActive() || newerExists(userId, imageId)) {
+		if (user == null || !user.isActive() || newerReadyExists(userId, imageId)) {
 			image.markRemoved();
 			scheduler.onProfileImageDropped(image);
 			return Outcome.DROPPED;
@@ -155,8 +155,11 @@ public class ProfileProcessJobHandler implements JobHandler {
 		return Outcome.READY;
 	}
 
-	private boolean newerExists(long userId, long imageId) {
-		return images.existsByUserIdAndStatusAndIdGreaterThan(userId, ProfileImageStatus.PROCESSING, imageId)
-				|| images.existsByUserIdAndStatusAndIdGreaterThan(userId, ProfileImageStatus.READY, imageId);
+	/**
+	 * 더 새 사진이 이미 READY일 때만 이 사진을 내린다. 더 새 사진이 아직 처리 중이면 이 사진을 먼저 쓴다. 그 사진이 나중에
+	 * READY가 되면 이 사진을 내리고, 실패하면 이 사진이 남는다(둘 다 잃지 않는다).
+	 */
+	private boolean newerReadyExists(long userId, long imageId) {
+		return images.existsByUserIdAndStatusAndIdGreaterThan(userId, ProfileImageStatus.READY, imageId);
 	}
 }

@@ -130,4 +130,37 @@ class ModerationProfilePersistenceTest {
 		assertThat(saved.getStatus()).isEqualTo(ReportStatus.ACTIONED);
 		assertThat(saved.getHandledBy()).isEqualTo(reporter.getId());
 	}
+
+	@Test
+	void 둘_다_내리면_한_트랜잭션에서_사진과_자기소개가_함께_저장된다() {
+		// given: 지금 사진 B, 자기소개, 열린 신고
+		User reporter = user("신고자2");
+		User target = user("대상2");
+		ProfileImage b = tx.execute(s -> {
+			ProfileImage image = ProfileImage.start(target.getId(), "uploads/mb2.jpg", "a/mb2", 100);
+			image.markReady();
+			return images.save(image);
+		});
+		tx.executeWithoutResult(s -> {
+			User u = users.findById(target.getId()).orElseThrow();
+			u.useProfileImage(b.getId());
+			u.changeBio("광고");
+		});
+		Report report = tx.execute(s -> reports
+				.save(Report.open(reporter.getId(), ReportTargetType.USER, target.getId(), ReportReason.SPAM, null)));
+
+		// when
+		tx.executeWithoutResult(s -> service.act(reporter.getId(), ReportTargetType.USER, target.getId(),
+				Action.REMOVE_PROFILE));
+
+		// then: 새로 읽은 값. 작업 취소(벌크 UPDATE) 뒤의 자기소개 변경도 남아 있어야 한다.
+		User after = users.findById(target.getId()).orElseThrow();
+		assertThat(after.getProfileImageId()).isNull();
+		assertThat(after.getBio()).isNull();
+		assertThat(images.findById(b.getId()).orElseThrow().getStatus()).isEqualTo(ProfileImageStatus.REMOVED);
+		List<MediaJob> jobsOfB = jobs.findAll().stream()
+				.filter(j -> j.getTargetType() == MediaTargetType.PROFILE_IMAGE && j.getTargetId() == b.getId()).toList();
+		assertThat(jobsOfB).extracting(MediaJob::getKind).containsExactly(MediaJobKind.QUARANTINE);
+		assertThat(reports.findById(report.getId()).orElseThrow().getStatus()).isEqualTo(ReportStatus.ACTIONED);
+	}
 }

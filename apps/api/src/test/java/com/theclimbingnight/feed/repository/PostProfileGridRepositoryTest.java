@@ -124,6 +124,17 @@ class PostProfileGridRepositoryTest {
 		visible(author, T0.plusSeconds(1));
 
 		// when / then
-		assertThat(posts.countByAuthorIdAndStatusAndDeletedAtIsNull(author, PostStatus.VISIBLE)).isEqualTo(2);
+		assertThat(posts.countByAuthorIdAndStatusInAndDeletedAtIsNull(author, List.of(PostStatus.VISIBLE)))
+				.isEqualTo(2);
+	}
+
+	@Test
+	void 본인_글_수는_격자와_같은_상태를_센다() {
+		// given: VISIBLE·HIDDEN·HIDDEN_PENDING 하나씩 + PENDING·FAILED·DRAFT·지운 글
+		long author = user("작성자");
+		everyStatus(author);
+
+		// when / then
+		assertThat(posts.countByAuthorIdAndStatusInAndDeletedAtIsNull(author, OWNER)).isEqualTo(3);
 	}
 }

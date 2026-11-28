@@ -143,7 +143,8 @@ public class ModerationService {
 
 	@Transactional
 	public void act(long adminId, ReportTargetType targetType, long targetId, Action action) {
-		boolean profileAction = action == Action.REMOVE_PROFILE_IMAGE || action == Action.CLEAR_BIO;
+		boolean profileAction = action == Action.REMOVE_PROFILE_IMAGE || action == Action.CLEAR_BIO
+				|| action == Action.REMOVE_PROFILE;
 		if (targetType == ReportTargetType.USER ? !profileAction && action != Action.DISMISS : profileAction) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
@@ -177,11 +178,19 @@ public class ModerationService {
 				close(targetType, targetId, ReportStatus.DISMISSED, adminId);
 			}
 			case REMOVE_PROFILE_IMAGE -> {
-				removeProfileImage(targetId);
+				lockedUser(targetId).ifPresent(this::takeDownProfileImage);
 				close(targetType, targetId, ReportStatus.ACTIONED, adminId);
 			}
 			case CLEAR_BIO -> {
 				lockedUser(targetId).ifPresent(u -> u.changeBio(null));
+				close(targetType, targetId, ReportStatus.ACTIONED, adminId);
+			}
+			case REMOVE_PROFILE -> {
+				// 사진과 자기소개를 한 트랜잭션에서 함께 내린다. 사용자 행은 한 번만 잠근다.
+				lockedUser(targetId).ifPresent(u -> {
+					takeDownProfileImage(u);
+					u.changeBio(null);
+				});
 				close(targetType, targetId, ReportStatus.ACTIONED, adminId);
 			}
 		}
@@ -192,18 +201,19 @@ public class ModerationService {
 		return users.findByIdForUpdate(userId).filter(User::isActive);
 	}
 
-	/** 지금 사진을 내린다. 운영진이 내린 사진은 격리만 하고 원본은 남긴다. 사진이 없으면 아무것도 안 한다. */
-	private void removeProfileImage(long userId) {
-		lockedUser(userId).ifPresent(user -> {
-			Long imageId = user.getProfileImageId();
-			if (imageId == null) {
-				return;
-			}
-			user.useProfileImage(null);
-			profileImages.findByIdForUpdate(imageId).ifPresent(image -> {
-				image.markRemoved();
-				scheduler.onProfileImageTakenDown(image);
-			});
+	/**
+	 * 잠근 사용자의 지금 사진을 내린다. 운영진이 내린 사진은 격리만 하고 원본은 남긴다. 사진이 없으면 아무것도 안 한다.
+	 * 작업 취소는 벌크 UPDATE지만 영속성 컨텍스트를 비우지 않으므로 그 뒤의 엔티티 변경도 저장된다.
+	 */
+	private void takeDownProfileImage(User user) {
+		Long imageId = user.getProfileImageId();
+		if (imageId == null) {
+			return;
+		}
+		user.useProfileImage(null);
+		profileImages.findByIdForUpdate(imageId).ifPresent(image -> {
+			image.markRemoved();
+			scheduler.onProfileImageTakenDown(image);
 		});
 	}
 

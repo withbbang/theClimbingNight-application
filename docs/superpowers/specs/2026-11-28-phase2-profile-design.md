@@ -67,7 +67,7 @@
 - 격자 칸: 첫 미디어의 썸네일(480px WebP)을 정사각으로 잘라 보인다. 미디어가 2개 이상이면 오른쪽 위에 겹친 아이콘.
 - **남의 프로필 격자**: `VISIBLE` 게시물만, `published_at`·`id` 내림차순 커서 페이징(한 번에 18개 = 6줄).
 - **내 프로필 격자**: 위와 같은 목록에 내가 볼 수 있는 숨긴 글(`HIDDEN_PENDING`·`HIDDEN`)도 섞어 넣는다. 숨긴 글은 공개본이 격리돼 있고, 지금 `PostResponseMapper`도 작성자에게 사진 URL을 주지 않는다. 그래서 숨긴 칸은 사진 없이 회색 칸에 "숨겨짐"만 보이고, 누르면 기존 상세의 "운영 정책에 따라 숨겨졌어요"로 간다. (검토 뒤 추가, 설계자 결정) 처리 중·실패한 글은 기존 `GET /posts/mine/in-progress`로 격자 위에 띠로 따로 보인다(피드 탭과 같은 컴포넌트 재사용).
-- 게시물 수: `VISIBLE` 게시물 수. 내 프로필도 같은 기준(남이 보는 숫자와 같게).
+- 게시물 수: 격자에 보이는 게시물 수. 남의 프로필은 `VISIBLE`, 내 프로필은 내 격자와 같은 `VISIBLE`·`HIDDEN_PENDING`·`HIDDEN`(격자 칸 수와 숫자가 맞게). 자기소개 저장 응답(`PATCH /users/me/profile`)도 내 기준이다. (만든 뒤 수정)
 - 비어 있으면: 남의 프로필 "아직 올린 사진이 없어요", 내 프로필 "첫 사진을 올려 보세요" + 작성 버튼.
 - 화면 디자인은 화면 작업 디자인 스킬을 쓰고 애니메이션을 살린다(격자 칸 순차 등장, 프로필 사진 교체 시 크로스페이드 등).
 
@@ -110,8 +110,8 @@ media_jobs      + target_type(POST_MEDIA, PROFILE_IMAGE) NOT NULL DEFAULT 'POST_
 1. 앱 → `POST /api/v1/users/me/profile-images` → `profile_images`(UPLOADING) + presigned PUT(15분, `image/jpeg`, 1바이트~5MB). 앱은 1:1로 자른 뒤 긴 변 1024px JPEG 0.85로 올린다.
 2. 앱이 `media-incoming`에 올린다 → `POST /api/v1/users/me/profile-images/{id}/confirm` → API가 HEAD로 존재·크기 확인 → PROCESSING, `media_jobs`(PROCESS, PROFILE_IMAGE) 생성.
 3. 워커: 업로드 다운로드 → NAS 원본 저장 → 가운데를 정사각으로 잘라 WebP 320px·96px(EXIF·프레임 메타데이터 제거, 기존 `ImageTranscoder` 규칙 재사용) → `media-public` 업로드 → 업로드 객체 삭제 → 한 트랜잭션에서 사용자 행을 잠그고:
-   - 이 사진이 그 사용자의 **가장 최근에 확정한 사진**이면 READY로 바꾸고 `users.profile_image_id`를 이것으로 바꾼다. 예전 사진은 REMOVED + `DELETE_MEDIA` 작업.
-   - 더 최근 사진이 이미 확정됐거나 그 사이 사용자가 되돌리기·탈퇴했으면 이 사진은 REMOVED로 두고 방금 올린 공개본을 지운다. 늦게 끝난 예전 업로드가 새 사진을 덮지 않게 한다.
+   - 더 새 사진(id가 더 큰 것)이 이미 READY가 아니면 READY로 바꾸고 `users.profile_image_id`를 이것으로 바꾼다. 예전 사진은 REMOVED + `DELETE_MEDIA` 작업. 더 새 사진이 아직 처리 중이어도 이 사진을 먼저 쓴다. 그 사진이 나중에 READY가 되면 같은 규칙으로 이 사진을 내리고, 실패하면 이 사진이 남는다(둘 다 잃지 않게). (만든 뒤 수정)
+   - 더 새 사진이 이미 READY이거나 그 사이 사용자가 되돌리기·탈퇴했으면 이 사진은 REMOVED로 두고 방금 올린 공개본을 지운다. 늦게 끝난 예전 업로드가 새 사진을 덮지 않게 한다.
 4. 실패·재시도는 게시물과 같다(1분 → 5분, 3번째에 FAILED). FAILED면 `profile_image_id`는 예전 그대로.
 5. 되돌리기: `DELETE /api/v1/users/me/profile-image` → `profile_image_id = null`, 예전 사진 REMOVED + `DELETE_MEDIA`.
 6. NAS 원본은 REMOVED가 된 뒤 30일에 `PURGE_ORIGINAL`이 지운다(게시물과 같음).
@@ -127,10 +127,11 @@ media_jobs      + target_type(POST_MEDIA, PROFILE_IMAGE) NOT NULL DEFAULT 'POST_
 
 ## 7. 운영진 조치 (제안)
 
-- 사용자 신고(`USER`) 대상에 조치 두 개를 연다: `REMOVE_PROFILE_IMAGE`, `CLEAR_BIO`. 지금은 `USER`에 `DISMISS`만 된다.
+- 사용자 신고(`USER`) 대상에 조치 세 개를 연다: `REMOVE_PROFILE_IMAGE`, `CLEAR_BIO`, `REMOVE_PROFILE`. 지금은 `USER`에 `DISMISS`만 된다. 게시물·댓글 대상에 보내면 `COMMON_VALIDATION_FAILED`(400).
   - `REMOVE_PROFILE_IMAGE`: `profile_image_id = null`, 사진 REMOVED + `QUARANTINE`(공개본을 격리하고 캐시를 비움). 신고는 ACTIONED로 닫는다.
   - `CLEAR_BIO`: `bio = null`. 신고는 ACTIONED로 닫는다.
-  - 사진과 자기소개가 다 있으면 카드에 "둘 다 내리기" 버튼을 하나 더 두고, 앱이 `REMOVE_PROFILE_IMAGE` → `CLEAR_BIO`를 차례로 보낸다. 두 번째 요청은 신고가 이미 닫혀 있어도 조치하고 204를 준다(`close()`는 열린 신고가 없으면 아무것도 안 한다).
+  - `REMOVE_PROFILE`("둘 다 내리기"): 한 트랜잭션에서 사용자 행을 한 번 잠그고 `REMOVE_PROFILE_IMAGE`와 같은 사진 내리기 + `bio = null`. 신고는 ACTIONED로 닫는다. 사진과 자기소개가 다 있으면 카드에 이 버튼을 하나 더 두고, 앱은 이 조치를 한 번만 보낸다.
+  - 만든 뒤 달라진 점: 처음에는 앱이 `REMOVE_PROFILE_IMAGE` → `CLEAR_BIO`를 차례로 보내게 했으나, 조치를 앱에서 조합하는 것은 "도메인 로직은 API 한 곳에만" 원칙에 어긋나고 두 번째 요청이 실패하면 반만 내려간다. 그래서 `REMOVE_PROFILE` 하나로 바꿨다.
 - 복원은 없다. 내린 사진은 본인이 다시 올린다.
 - 보존 (검토 뒤 추가, 설계자 결정): 숨긴 게시물과 같은 기준을 쓴다. 운영진이 내린 사진은 `QUARANTINE`만 걸고 격리본과 NAS 원본을 모두 남기며 `PURGE_ORIGINAL`을 예약하지 않는다. 탈퇴할 때 그 사람의 모든 프로필 사진에 `DELETE_MEDIA` + 30일 뒤 `PURGE_ORIGINAL`을 걸어 함께 지운다. 본인이 바꾸거나 되돌린 사진만 30일 뒤 원본을 지운다. 보존 기간 문구는 `content-todo.md`의 신고 기록 보관 항목에 넣는다.
 - 신고 목록의 사용자 대상 카드에는 지금 프로필 사진(공개 URL, 96px)과 자기소개만 보여 준다. 조치해 신고가 닫히면 카드가 목록에서 빠지므로, 예전에 내린 사진은 보여 주지 않는다. 격리본은 분쟁에 대비한 기록이고, 그 사진을 보는 화면은 이번 범위 밖이다. (설계자 결정)
@@ -147,14 +148,14 @@ media_jobs      + target_type(POST_MEDIA, PROFILE_IMAGE) NOT NULL DEFAULT 'POST_
 | `POST /api/v1/users/me/profile-images/{id}/confirm` | USER | 처리 시작. 202 |
 | `GET /api/v1/users/me/profile-images/{id}` | USER | `{ id, status }`. 본인 것만, 아니면 404 |
 | `DELETE /api/v1/users/me/profile-image` | USER | 기본 이미지로 |
-| `POST /api/v1/report-targets/USER/{id}/actions` | ADMIN | `action`에 `REMOVE_PROFILE_IMAGE`, `CLEAR_BIO` 추가 |
+| `POST /api/v1/report-targets/USER/{id}/actions` | ADMIN | `action`에 `REMOVE_PROFILE_IMAGE`, `CLEAR_BIO`, `REMOVE_PROFILE`(둘 다) 추가 |
 
 - 작성자·사용자를 담는 응답에 작은 사진 URL을 넣는다: `PostAuthorResponse`·`LikerResponse`·`BlockedUserResponse`에 `profileImageUrl`(96px, nullable), `UserResponse`(`/users/me`)는 그대로 둔다(토큰·벙 주최자·인증 신청에도 쓰여서). 마이 탭과 편집 화면은 `GET /users/{내 id}/profile`로 받는다. 응답 만들 때 사용자 id 묶음으로 한 번에 읽어 N+1을 피한다.
 - 비로그인 피드 맛보기 3개의 작성자 아바타도 사진 URL을 준다(공개 버킷이라 어차피 공개, 프로필 자체는 401).
 
 ## 9. 탈퇴·자격 변경 (제안)
 
-- 탈퇴(`UserWithdrawnEvent`): `bio = null`, `profile_image_id = null`, 그 사람의 모든 프로필 사진 REMOVED + `DELETE_MEDIA` + 30일 뒤 `PURGE_ORIGINAL`(운영진이 내린 사진 포함), 진행 중인 `PROCESS`는 취소. 아키텍처 문서의 "개인정보(닉네임, 프로필 사진 …)를 지운다"와 맞춘다.
+- 탈퇴(`UserWithdrawnEvent`): `bio = null`, `profile_image_id = null`, 그 사람의 모든 프로필 사진 REMOVED + `DELETE_MEDIA` + 30일 뒤 `PURGE_ORIGINAL`(운영진이 내린 사진 포함), 진행 중인 `PROCESS`는 취소. 이미 REMOVED이고 `original_path`도 없는(원본까지 정리된) 사진은 건너뛴다. 운영진이 내린 사진은 원본 경로가 남아 있어 여기서 정리된다. 아키텍처 문서의 "개인정보(닉네임, 프로필 사진 …)를 지운다"와 맞춘다.
 - 자격 해제(MEMBER→USER)는 영향 없음.
 
 ## 10. 앱 공통 변경 (제안)

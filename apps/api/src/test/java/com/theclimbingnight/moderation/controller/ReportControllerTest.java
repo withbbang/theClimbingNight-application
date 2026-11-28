@@ -182,7 +182,11 @@ class ReportControllerTest {
 		mockMvc.perform(post("/api/v1/report-targets/USER/9/actions").header("Authorization", admin)
 				.contentType(MediaType.APPLICATION_JSON).content("{\"action\":\"CLEAR_BIO\"}"))
 				.andExpect(status().isNoContent());
+		mockMvc.perform(post("/api/v1/report-targets/USER/9/actions").header("Authorization", admin)
+				.contentType(MediaType.APPLICATION_JSON).content("{\"action\":\"REMOVE_PROFILE\"}"))
+				.andExpect(status().isNoContent());
 		verify(moderationService).act(1L, ReportTargetType.USER, 9L, Action.REMOVE_PROFILE_IMAGE);
 		verify(moderationService).act(1L, ReportTargetType.USER, 9L, Action.CLEAR_BIO);
+		verify(moderationService).act(1L, ReportTargetType.USER, 9L, Action.REMOVE_PROFILE);
 	}
 }

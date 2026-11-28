@@ -169,19 +169,22 @@ class ProfileProcessJobHandlerTest {
 	}
 
 	@Test
-	void 늦게_끝난_예전_사진은_더_새_사진을_덮지_않는다() throws Exception {
-		// given: B(11)·C(12) 둘 다 처리 중이고 B가 먼저 끝났다
-		given(images.existsByUserIdAndStatusAndIdGreaterThan(USER_ID, ProfileImageStatus.PROCESSING, 11L))
-				.willReturn(true);
+	void 더_새_사진이_아직_처리_중이면_먼저_끝난_사진을_지금_사진으로_쓴다() throws Exception {
+		// given: B(11)·C(12) 둘 다 처리 중이고 B가 먼저 끝났다. C가 나중에 실패해도 사진이 남아야 한다.
+		lenient().when(images.existsByUserIdAndStatusAndIdGreaterThan(USER_ID, ProfileImageStatus.PROCESSING, 11L))
+				.thenReturn(true);
+		ProfileImage current = WorkerFixtures.profileImage(5L, ProfileImageStatus.READY);
 		user.useProfileImage(5L);
+		given(images.findByIdForUpdate(5L)).willReturn(Optional.of(current));
 
 		// when
 		handler.handle(WorkerFixtures.profileJob(MediaJobKind.PROCESS, 11L, 0));
 
-		// then: B는 내리고 방금 올린 공개본은 정리 작업이 지운다
-		assertThat(image.getStatus()).isEqualTo(ProfileImageStatus.REMOVED);
-		assertThat(user.getProfileImageId()).isEqualTo(5L);
-		assertDropJobs(savedJobs(), 11L);
+		// then: B가 지금 사진이 되고 예전 사진은 정리 작업에 넘긴다
+		assertThat(image.getStatus()).isEqualTo(ProfileImageStatus.READY);
+		assertThat(user.getProfileImageId()).isEqualTo(11L);
+		assertThat(current.getStatus()).isEqualTo(ProfileImageStatus.REMOVED);
+		assertDropJobs(savedJobs(), 5L);
 	}
 
 	@Test
