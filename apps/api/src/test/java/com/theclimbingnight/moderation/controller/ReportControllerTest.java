@@ -169,4 +169,20 @@ class ReportControllerTest {
 				.andExpect(status().isForbidden());
 		verify(moderationService, never()).act(eq(7L), any(), anyLong(), any());
 	}
+
+	@Test
+	void 프로필_조치도_204로_넘긴다() throws Exception {
+		// given
+		String admin = bearer(1L, Role.ADMIN);
+
+		// when / then
+		mockMvc.perform(post("/api/v1/report-targets/USER/9/actions").header("Authorization", admin)
+				.contentType(MediaType.APPLICATION_JSON).content("{\"action\":\"REMOVE_PROFILE_IMAGE\"}"))
+				.andExpect(status().isNoContent());
+		mockMvc.perform(post("/api/v1/report-targets/USER/9/actions").header("Authorization", admin)
+				.contentType(MediaType.APPLICATION_JSON).content("{\"action\":\"CLEAR_BIO\"}"))
+				.andExpect(status().isNoContent());
+		verify(moderationService).act(1L, ReportTargetType.USER, 9L, Action.REMOVE_PROFILE_IMAGE);
+		verify(moderationService).act(1L, ReportTargetType.USER, 9L, Action.CLEAR_BIO);
+	}
 }

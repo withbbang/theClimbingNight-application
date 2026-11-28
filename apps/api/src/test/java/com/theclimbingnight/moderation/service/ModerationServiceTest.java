@@ -44,6 +44,9 @@ import com.theclimbingnight.moderation.entity.ReportTargetType;
 import com.theclimbingnight.moderation.repository.ReportRepository;
 import com.theclimbingnight.moderation.repository.ReportTargetSummary;
 import com.theclimbingnight.profile.dto.ProfileImageUrls;
+import com.theclimbingnight.profile.entity.ProfileImage;
+import com.theclimbingnight.profile.entity.ProfileImageStatus;
+import com.theclimbingnight.profile.repository.ProfileImageRepository;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
 import com.theclimbingnight.user.service.UserAvatars;
@@ -82,6 +85,7 @@ class ModerationServiceTest {
 	@Mock MediaJobRepository jobs;
 	@Mock MediaStorage storage;
 	@Mock UserAvatars avatars;
+	@Mock ProfileImageRepository profileImages;
 
 	private final MutableClock clock = new MutableClock(NOW);
 	private ModerationService service;
@@ -91,7 +95,7 @@ class ModerationServiceTest {
 		MediaUrls urls = new MediaUrls(new MediaProperties(true, "a", "k", "s", "in", "pub", "https://m.example", null));
 		MediaJobScheduler scheduler = new MediaJobScheduler(jobs, mediaRepository, clock);
 		service = new ModerationService(reports, posts, comments, counter, mediaRepository, users, jobs, scheduler, storage,
-				new PostResponseMapper(urls), urls, avatars, clock);
+				new PostResponseMapper(urls), urls, avatars, profileImages, clock);
 	}
 
 	private Post givenPost(PostStatus status) {
@@ -291,6 +295,117 @@ class ModerationServiceTest {
 	}
 
 	@Test
+	void 프로필_조치는_USER_대상에만_쓴다() {
+		// when / then
+		for (ReportTargetType type : List.of(ReportTargetType.POST, ReportTargetType.COMMENT)) {
+			assertValidationFailed(() -> service.act(ADMIN, type, 9L, Action.REMOVE_PROFILE_IMAGE));
+			assertValidationFailed(() -> service.act(ADMIN, type, 9L, Action.CLEAR_BIO));
+		}
+		verifyNoInteractions(posts, reports, jobs, users, profileImages);
+	}
+
+	@Test
+	void 프로필_사진을_내리면_사진은_REMOVED이고_격리_작업이_생기고_신고는_ACTIONED다() {
+		// given
+		User user = user(9L, "대상");
+		user.useProfileImage(30L);
+		given(users.findByIdForUpdate(9L)).willReturn(Optional.of(user));
+		ProfileImage image = profileImage(30L, ProfileImageStatus.READY);
+		given(profileImages.findByIdForUpdate(30L)).willReturn(Optional.of(image));
+		Report report = givenOpenReport(ReportTargetType.USER, 9L);
+
+		// when
+		service.act(ADMIN, ReportTargetType.USER, 9L, Action.REMOVE_PROFILE_IMAGE);
+
+		// then
+		assertThat(user.getProfileImageId()).isNull();
+		assertThat(image.getStatus()).isEqualTo(ProfileImageStatus.REMOVED);
+		verify(jobs).cancelQueued(List.of(30L), MediaTargetType.PROFILE_IMAGE, MediaJobKind.PROCESS);
+		ArgumentCaptor<MediaJob> saved = ArgumentCaptor.forClass(MediaJob.class);
+		verify(jobs).save(saved.capture());
+		assertThat(saved.getValue().getKind()).isEqualTo(MediaJobKind.QUARANTINE);
+		assertThat(saved.getValue().getTargetType()).isEqualTo(MediaTargetType.PROFILE_IMAGE);
+		assertThat(saved.getValue().getTargetId()).isEqualTo(30L);
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.ACTIONED);
+		assertThat(report.getHandledBy()).isEqualTo(ADMIN);
+	}
+
+	@Test
+	void 사진이_없어도_신고는_닫힌다() {
+		// given
+		User user = user(9L, "대상");
+		given(users.findByIdForUpdate(9L)).willReturn(Optional.of(user));
+		Report report = givenOpenReport(ReportTargetType.USER, 9L);
+
+		// when
+		service.act(ADMIN, ReportTargetType.USER, 9L, Action.REMOVE_PROFILE_IMAGE);
+
+		// then
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.ACTIONED);
+		verifyNoInteractions(jobs, profileImages);
+	}
+
+	@Test
+	void 탈퇴했거나_없는_사용자는_조치_없이_신고만_닫는다() {
+		// given
+		given(users.findByIdForUpdate(9L)).willReturn(Optional.empty());
+		Report report = givenOpenReport(ReportTargetType.USER, 9L);
+
+		// when
+		service.act(ADMIN, ReportTargetType.USER, 9L, Action.REMOVE_PROFILE_IMAGE);
+
+		// then
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.ACTIONED);
+		verifyNoInteractions(jobs, profileImages);
+	}
+
+	@Test
+	void 자기소개를_지우면_null이_되고_신고는_ACTIONED다() {
+		// given
+		User user = user(9L, "대상");
+		user.changeBio("광고");
+		given(users.findByIdForUpdate(9L)).willReturn(Optional.of(user));
+		Report report = givenOpenReport(ReportTargetType.USER, 9L);
+
+		// when
+		service.act(ADMIN, ReportTargetType.USER, 9L, Action.CLEAR_BIO);
+
+		// then
+		assertThat(user.getBio()).isNull();
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.ACTIONED);
+		assertThat(report.getHandledBy()).isEqualTo(ADMIN);
+	}
+
+	@Test
+	void 신고가_이미_닫힌_뒤의_두_번째_조치도_실행된다() {
+		// given: 둘 다 내리기. 첫 조치가 신고를 닫아 두 번째는 열린 신고가 없다.
+		User user = user(9L, "대상");
+		user.useProfileImage(30L);
+		user.changeBio("광고");
+		given(users.findByIdForUpdate(9L)).willReturn(Optional.of(user));
+		given(profileImages.findByIdForUpdate(30L)).willReturn(Optional.of(profileImage(30L, ProfileImageStatus.READY)));
+		Report report = givenOpenReport(ReportTargetType.USER, 9L);
+
+		// when
+		service.act(ADMIN, ReportTargetType.USER, 9L, Action.REMOVE_PROFILE_IMAGE);
+		given(reports.findAllByTargetTypeAndTargetIdAndStatus(ReportTargetType.USER, 9L, ReportStatus.OPEN))
+				.willReturn(List.of());
+		service.act(ADMIN, ReportTargetType.USER, 9L, Action.CLEAR_BIO);
+
+		// then
+		assertThat(user.getBio()).isNull();
+		assertThat(user.getProfileImageId()).isNull();
+		assertThat(report.getStatus()).isEqualTo(ReportStatus.ACTIONED);
+	}
+
+	private static ProfileImage profileImage(long id, ProfileImageStatus status) {
+		ProfileImage image = ProfileImage.start(9L, "uploads/x.jpg", "a/x", 100);
+		ReflectionTestUtils.setField(image, "id", id);
+		ReflectionTestUtils.setField(image, "status", status);
+		return image;
+	}
+
+	@Test
 	void USER_대상은_기각할_수_있다() {
 		// given
 		Report report = givenOpenReport(ReportTargetType.USER, 9L);
@@ -360,9 +475,12 @@ class ModerationServiceTest {
 		ready.markReady("2026/11/11.jpg", 800, 600, 1000L);
 		PostMedia processing = media(12L, 1);
 		given(mediaRepository.findAllByPostIdInOrderBySortOrder(List.of(POST_ID))).willReturn(List.of(ready, processing));
-		given(users.findAllById(anyCollection())).willReturn(List.of(user(AUTHOR, "작성자"), user(9L, "대상")));
+		User target = user(9L, "대상");
+		target.changeBio("안녕하세요");
+		given(users.findAllById(anyCollection())).willReturn(List.of(user(AUTHOR, "작성자"), target));
 		given(avatars.of(anyCollection())).willReturn(Map.of(AUTHOR,
-				new ProfileImageUrls("https://m.example/a/ab12/l.webp", "https://m.example/a/ab12/s.webp")));
+				new ProfileImageUrls("https://m.example/a/ab12/l.webp", "https://m.example/a/ab12/s.webp"),
+				9L, new ProfileImageUrls("https://m.example/a/cd34/l.webp", "https://m.example/a/cd34/s.webp")));
 		given(storage.quarantineExists("p/k11/d.webp")).willReturn(true);
 		given(storage.presignQuarantineGet(eq("p/k11/d.webp"), eq(Duration.ofMinutes(5))))
 				.willReturn(URI.create("https://in.example/quarantine/p/k11/d.webp?sig"));
@@ -384,10 +502,14 @@ class ModerationServiceTest {
 		assertThat(postTarget.post().media()).allSatisfy(m -> assertThat(m.url()).isNull());
 		assertThat(postTarget.quarantineUrls()).containsExactly("https://in.example/quarantine/p/k11/d.webp?sig");
 		assertThat(postTarget.userNickname()).isNull();
+		assertThat(postTarget.userProfileImageUrl()).isNull();
+		assertThat(postTarget.userBio()).isNull();
 		ReportTargetResponse userTarget = page.items().get(1);
 		assertThat(userTarget.targetType()).isEqualTo("USER");
 		assertThat(userTarget.targetStatus()).isEqualTo("ACTIVE");
 		assertThat(userTarget.userNickname()).isEqualTo("대상");
+		assertThat(userTarget.userProfileImageUrl()).isEqualTo("https://m.example/a/cd34/s.webp");
+		assertThat(userTarget.userBio()).isEqualTo("안녕하세요");
 		assertThat(userTarget.post()).isNull();
 		assertThat(userTarget.quarantineUrls()).isEmpty();
 		assertThat(userTarget.cleanupFailed()).isFalse();

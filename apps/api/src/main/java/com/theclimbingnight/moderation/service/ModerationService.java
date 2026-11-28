@@ -30,6 +30,8 @@ import com.theclimbingnight.moderation.entity.ReportTargetType;
 import com.theclimbingnight.moderation.repository.ReportRepository;
 import com.theclimbingnight.moderation.repository.ReportTargetSummary;
 import com.theclimbingnight.profile.dto.ProfileImageUrls;
+import com.theclimbingnight.profile.entity.ProfileImage;
+import com.theclimbingnight.profile.repository.ProfileImageRepository;
 import com.theclimbingnight.user.entity.User;
 import com.theclimbingnight.user.repository.UserRepository;
 import com.theclimbingnight.user.service.UserAvatars;
@@ -77,11 +79,12 @@ public class ModerationService {
 	private final PostResponseMapper mapper;
 	private final MediaUrls urls;
 	private final UserAvatars avatars;
+	private final ProfileImageRepository profileImages;
 	private final Clock clock;
 
 	public ModerationService(ReportRepository reports, PostRepository posts, CommentRepository comments,
 			CommentCounter counter, PostMediaRepository mediaRepository, UserRepository users, MediaJobRepository jobs, MediaJobScheduler scheduler, MediaStorage storage,
-			PostResponseMapper mapper, MediaUrls urls, UserAvatars avatars, Clock clock) {
+			PostResponseMapper mapper, MediaUrls urls, UserAvatars avatars, ProfileImageRepository profileImages, Clock clock) {
 		this.reports = reports;
 		this.posts = posts;
 		this.comments = comments;
@@ -94,6 +97,7 @@ public class ModerationService {
 		this.mapper = mapper;
 		this.urls = urls;
 		this.avatars = avatars;
+		this.profileImages = profileImages;
 		this.clock = clock;
 	}
 
@@ -132,14 +136,15 @@ public class ModerationService {
 						images, cleanupFailed.contains(s.targetId()));
 				case COMMENT -> commentTarget(s, targetReports, commentById.get(s.targetId()), postById,
 						mediaByPost, userById, images);
-				case USER -> userTarget(s, targetReports, userById.get(s.targetId()));
+				case USER -> userTarget(s, targetReports, userById.get(s.targetId()), images);
 			};
 		});
 	}
 
 	@Transactional
 	public void act(long adminId, ReportTargetType targetType, long targetId, Action action) {
-		if (targetType == ReportTargetType.USER && action != Action.DISMISS) {
+		boolean profileAction = action == Action.REMOVE_PROFILE_IMAGE || action == Action.CLEAR_BIO;
+		if (targetType == ReportTargetType.USER ? !profileAction && action != Action.DISMISS : profileAction) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
 		boolean comment = targetType == ReportTargetType.COMMENT;
@@ -171,7 +176,35 @@ public class ModerationService {
 				}
 				close(targetType, targetId, ReportStatus.DISMISSED, adminId);
 			}
+			case REMOVE_PROFILE_IMAGE -> {
+				removeProfileImage(targetId);
+				close(targetType, targetId, ReportStatus.ACTIONED, adminId);
+			}
+			case CLEAR_BIO -> {
+				lockedUser(targetId).ifPresent(u -> u.changeBio(null));
+				close(targetType, targetId, ReportStatus.ACTIONED, adminId);
+			}
 		}
+	}
+
+	/** 탈퇴했거나 없는 사용자면 비어 있다. 신고는 그래도 닫는다. 사용자 행을 먼저 잠근다(탈퇴와 같은 순서). */
+	private Optional<User> lockedUser(long userId) {
+		return users.findByIdForUpdate(userId).filter(User::isActive);
+	}
+
+	/** 지금 사진을 내린다. 운영진이 내린 사진은 격리만 하고 원본은 남긴다. 사진이 없으면 아무것도 안 한다. */
+	private void removeProfileImage(long userId) {
+		lockedUser(userId).ifPresent(user -> {
+			Long imageId = user.getProfileImageId();
+			if (imageId == null) {
+				return;
+			}
+			user.useProfileImage(null);
+			profileImages.findByIdForUpdate(imageId).ifPresent(image -> {
+				image.markRemoved();
+				scheduler.onProfileImageTakenDown(image);
+			});
+		});
 	}
 
 	/** 잠근 게시물과 그 아래 잠근 댓글. */
@@ -268,7 +301,7 @@ public class ModerationService {
 			Map<Long, List<PostMedia>> mediaByPost, Map<Long, User> userById,
 			Map<Long, ProfileImageUrls> images, boolean cleanupFailed) {
 		if (post == null || post.getDeletedAt() != null) {
-			return response(s, targetReports, DELETED, null, List.of(), null, null, cleanupFailed);
+			return response(s, targetReports, DELETED, null, List.of(), null, null, null, null, cleanupFailed);
 		}
 		List<PostMedia> media = mediaByPost.getOrDefault(post.getId(), List.of());
 		User author = userById.get(post.getAuthorId());
@@ -279,7 +312,7 @@ public class ModerationService {
 				.map(this::reviewUrl)
 				.flatMap(Optional::stream)
 				.toList() : List.of();
-		return response(s, targetReports, post.getStatus().name(), body, quarantineUrls, null, null, cleanupFailed);
+		return response(s, targetReports, post.getStatus().name(), body, quarantineUrls, null, null, null, null, cleanupFailed);
 	}
 
 	/**
@@ -303,7 +336,7 @@ public class ModerationService {
 			Map<Long, ProfileImageUrls> images) {
 		Post post = comment == null ? null : postById.get(comment.getPostId());
 		if (comment == null || comment.getDeletedAt() != null || post == null || post.getDeletedAt() != null) {
-			return response(s, targetReports, DELETED, null, List.of(), null, null, false);
+			return response(s, targetReports, DELETED, null, List.of(), null, null, null, null, false);
 		}
 		User postAuthor = userById.get(post.getAuthorId());
 		PostResponse body = mapper.toResponse(post, postAuthor == null ? null : postAuthor.getNickname(),
@@ -313,17 +346,21 @@ public class ModerationService {
 				new PostAuthorResponse(comment.getAuthorId(), commentAuthor == null ? null : commentAuthor.getNickname(),
 						UserAvatars.smallUrl(images, comment.getAuthorId())),
 				comment.getBody());
-		return response(s, targetReports, comment.getStatus().name(), body, List.of(), shown, null, false);
+		return response(s, targetReports, comment.getStatus().name(), body, List.of(), shown, null, null, null, false);
 	}
 
-	private ReportTargetResponse userTarget(ReportTargetSummary s, List<Report> targetReports, User user) {
-		return response(s, targetReports, user == null ? DELETED : user.getStatus().name(), null, List.of(), null,
-				user == null ? null : user.getNickname(), false);
+	private ReportTargetResponse userTarget(ReportTargetSummary s, List<Report> targetReports, User user,
+			Map<Long, ProfileImageUrls> images) {
+		if (user == null) {
+			return response(s, targetReports, DELETED, null, List.of(), null, null, null, null, false);
+		}
+		return response(s, targetReports, user.getStatus().name(), null, List.of(), null, user.getNickname(),
+				UserAvatars.smallUrl(images, user.getId()), user.getBio(), false);
 	}
 
 	private static ReportTargetResponse response(ReportTargetSummary s, List<Report> targetReports,
 			String targetStatus, PostResponse post, List<String> quarantineUrls, ReportCommentResponse comment,
-			String userNickname, boolean cleanupFailed) {
+			String userNickname, String userProfileImageUrl, String userBio, boolean cleanupFailed) {
 		Map<ReportReason, Integer> counts = new EnumMap<>(ReportReason.class);
 		targetReports.forEach(r -> counts.merge(r.getReason(), 1, Integer::sum));
 		Map<String, Integer> reasons = new LinkedHashMap<>();
@@ -332,7 +369,7 @@ public class ModerationService {
 				.map(Report::getDetail).filter(Objects::nonNull).toList();
 		return new ReportTargetResponse(s.targetType().name(), s.targetId(), targetStatus,
 				s.reportCount().intValue(), reasons, details, s.lastReportedAt().atOffset(ZoneOffset.UTC), post,
-				quarantineUrls, comment, userNickname, cleanupFailed);
+				quarantineUrls, comment, userNickname, userProfileImageUrl, userBio, cleanupFailed);
 	}
 
 	private Map<Long, List<Report>> openReports(ReportTargetType type, List<Long> ids) {
