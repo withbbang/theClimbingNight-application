@@ -168,3 +168,82 @@ it('offers only dismiss for a deleted comment', async () => {
   expect(screen.getByRole('button', { name: '9번 댓글 기각' })).toBeOnTheScreen();
   expect(screen.queryByRole('button', { name: /숨기기|복원/ })).toBeNull();
 });
+
+const userTarget = (over: Partial<ReportTargetResponse> = {}) =>
+  target({
+    targetType: 'USER',
+    targetId: 7,
+    targetStatus: 'ACTIVE',
+    post: null,
+    userNickname: '달이',
+    ...over,
+  });
+const ACT = 'POST /report-targets/USER/7/actions';
+
+it('offers only 기각 for a user without photo or bio', async () => {
+  mockServer({ [LIST]: list([userTarget()]) });
+  await renderApp('/admin/reports');
+  expect(screen.queryByRole('button', { name: /내리기|지우기/ })).toBeNull();
+});
+
+it('shows bio and 자기소개 지우기 only when the user has a bio', async () => {
+  const server = mockServer({
+    [LIST]: list([userTarget({ userBio: '벽 타는 밤이 좋아요' })]),
+    [ACT]: { status: 204 },
+  });
+  await renderApp('/admin/reports');
+  expect(screen.getByText('벽 타는 밤이 좋아요')).toBeOnTheScreen();
+  expect(screen.queryByRole('button', { name: /프로필 사진 내리기|둘 다/ })).toBeNull();
+
+  await press('달이 사용자 자기소개 지우기');
+  await press('달이 사용자 자기소개 지우기 확정');
+
+  expect(server.calls.filter((c) => c.method === 'POST').map((c) => c.body)).toEqual([
+    { action: 'CLEAR_BIO' },
+  ]);
+});
+
+it('offers 프로필 사진 내리기 only when the user has a photo', async () => {
+  const server = mockServer({
+    [LIST]: list([userTarget({ userProfileImageUrl: 'https://r2.test/p.jpg' })]),
+    [ACT]: { status: 204 },
+  });
+  await renderApp('/admin/reports');
+  expect(screen.queryByRole('button', { name: /자기소개 지우기|둘 다/ })).toBeNull();
+
+  await press('달이 사용자 프로필 사진 내리기');
+  await press('달이 사용자 프로필 사진 내리기 확정');
+
+  expect(server.calls.filter((c) => c.method === 'POST').map((c) => c.body)).toEqual([
+    { action: 'REMOVE_PROFILE_IMAGE' },
+  ]);
+});
+
+const both = () =>
+  userTarget({ userProfileImageUrl: 'https://r2.test/p.jpg', userBio: '벽 타는 밤이 좋아요' });
+
+it('sends both actions in order for 둘 다 내리기', async () => {
+  const server = mockServer({ [LIST]: list([both()]), [ACT]: { status: 204 } });
+  await renderApp('/admin/reports');
+
+  await press('달이 사용자 둘 다 내리기');
+  await press('달이 사용자 둘 다 내리기 확정');
+
+  expect(server.calls.filter((c) => c.method === 'POST').map((c) => c.body)).toEqual([
+    { action: 'REMOVE_PROFILE_IMAGE' },
+    { action: 'CLEAR_BIO' },
+  ]);
+  expect(screen.getByRole('button', { name: '달이 사용자 기각' })).toBeOnTheScreen();
+});
+
+it('does not send CLEAR_BIO when the first request fails', async () => {
+  const server = mockServer({ [LIST]: list([both()]), [ACT]: { status: 500 } });
+  await renderApp('/admin/reports');
+
+  await press('달이 사용자 둘 다 내리기');
+  await press('달이 사용자 둘 다 내리기 확정');
+
+  expect(server.calls.filter((c) => c.method === 'POST').map((c) => c.body)).toEqual([
+    { action: 'REMOVE_PROFILE_IMAGE' },
+  ]);
+});

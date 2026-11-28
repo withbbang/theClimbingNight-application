@@ -7,11 +7,12 @@ import Animated, { FadeIn, useReducedMotion, ZoomIn } from 'react-native-reanima
 
 import { REASONS } from '@/components/feed/ReportSheet';
 import { AppText } from '@/components/ui/AppText';
+import { Avatar } from '@/components/ui/Avatar';
 import { ConfirmAction } from '@/components/ui/ConfirmAction';
 import { FadeInItem } from '@/components/ui/FadeInItem';
 import { useTheme } from '@/hooks/use-theme';
 import { formatRelative } from '@/lib/kst';
-import type { ReportTargetAction, ReportTargetResponse } from '@/types/api/moderation';
+import type { ReportRowAction, ReportTargetResponse } from '@/types/api/moderation';
 
 const THUMB = 64;
 const SHOWN_DETAILS = 3;
@@ -51,7 +52,7 @@ function reasonSummary(reasons: ReportTargetResponse['reasons']) {
 }
 
 interface ActionSpec {
-  action: ReportTargetAction;
+  action: ReportRowAction;
   label: string;
   message: string;
 }
@@ -59,7 +60,32 @@ interface ActionSpec {
 function actionsOf(target: ReportTargetResponse): ActionSpec[] {
   const dismiss = (message: string): ActionSpec => ({ action: 'DISMISS', label: '기각', message });
   if (target.targetType === 'USER') {
-    return [dismiss('신고를 모두 기각해요.')];
+    const photo = !!target.userProfileImageUrl;
+    const bio = !!target.userBio;
+    const actions: ActionSpec[] = [];
+    if (photo) {
+      actions.push({
+        action: 'REMOVE_PROFILE_IMAGE',
+        label: '프로필 사진 내리기',
+        message: '프로필 사진을 내려요. 신고는 모두 처리돼요.',
+      });
+    }
+    if (bio) {
+      actions.push({
+        action: 'CLEAR_BIO',
+        label: '자기소개 지우기',
+        message: '자기소개를 지워요. 신고는 모두 처리돼요.',
+      });
+    }
+    if (photo && bio) {
+      actions.push({
+        action: 'REMOVE_BOTH',
+        label: '둘 다 내리기',
+        message: '프로필 사진을 내리고 자기소개를 지워요. 신고는 모두 처리돼요.',
+      });
+    }
+    actions.push(dismiss('신고를 모두 기각해요.'));
+    return actions;
   }
   const comment = target.targetType === 'COMMENT';
   const noun = comment ? '댓글' : '글';
@@ -139,9 +165,9 @@ interface ReportTargetRowProps {
   target: ReportTargetResponse;
   index: number;
   /** 이 대상에 보내는 중인 조치. */
-  sending: ReportTargetAction | null;
+  sending: ReportRowAction | null;
   locked: boolean;
-  onAct: (action: ReportTargetAction) => Promise<boolean>;
+  onAct: (action: ReportRowAction) => Promise<boolean>;
 }
 
 /** 신고가 들어온 대상 하나. 무엇이 왜 신고됐는지 보여 주고 숨김·복원·기각을 고른다. */
@@ -208,7 +234,22 @@ export function ReportTargetRow({ target, index, sending, locked, onAct }: Repor
       ) : null}
 
       {target.targetType === 'USER' ? (
-        <AppText>{target.userNickname ?? '탈퇴한 회원'}</AppText>
+        <Animated.View
+          entering={reduced ? undefined : FadeIn.duration(240)}
+          style={[styles.row, { gap: space(3) }]}
+        >
+          {target.userProfileImageUrl ? (
+            <Avatar
+              nickname={target.userNickname ?? '탈'}
+              imageUrl={target.userProfileImageUrl}
+              size={96}
+            />
+          ) : null}
+          <View style={[styles.fill, { gap: space(1) }]}>
+            <AppText>{target.userNickname ?? '탈퇴한 회원'}</AppText>
+            {target.userBio ? <AppText numberOfLines={4}>{target.userBio}</AppText> : null}
+          </View>
+        </Animated.View>
       ) : isComment ? (
         comment || post ? (
           <View style={{ gap: space(2) }}>

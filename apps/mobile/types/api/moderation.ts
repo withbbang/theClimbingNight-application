@@ -2,7 +2,14 @@ import type { PostAuthorResponse, PostResponse } from '@/types/api/post';
 
 export type ReportTargetType = 'POST' | 'COMMENT' | 'USER';
 export type ReportReason = 'SPAM' | 'SEXUAL' | 'ABUSE' | 'PORTRAIT_PRIVACY' | 'OTHER';
-export type ReportTargetAction = 'HIDE' | 'RESTORE' | 'DISMISS';
+export type ReportTargetAction =
+  | 'HIDE'
+  | 'RESTORE'
+  | 'DISMISS'
+  | 'REMOVE_PROFILE_IMAGE'
+  | 'CLEAR_BIO';
+/** 화면의 조치. REMOVE_BOTH는 API 동작이 아니라 사진 내리기 뒤 자기소개 지우기를 차례로 보낸다. */
+export type ReportRowAction = ReportTargetAction | 'REMOVE_BOTH';
 
 /** 탈퇴한 사용자는 nickname이 null이다. */
 export interface BlockedUserResponse {

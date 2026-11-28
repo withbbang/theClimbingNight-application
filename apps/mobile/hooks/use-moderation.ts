@@ -9,7 +9,7 @@ import { notifyError, notifySuccess } from '@/lib/haptics';
 import { moderationApi } from '@/lib/moderation-api';
 import type {
   ReportCreateRequest,
-  ReportTargetAction,
+  ReportRowAction,
   ReportTargetResponse,
   ReportTargetType,
 } from '@/types/api/moderation';
@@ -90,15 +90,23 @@ export function useReportTargets() {
 interface TargetAction {
   targetType: ReportTargetType;
   targetId: number;
-  action: ReportTargetAction;
+  action: ReportRowAction;
 }
 
 /** 조치하면 그 대상의 열린 신고가 모두 닫히므로 목록에서 뺀다. */
 export function useReportTargetAction() {
   const drop = useDropFromPages<ReportTargetResponse>(REPORT_TARGETS, reportTargetKey);
   return useAdminMutation(
-    ({ targetType, targetId, action }: TargetAction) =>
-      moderationApi.act(targetType, targetId, action).then(() => true),
+    async ({ targetType, targetId, action }: TargetAction) => {
+      if (action === 'REMOVE_BOTH') {
+        // 첫 요청이 실패하면 던져서 두 번째는 보내지 않는다.
+        await moderationApi.act(targetType, targetId, 'REMOVE_PROFILE_IMAGE');
+        await moderationApi.act(targetType, targetId, 'CLEAR_BIO');
+      } else {
+        await moderationApi.act(targetType, targetId, action);
+      }
+      return true;
+    },
     [REPORT_TARGETS, ['posts']],
     { success: (_, target) => drop(reportTargetKey(target)) },
   );
