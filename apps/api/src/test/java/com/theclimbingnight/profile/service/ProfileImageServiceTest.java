@@ -85,8 +85,6 @@ class ProfileImageServiceTest {
 	@Test
 	void startDropsOldUploading() {
 		// given
-		ProfileImage old = image(1L, ME, ProfileImageStatus.UPLOADING, 100L);
-		given(images.findAllByUserIdAndStatus(ME, ProfileImageStatus.UPLOADING)).willReturn(List.of(old));
 		given(images.countByUserIdAndStatus(ME, ProfileImageStatus.PROCESSING)).willReturn(0L);
 		given(images.save(any(ProfileImage.class))).willAnswer(inv -> {
 			ProfileImage saved = inv.getArgument(0);
@@ -101,7 +99,7 @@ class ProfileImageServiceTest {
 		ProfileImageUploadResponse response = service.start(ME, 1000L);
 
 		// then
-		verify(images).deleteAll(List.of(old));
+		verify(images).deleteByUserIdAndStatus(ME, ProfileImageStatus.UPLOADING);
 		ArgumentCaptor<ProfileImage> saved = ArgumentCaptor.forClass(ProfileImage.class);
 		verify(images).save(saved.capture());
 		assertThat(saved.getValue().getUploadKey()).matches("uploads/[0-9a-f]{32}\\.jpg");
@@ -115,7 +113,6 @@ class ProfileImageServiceTest {
 	@Test
 	void startRejectsWhenTwoProcessing() {
 		// given
-		given(images.findAllByUserIdAndStatus(ME, ProfileImageStatus.UPLOADING)).willReturn(List.of());
 		given(images.countByUserIdAndStatus(ME, ProfileImageStatus.PROCESSING)).willReturn(2L);
 
 		// when / then

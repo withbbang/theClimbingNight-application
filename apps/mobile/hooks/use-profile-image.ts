@@ -83,8 +83,10 @@ export function useProfileImage() {
       }
       if (status === 'FAILED') {
         notifyError();
-        setPhase('failed');
-        setPreview(null);
+        if (mounted.current) {
+          setPhase('failed');
+          setPreview(null);
+        }
         return;
       }
     }

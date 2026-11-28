@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -25,6 +26,11 @@ public interface ProfileImageRepository extends JpaRepository<ProfileImage, Long
 	long countByUserIdAndStatus(long userId, ProfileImageStatus status);
 
 	List<ProfileImage> findAllByUserIdAndStatus(long userId, ProfileImageStatus status);
+
+	/** 사용자의 UPLOADING 행을 한 번에 지운다. 정리 작업이 먼저 지운 행이어도 오류 없이 0건으로 끝난다. */
+	@Modifying(flushAutomatically = true)
+	@Query("delete from ProfileImage i where i.userId = :userId and i.status = :status")
+	int deleteByUserIdAndStatus(@Param("userId") long userId, @Param("status") ProfileImageStatus status);
 
 	List<ProfileImage> findAllByUserId(long userId);
 

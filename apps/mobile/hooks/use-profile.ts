@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { profileKey } from '@/hooks/use-user-profile';
 import { useSubmit } from '@/hooks/use-submit';
 import { ApiError } from '@/lib/api-error';
 import { notifyError, notifySuccess } from '@/lib/haptics';
@@ -22,6 +23,8 @@ export function useChangeNickname() {
       await client.cancelQueries({ queryKey: ME });
       client.setQueryData(ME, user);
       await sessionStore.updateUser(user);
+      // 스택에 열린 내 프로필이 옛 닉네임을 보이지 않게 한다.
+      await client.invalidateQueries({ queryKey: profileKey(user.id) });
     },
     onError: notifyError,
   });

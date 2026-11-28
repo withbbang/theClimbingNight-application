@@ -55,3 +55,12 @@ it.each([
 ])('says what remains after withdrawal: %s', (text) => {
   expect(privacyBody('retention')).toContain(text);
 });
+
+it('covers profile bio and photo in collected, shared and retention', () => {
+  expect(privacyBody('collected')).toContain('자기소개');
+  expect(privacyBody('collected')).toContain('프로필 사진');
+  expect(privacyBody('shared')).toContain('프로필 사진');
+  expect(privacyBody('retention')).toContain('| 자기소개 | 바로 지움 |');
+  expect(privacyBody('retention')).toContain('원본은 30일 뒤 지움');
+  expect(privacyBody('retention')).toContain('탈퇴할 때까지 보관');
+});

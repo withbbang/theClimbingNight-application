@@ -51,7 +51,7 @@ public class ProfileImageService {
 	@Transactional
 	public ProfileImageUploadResponse start(long userId, long byteSize) {
 		lockUser(userId);
-		images.deleteAll(images.findAllByUserIdAndStatus(userId, ProfileImageStatus.UPLOADING));
+		images.deleteByUserIdAndStatus(userId, ProfileImageStatus.UPLOADING);
 		if (images.countByUserIdAndStatus(userId, ProfileImageStatus.PROCESSING) >= MAX_PROCESSING) {
 			throw new BusinessException(ErrorCode.PROFILE_IMAGE_BUSY);
 		}

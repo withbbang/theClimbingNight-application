@@ -63,4 +63,25 @@ class ProfileImageRepositoryTest {
 		// then
 		assertThat(found).containsExactly(new ProfileImageRepository.CurrentImage(ready.getId(), "a/r"));
 	}
+
+	@Test
+	void 사용자의_UPLOADING_행만_한_번에_지운다() {
+		// given
+		User me = user("나");
+		User other = user("남");
+		image(me.getId(), "u1");
+		image(me.getId(), "u2");
+		ProfileImage processing = image(me.getId(), "p");
+		processing.markProcessing();
+		images.saveAndFlush(processing);
+		ProfileImage others = image(other.getId(), "o");
+
+		// when
+		int deleted = images.deleteByUserIdAndStatus(me.getId(), com.theclimbingnight.profile.entity.ProfileImageStatus.UPLOADING);
+
+		// then
+		assertThat(deleted).isEqualTo(2);
+		assertThat(images.findAll()).extracting(ProfileImage::getId)
+				.containsExactlyInAnyOrder(processing.getId(), others.getId());
+	}
 }
