@@ -35,7 +35,11 @@ public class MediaJob extends BaseTimeEntity {
 	@Column(nullable = false)
 	private int priority;
 
-	/** post_media id. */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "target_type", nullable = false, length = 16)
+	private MediaTargetType targetType;
+
+	/** targetType이 가리키는 표(post_media·profile_images)의 id. */
 	@Column(name = "target_id", nullable = false)
 	private Long targetId;
 
@@ -58,9 +62,14 @@ public class MediaJob extends BaseTimeEntity {
 	private String lastError;
 
 	public static MediaJob queue(MediaJobKind kind, long targetId, Instant now) {
+		return queue(kind, MediaTargetType.POST_MEDIA, targetId, now);
+	}
+
+	public static MediaJob queue(MediaJobKind kind, MediaTargetType type, long targetId, Instant now) {
 		MediaJob job = new MediaJob();
 		job.kind = kind;
 		job.priority = kind.priority();
+		job.targetType = type;
 		job.targetId = targetId;
 		job.status = MediaJobStatus.QUEUED;
 		job.nextRunAt = now;

@@ -31,6 +31,7 @@ import com.theclimbingnight.media.MediaProperties;
 import com.theclimbingnight.media.MediaUrls;
 import com.theclimbingnight.media.job.MediaJob;
 import com.theclimbingnight.media.job.MediaJobKind;
+import com.theclimbingnight.media.job.MediaTargetType;
 import com.theclimbingnight.media.job.MediaJobRepository;
 import com.theclimbingnight.media.job.MediaJobScheduler;
 import com.theclimbingnight.media.storage.MediaStorage;
@@ -136,7 +137,7 @@ class ModerationServiceTest {
 
 		// then
 		assertThat(post.getStatus()).isEqualTo(PostStatus.HIDDEN);
-		verify(jobs).cancelQueued(List.of(11L, 12L), MediaJobKind.PROCESS);
+		verify(jobs).cancelQueued(List.of(11L, 12L), MediaTargetType.POST_MEDIA, MediaJobKind.PROCESS);
 		assertThat(savedJobs()).extracting(MediaJob::getKind, MediaJob::getTargetId).containsExactly(
 				org.assertj.core.groups.Tuple.tuple(MediaJobKind.QUARANTINE, 11L),
 				org.assertj.core.groups.Tuple.tuple(MediaJobKind.QUARANTINE, 12L));

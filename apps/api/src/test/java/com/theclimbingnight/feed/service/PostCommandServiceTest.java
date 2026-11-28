@@ -29,6 +29,7 @@ import com.theclimbingnight.media.MediaProperties;
 import com.theclimbingnight.media.MediaUrls;
 import com.theclimbingnight.media.job.MediaJob;
 import com.theclimbingnight.media.job.MediaJobKind;
+import com.theclimbingnight.media.job.MediaTargetType;
 import com.theclimbingnight.media.job.MediaJobRepository;
 import com.theclimbingnight.media.job.MediaJobScheduler;
 import com.theclimbingnight.media.storage.DisabledMediaStorage;
@@ -340,7 +341,7 @@ class PostCommandServiceTest {
 		withRealScheduler.delete(AUTHOR, Role.USER, 1L);
 
 		// then
-		verify(jobs).cancelQueued(anyCollection(), eq(MediaJobKind.PROCESS));
+		verify(jobs).cancelQueued(anyCollection(), eq(MediaTargetType.POST_MEDIA), eq(MediaJobKind.PROCESS));
 		ArgumentCaptor<List<MediaJob>> saved = ArgumentCaptor.forClass(List.class);
 		verify(jobs).saveAll(saved.capture());
 		List<MediaJob> created = saved.getValue();

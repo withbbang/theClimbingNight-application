@@ -65,7 +65,7 @@ class MediaJobSchedulerTest {
 		scheduler.onPostHidden(post);
 
 		// then
-		verify(jobs).cancelQueued(List.of(11L, 12L), MediaJobKind.PROCESS);
+		verify(jobs).cancelQueued(List.of(11L, 12L), MediaTargetType.POST_MEDIA, MediaJobKind.PROCESS);
 		assertThat(saved()).extracting(MediaJob::getKind, MediaJob::getTargetId, MediaJob::getNextRunAt)
 				.containsExactly(tuple(MediaJobKind.QUARANTINE, 11L, NOW), tuple(MediaJobKind.QUARANTINE, 12L, NOW));
 	}

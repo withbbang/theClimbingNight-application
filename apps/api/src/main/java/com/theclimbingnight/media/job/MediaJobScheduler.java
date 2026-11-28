@@ -73,7 +73,8 @@ public class MediaJobScheduler {
 	}
 
 	private void cancelProcess(List<PostMedia> media) {
-		jobs.cancelQueued(media.stream().map(PostMedia::getId).toList(), MediaJobKind.PROCESS);
+		jobs.cancelQueued(media.stream().map(PostMedia::getId).toList(), MediaTargetType.POST_MEDIA,
+				MediaJobKind.PROCESS);
 	}
 
 	private List<PostMedia> mediaOf(Post post) {

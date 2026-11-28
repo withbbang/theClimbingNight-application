@@ -75,7 +75,7 @@ class MediaJobRepositoryTest {
 		MediaJob job = queue(MediaJobKind.PROCESS, 7, NOW);
 
 		// when
-		int canceled = jobs.cancelQueued(List.of(7L, 8L), MediaJobKind.PROCESS);
+		int canceled = jobs.cancelQueued(List.of(7L, 8L), MediaTargetType.POST_MEDIA, MediaJobKind.PROCESS);
 		int claimed = jobs.claim(job.getId(), NOW);
 
 		// then
@@ -93,7 +93,7 @@ class MediaJobRepositoryTest {
 		MediaJob otherKind = queue(MediaJobKind.RELEASE, 1, NOW);
 
 		// when
-		int canceled = jobs.cancelQueued(List.of(1L), MediaJobKind.PROCESS);
+		int canceled = jobs.cancelQueued(List.of(1L), MediaTargetType.POST_MEDIA, MediaJobKind.PROCESS);
 
 		// then
 		assertThat(canceled).isEqualTo(1);
@@ -222,5 +222,37 @@ class MediaJobRepositoryTest {
 
 		// then
 		assertThat(failed).containsExactly(processedAfterPost);
+	}
+
+	@Test
+	void cancelQueuedIgnoresOtherTargetType() {
+		// given
+		MediaJob post = jobs.saveAndFlush(MediaJob.queue(MediaJobKind.PROCESS, MediaTargetType.POST_MEDIA, 7, NOW));
+		MediaJob profile = jobs.saveAndFlush(MediaJob.queue(MediaJobKind.PROCESS, MediaTargetType.PROFILE_IMAGE, 7, NOW));
+
+		// when
+		int canceled = jobs.cancelQueued(List.of(7L), MediaTargetType.POST_MEDIA, MediaJobKind.PROCESS);
+
+		// then
+		assertThat(canceled).isEqualTo(1);
+		assertThat(reload(post).getStatus()).isEqualTo(MediaJobStatus.CANCELED);
+		assertThat(reload(profile).getStatus()).isEqualTo(MediaJobStatus.QUEUED);
+	}
+
+	@Test
+	void failedCleanupOnlyCountsPostMedia() {
+		// given: 게시물 사진 id와 같은 id의 프로필 사진 작업이 실패
+		long author = users.saveAndFlush(User.create("작성자")).getId();
+		long[] ids = new long[1];
+		long postId = postWithMedia(author, ids);
+		MediaJob profile = MediaJob.queue(MediaJobKind.QUARANTINE, MediaTargetType.PROFILE_IMAGE, ids[0], NOW);
+		profile.markFailed("R2 503");
+		jobs.saveAndFlush(profile);
+
+		// when
+		List<Long> failed = jobs.findPostIdsWithFailedCleanup(List.of(postId));
+
+		// then
+		assertThat(failed).isEmpty();
 	}
 }

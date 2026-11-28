@@ -6,6 +6,7 @@ import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.media.job.MediaJob;
 import com.theclimbingnight.media.job.MediaJobKind;
 import com.theclimbingnight.media.job.MediaJobRepository;
+import com.theclimbingnight.media.job.MediaTargetType;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.EnumMap;
@@ -96,7 +97,8 @@ public class MediaJobProcessor {
 			}
 			job.markFailed(error);
 			log.error("미디어 작업 최종 실패 id={} kind={} target={}", job.getId(), job.getKind(), job.getTargetId());
-			if (job.getKind() == MediaJobKind.PROCESS || job.getKind() == MediaJobKind.RELEASE) {
+			if (job.getTargetType() == MediaTargetType.POST_MEDIA
+					&& (job.getKind() == MediaJobKind.PROCESS || job.getKind() == MediaJobKind.RELEASE)) {
 				failMedia(job.getTargetId());
 			}
 		});

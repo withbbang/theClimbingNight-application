@@ -37,6 +37,12 @@ public class User extends BaseTimeEntity {
 	@Column(nullable = false, length = 16)
 	private UserStatus status;
 
+	@Column(length = 150)
+	private String bio;
+
+	@Column(name = "profile_image_id")
+	private Long profileImageId;
+
 	@JdbcTypeCode(SqlTypes.TIMESTAMP)
 	@Column(name = "withdrawn_at")
 	private Instant withdrawnAt;
@@ -53,6 +59,14 @@ public class User extends BaseTimeEntity {
 		this.nickname = nickname;
 	}
 
+	public void changeBio(String bio) {
+		this.bio = bio;
+	}
+
+	public void useProfileImage(Long id) {
+		this.profileImageId = id;
+	}
+
 	public void changeRole(Role role) {
 		this.role = role;
 	}
@@ -61,6 +75,8 @@ public class User extends BaseTimeEntity {
 		this.status = UserStatus.WITHDRAWN;
 		this.withdrawnAt = now;
 		this.nickname = null;
+		this.bio = null;
+		this.profileImageId = null;
 	}
 
 	public boolean isActive() {

@@ -41,10 +41,11 @@ public interface MediaJobRepository extends JpaRepository<MediaJob, Long> {
 	@Modifying(clearAutomatically = true, flushAutomatically = true)
 	@Query("""
 			update MediaJob j set j.status = com.theclimbingnight.media.job.MediaJobStatus.CANCELED
-			where j.targetId in :mediaIds and j.kind = :kind
+			where j.targetId in :targetIds and j.targetType = :targetType and j.kind = :kind
 			  and j.status = com.theclimbingnight.media.job.MediaJobStatus.QUEUED
 			""")
-	int cancelQueued(@Param("mediaIds") Collection<Long> mediaIds, @Param("kind") MediaJobKind kind);
+	int cancelQueued(@Param("targetIds") Collection<Long> targetIds, @Param("targetType") MediaTargetType targetType,
+			@Param("kind") MediaJobKind kind);
 
 	/**
 	 * postIds 중 격리·삭제 작업이 FAILED로 끝났고, 그 뒤로 같은 사진에 정리 관련 작업(QUARANTINE·DELETE_MEDIA·RELEASE)이
@@ -54,12 +55,14 @@ public interface MediaJobRepository extends JpaRepository<MediaJob, Long> {
 	@Query("""
 			select distinct m.postId from MediaJob j, com.theclimbingnight.feed.entity.PostMedia m
 			where j.targetId = m.id and m.postId in :postIds
+			  and j.targetType = com.theclimbingnight.media.job.MediaTargetType.POST_MEDIA
 			  and j.status = com.theclimbingnight.media.job.MediaJobStatus.FAILED
 			  and j.kind in (com.theclimbingnight.media.job.MediaJobKind.QUARANTINE,
 			                 com.theclimbingnight.media.job.MediaJobKind.DELETE_MEDIA)
 			  and not exists (
 			      select 1 from MediaJob later
 			      where later.targetId = j.targetId and later.id > j.id
+			        and later.targetType = com.theclimbingnight.media.job.MediaTargetType.POST_MEDIA
 			        and later.kind in (com.theclimbingnight.media.job.MediaJobKind.QUARANTINE,
 			                           com.theclimbingnight.media.job.MediaJobKind.DELETE_MEDIA,
 			                           com.theclimbingnight.media.job.MediaJobKind.RELEASE))
