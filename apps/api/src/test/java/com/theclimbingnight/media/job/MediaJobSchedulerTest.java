@@ -114,4 +114,21 @@ class MediaJobSchedulerTest {
 		assertThat(media).extracting(PostMedia::getStatus)
 				.containsOnly(com.theclimbingnight.feed.entity.PostMediaStatus.PROCESSING);
 	}
+
+	@Test
+	void 운영진이_프로필_사진을_내리면_대기_중인_변환을_취소하고_격리_작업만_만든다() {
+		// given
+		var image = com.theclimbingnight.profile.entity.ProfileImage.start(7L, "uploads/u.jpg", "a/k", 10L);
+		ReflectionTestUtils.setField(image, "id", 31L);
+
+		// when
+		scheduler.onProfileImageTakenDown(image);
+
+		// then
+		verify(jobs).cancelQueued(List.of(31L), MediaTargetType.PROFILE_IMAGE, MediaJobKind.PROCESS);
+		ArgumentCaptor<MediaJob> job = ArgumentCaptor.forClass(MediaJob.class);
+		verify(jobs).save(job.capture());
+		assertThat(job.getValue()).extracting(MediaJob::getKind, MediaJob::getTargetType, MediaJob::getTargetId)
+				.containsExactly(MediaJobKind.QUARANTINE, MediaTargetType.PROFILE_IMAGE, 31L);
+	}
 }

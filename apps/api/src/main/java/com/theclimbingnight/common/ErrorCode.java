@@ -44,6 +44,8 @@ public enum ErrorCode {
 	PENALTY_ALREADY_REVOKED(HttpStatus.CONFLICT, "이미 취소된 블랙리스트 기록입니다."),
 	MEDIA_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "사진 올리기를 잠시 쓸 수 없습니다. 잠시 후 다시 시도해 주세요."),
 	POST_UPLOAD_INCOMPLETE(HttpStatus.CONFLICT, "아직 올라가지 않은 사진이 있습니다. 다시 올려 주세요."),
+	PROFILE_IMAGE_BUSY(HttpStatus.CONFLICT, "앞서 올린 사진을 적용하는 중이에요. 잠시 뒤 다시 해 주세요."),
+	PROFILE_IMAGE_UPLOAD_INCOMPLETE(HttpStatus.CONFLICT, "사진이 아직 올라가지 않았어요. 다시 올려 주세요."),
 	POST_NOT_DRAFT(HttpStatus.CONFLICT, "이미 게시한 글입니다."),
 	POST_NOT_EDITABLE(HttpStatus.CONFLICT, "숨겨지거나 삭제된 글은 고칠 수 없습니다."),
 	BLOCK_SELF(HttpStatus.BAD_REQUEST, "자기 자신은 차단할 수 없습니다."),

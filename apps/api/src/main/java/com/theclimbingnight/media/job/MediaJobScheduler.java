@@ -4,6 +4,7 @@ import com.theclimbingnight.feed.entity.Post;
 import com.theclimbingnight.feed.entity.PostMedia;
 import com.theclimbingnight.feed.entity.PostMediaStatus;
 import com.theclimbingnight.feed.repository.PostMediaRepository;
+import com.theclimbingnight.profile.entity.ProfileImage;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -65,6 +66,31 @@ public class MediaJobScheduler {
 		List<PostMedia> media = mediaOf(post);
 		media.stream().filter(m -> m.getStatus() == PostMediaStatus.READY).forEach(PostMedia::markProcessing);
 		queueEach(media, MediaJobKind.RELEASE);
+	}
+
+	public void enqueueProfileProcess(ProfileImage image) {
+		jobs.save(MediaJob.queue(MediaJobKind.PROCESS, MediaTargetType.PROFILE_IMAGE, image.getId(), clock.instant()));
+	}
+
+	/** 본인이 바꾸거나 되돌린 사진: 공개 사본은 바로, NAS 원본은 30일 뒤 지운다. 상태는 호출한 쪽이 바꾼다. */
+	public void onProfileImageDropped(ProfileImage image) {
+		cancelProfileProcess(image);
+		Instant now = clock.instant();
+		jobs.saveAll(List.of(
+				MediaJob.queue(MediaJobKind.DELETE_MEDIA, MediaTargetType.PROFILE_IMAGE, image.getId(), now),
+				MediaJob.queue(MediaJobKind.PURGE_ORIGINAL, MediaTargetType.PROFILE_IMAGE, image.getId(),
+						now.plus(ORIGINAL_RETENTION))));
+	}
+
+	/** 운영진이 내린 사진: 격리만 하고 원본·격리본은 보존한다. */
+	public void onProfileImageTakenDown(ProfileImage image) {
+		cancelProfileProcess(image);
+		jobs.save(MediaJob.queue(MediaJobKind.QUARANTINE, MediaTargetType.PROFILE_IMAGE, image.getId(),
+				clock.instant()));
+	}
+
+	private void cancelProfileProcess(ProfileImage image) {
+		jobs.cancelQueued(List.of(image.getId()), MediaTargetType.PROFILE_IMAGE, MediaJobKind.PROCESS);
 	}
 
 	private void queueEach(List<PostMedia> media, MediaJobKind kind) {
