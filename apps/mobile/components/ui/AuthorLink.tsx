@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { useRouter, type Href } from 'expo-router';
+import { useRouter } from 'expo-router';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { useSession } from '@/hooks/use-session';
@@ -35,8 +35,7 @@ export function AuthorLink({
       accessibilityRole="link"
       accessibilityLabel={`${nickname} 프로필 보기`}
       hitSlop={4}
-      // /users/[id]는 다음 작업에서 만든다. 라우트 타입이 생길 때까지 Href로 넘긴다.
-      onPress={() => router.push((signedIn ? `/users/${userId}` : '/login') as Href)}
+      onPress={() => router.push(signedIn ? `/users/${userId}` : '/login')}
     >
       {content}
     </Pressable>

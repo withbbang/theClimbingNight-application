@@ -40,3 +40,16 @@ it.each([
   await press(label);
   expect(app.getPathname()).toBe(path);
 });
+
+it('opens my profile from the top area', async () => {
+  // given
+  await startAs('MEMBER');
+  mockServer({});
+  const app = await renderApp('/my');
+
+  // when
+  await press('내 프로필 보기');
+
+  // then
+  expect(app.getPathname()).toBe('/users/1');
+});

@@ -6,13 +6,14 @@ import { profileApi } from '@/lib/profile-api';
 
 export const profileKey = (id: number) => ['users', id, 'profile'];
 
-/** 사용자 프로필. 내 프로필도 내 id로 같은 키를 쓴다. */
-export function useUserProfile(id: number | null) {
+/** 사용자 프로필. 내 프로필도 내 id로 같은 키를 쓴다. fresh면 고치는 폼용으로 열 때마다 새로 받는다. */
+export function useUserProfile(id: number | null, { fresh = false }: { fresh?: boolean } = {}) {
   const role = useRole();
   return useQuery({
     queryKey: profileKey(id ?? 0),
     queryFn: () => profileApi.profile(id as number),
     enabled: role !== null && id !== null,
+    ...(fresh ? { refetchOnMount: 'always' as const } : {}),
   });
 }
 

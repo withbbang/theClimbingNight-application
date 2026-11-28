@@ -59,7 +59,17 @@ export function useProfileImage() {
       if (!mounted.current) {
         return;
       }
-      const { status } = await profileApi.imageStatus(imageId);
+      let status;
+      try {
+        ({ status } = await profileApi.imageStatus(imageId));
+      } catch {
+        // 확정은 됐으니 사진은 워커가 적용한다. 묻기만 실패한 것이라 오류로 알리지 않고 "잠시 뒤 반영돼요"로 둔다.
+        await refreshProfile();
+        if (mounted.current) {
+          setPhase('slow');
+        }
+        return;
+      }
       if (!mounted.current) {
         return;
       }

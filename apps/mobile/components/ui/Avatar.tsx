@@ -3,6 +3,8 @@ import { StyleSheet, View } from 'react-native';
 
 import { Image } from 'expo-image';
 
+import { useReducedMotion } from 'react-native-reanimated';
+
 import { AppText } from '@/components/ui/AppText';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -18,6 +20,7 @@ interface AvatarProps {
 /** 프로필 사진, 없으면 닉네임 첫 글자를 홀드 모양 위에 얹는다. */
 export function Avatar({ nickname, imageUrl, size = DEFAULT_SIZE }: AvatarProps) {
   const { colors } = useTheme();
+  const reduced = useReducedMotion();
   // 실패한 주소를 기억해 두면 주소가 바뀔 때(새 사진) 다시 시도한다.
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const showImage = !!imageUrl && imageUrl !== failedUrl;
@@ -45,6 +48,8 @@ export function Avatar({ nickname, imageUrl, size = DEFAULT_SIZE }: AvatarProps)
           source={{ uri: imageUrl }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
+          // 사진을 바꾸면 예전 사진 위로 새 사진이 겹쳐 나타난다.
+          transition={reduced ? 0 : 240}
           onError={() => setFailedUrl(imageUrl)}
         />
       ) : (

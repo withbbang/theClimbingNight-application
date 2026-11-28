@@ -197,3 +197,22 @@ it('resets to the default image and invalidates my profile', async () => {
   expect(profileApi.resetImage).toHaveBeenCalledTimes(1);
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['users', 1, 'profile'] });
 });
+
+it('treats a failed status request while waiting like slow and refreshes my profile', async () => {
+  // given
+  jest.mocked(profileApi.imageStatus).mockRejectedValue(new TypeError('Network request failed'));
+  const { result } = await setup();
+
+  // when
+  await startPick(result);
+  await tick(2000);
+
+  // then
+  expect(result.current.phase).toBe('slow');
+  expect(result.current.error).toBeNull();
+  expect(notifyError).not.toHaveBeenCalled();
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['users', 1, 'profile'] });
+  const calls = jest.mocked(profileApi.imageStatus).mock.calls.length;
+  await tick(10_000);
+  expect(jest.mocked(profileApi.imageStatus).mock.calls.length).toBe(calls);
+});

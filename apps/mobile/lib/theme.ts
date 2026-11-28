@@ -18,6 +18,10 @@ export interface Theme {
     danger: string;
     /** 꺼진 홀드. 장식이라 글자에는 쓰지 않는다. */
     holdOff: string;
+    /** 사진 위에 얹는 아이콘. 사진은 모드와 상관없으니 두 모드에서 같다. */
+    onPhoto: string;
+    /** 사진 위 아이콘의 그림자. */
+    photoShade: string;
   };
   space(n: number): number;
   radius: { pill: number; input: number; card: number };
@@ -43,6 +47,8 @@ export const lightTheme: Theme = {
     border: '#7C8AA5',
     danger: '#B3261E',
     holdOff: '#CBD5E6',
+    onPhoto: palette.chalk,
+    photoShade: palette.deepWall,
   },
 };
 
@@ -59,6 +65,8 @@ export const darkTheme: Theme = {
     border: '#6E7F9F',
     danger: '#FF9B91',
     holdOff: '#2B3B5E',
+    onPhoto: palette.chalk,
+    photoShade: palette.deepWall,
   },
 };
 

@@ -61,8 +61,13 @@ function FailedRow({ post }: { post: PostResponse }) {
   );
 }
 
+interface InProgressPostsProps {
+  /** 정리가 끝났을 때 피드 말고 더 다시 받을 것(프로필 격자 등). */
+  onDone?: () => void;
+}
+
 /** 피드 맨 위에 내가 올리는 중인 글과 올리지 못한 글을 보여 준다. */
-export function InProgressPosts() {
+export function InProgressPosts({ onDone }: InProgressPostsProps = {}) {
   const { colors, motion, radius, space } = useTheme();
   const reduced = useReducedMotion();
   const query = useMyInProgress();
@@ -74,9 +79,10 @@ export function InProgressPosts() {
   useEffect(() => {
     if (wasPending.current && !pending && query.isSuccess) {
       void refreshFeed();
+      onDone?.();
     }
     wasPending.current = pending;
-  }, [pending, query.isSuccess, refreshFeed]);
+  }, [onDone, pending, query.isSuccess, refreshFeed]);
 
   const posts = (query.data ?? []).filter(
     (post) => post.status === 'PENDING' || post.status === 'FAILED',

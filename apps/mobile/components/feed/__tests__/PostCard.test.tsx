@@ -219,3 +219,16 @@ it('only allows unliking on my hidden post', async () => {
   // then
   expect(unlikePost).toHaveBeenCalledWith(1);
 });
+
+it('opens the author profile without opening the post', async () => {
+  // given
+  const onOpen = jest.fn();
+  await show(post(), { onOpen });
+
+  // when
+  await fireEvent.press(screen.getAllByRole('link', { name: '달이 프로필 보기' })[1]);
+
+  // then
+  expect(mockPush).toHaveBeenCalledWith('/users/7');
+  expect(onOpen).not.toHaveBeenCalled();
+});
