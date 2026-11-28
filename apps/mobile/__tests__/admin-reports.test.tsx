@@ -26,6 +26,8 @@ const target = (over: Partial<ReportTargetResponse> = {}): ReportTargetResponse 
   quarantineUrls: [],
   comment: null,
   userNickname: null,
+  userProfileImageUrl: null,
+  userBio: null,
   cleanupFailed: false,
   ...over,
 });
@@ -124,7 +126,7 @@ const commentTarget = (status: string, withComment = true) =>
     targetStatus: status,
     post: withComment ? post({ id: 5, media: [media(51)] }) : null,
     comment: withComment
-      ? { id: 9, postId: 5, author: { id: 3, nickname: '별이' }, body: '신고된 댓글 내용' }
+      ? { id: 9, postId: 5, author: { id: 3, nickname: '별이', profileImageUrl: null }, body: '신고된 댓글 내용' }
       : null,
   });
 

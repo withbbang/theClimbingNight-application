@@ -5,7 +5,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { HeartIcon } from 'phosphor-react-native/src/icons/Heart';
 
 import { AppText } from '@/components/ui/AppText';
-import { Avatar } from '@/components/ui/Avatar';
+import { AuthorLink } from '@/components/ui/AuthorLink';
 import { BackButton } from '@/components/ui/BackButton';
 import { FadeInItem } from '@/components/ui/FadeInItem';
 import { FloatingIcon } from '@/components/ui/FloatingIcon';
@@ -47,11 +47,21 @@ export default function PostLikesScreen() {
               },
             ]}
           >
-            <Avatar nickname={liker.nickname} />
+            <AuthorLink
+              userId={liker.userId}
+              nickname={liker.nickname}
+              imageUrl={liker.profileImageUrl}
+            />
             <View style={styles.fill}>
-              <AppText variant="label" numberOfLines={1} testID="liker-name">
-                {liker.nickname}
-              </AppText>
+              <AuthorLink
+                userId={liker.userId}
+                nickname={liker.nickname}
+                imageUrl={liker.profileImageUrl}
+              >
+                <AppText variant="label" numberOfLines={1} testID="liker-name">
+                  {liker.nickname}
+                </AppText>
+              </AuthorLink>
             </View>
           </FadeInItem>
         )}

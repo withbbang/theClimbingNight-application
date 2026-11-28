@@ -14,7 +14,7 @@ import Animated, {
 import { CommentMenu } from '@/components/comment/CommentMenu';
 import { ReplyList } from '@/components/comment/ReplyList';
 import { AppText } from '@/components/ui/AppText';
-import { Avatar } from '@/components/ui/Avatar';
+import { AuthorLink } from '@/components/ui/AuthorLink';
 import { usePressScale } from '@/hooks/use-press-scale';
 import { useTheme } from '@/hooks/use-theme';
 import { formatRelative } from '@/lib/kst';
@@ -152,12 +152,24 @@ export function CommentItem({
         </View>
       ) : (
         <View style={[styles.row, styles.top, { gap: space(3) }]}>
-          <Avatar nickname={nickname} />
+          <AuthorLink
+            userId={comment.author?.id ?? 0}
+            nickname={nickname}
+            imageUrl={comment.author?.profileImageUrl ?? null}
+            withdrawn={comment.author === null}
+          />
           <View style={styles.fill}>
             <View style={[styles.row, { gap: space(2) }]}>
-              <AppText variant="label" numberOfLines={1} style={styles.shrink}>
-                {nickname}
-              </AppText>
+              <AuthorLink
+                userId={comment.author?.id ?? 0}
+                nickname={nickname}
+                imageUrl={comment.author?.profileImageUrl ?? null}
+                withdrawn={comment.author === null}
+              >
+                <AppText variant="label" numberOfLines={1} style={styles.shrink}>
+                  {nickname}
+                </AppText>
+              </AuthorLink>
               <AppText variant="caption" tone="muted">
                 {formatRelative(comment.createdAt)}
               </AppText>

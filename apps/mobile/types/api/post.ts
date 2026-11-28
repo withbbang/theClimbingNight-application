@@ -4,6 +4,8 @@ export type PostStatus = 'DRAFT' | 'PENDING' | 'VISIBLE' | 'FAILED' | 'HIDDEN_PE
 export interface PostAuthorResponse {
   id: number;
   nickname: string;
+  /** 96px. 사진이 없으면 null. */
+  profileImageUrl: string | null;
 }
 
 /** 아직 정리 중이거나 글이 숨겨졌으면 url·thumbnailUrl은 null이다. */
@@ -57,4 +59,5 @@ export interface LikeResponse {
 export interface LikerResponse {
   userId: number;
   nickname: string;
+  profileImageUrl: string | null;
 }

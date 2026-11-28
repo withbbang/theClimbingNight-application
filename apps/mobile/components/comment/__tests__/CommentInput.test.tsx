@@ -60,7 +60,7 @@ it('disables posting for blank or 501-character text', async () => {
 
 it('shows the reply header and clears it on cancel', async () => {
   // given
-  const onCancel = await show(comment({ id: 4, author: { id: 8, nickname: '바위' } }));
+  const onCancel = await show(comment({ id: 4, author: { id: 8, nickname: '바위', profileImageUrl: null } }));
   expect(screen.getByText('바위님에게 답글')).toBeOnTheScreen();
 
   // when

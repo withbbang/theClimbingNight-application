@@ -10,6 +10,7 @@ import Animated, {
 
 import { RoleGate } from '@/components/auth/RoleGate';
 import { AppText } from '@/components/ui/AppText';
+import { Avatar } from '@/components/ui/Avatar';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
@@ -65,6 +66,7 @@ function BlockedRow({
         },
       ]}
     >
+      <Avatar nickname={name} imageUrl={user.profileImageUrl} />
       <View style={styles.fill}>
         <AppText variant="label" numberOfLines={1}>
           {name}

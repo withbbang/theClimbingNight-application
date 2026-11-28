@@ -18,7 +18,7 @@ import { LikeButton } from '@/components/feed/LikeButton';
 import { MediaCarousel } from '@/components/feed/MediaCarousel';
 import { PostMenu } from '@/components/feed/PostMenu';
 import { AppText } from '@/components/ui/AppText';
-import { Avatar } from '@/components/ui/Avatar';
+import { AuthorLink } from '@/components/ui/AuthorLink';
 import { useLikePost } from '@/hooks/use-like-post';
 import { usePressScale } from '@/hooks/use-press-scale';
 import { useSession } from '@/hooks/use-session';
@@ -156,11 +156,21 @@ export function PostCard({
         { gap: space(3), padding: space(4), paddingRight: menu ? space(14) : space(4) },
       ]}
     >
-      <Avatar nickname={post.author.nickname} />
+      <AuthorLink
+        userId={post.author.id}
+        nickname={post.author.nickname}
+        imageUrl={post.author.profileImageUrl}
+      />
       <View style={styles.fill}>
-        <AppText variant="label" numberOfLines={1}>
-          {post.author.nickname}
-        </AppText>
+        <AuthorLink
+          userId={post.author.id}
+          nickname={post.author.nickname}
+          imageUrl={post.author.profileImageUrl}
+        >
+          <AppText variant="label" numberOfLines={1}>
+            {post.author.nickname}
+          </AppText>
+        </AuthorLink>
         {post.publishedAt ? (
           <AppText variant="caption" tone="muted">
             {formatRelative(post.publishedAt)}

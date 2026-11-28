@@ -99,7 +99,7 @@ describe('comments', () => {
       '/posts/8': ok(post({ id: 8 })),
       '/posts/8/comments?size=20': comments([
         comment({ id: 1, body: '먼저 단 댓글' }),
-        comment({ id: 2, body: '나중에 단 댓글', author: { id: 9, nickname: '구름' } }),
+        comment({ id: 2, body: '나중에 단 댓글', author: { id: 9, nickname: '구름', profileImageUrl: null } }),
       ]),
     });
 
@@ -177,7 +177,7 @@ describe('comments', () => {
           parentId: 1,
           body: '먼저 온 답글',
           replyToNickname: '바위',
-          author: { id: 9, nickname: '구름' },
+          author: { id: 9, nickname: '구름', profileImageUrl: null },
         }),
       ]),
       'POST /posts/8/comments': {
@@ -191,7 +191,7 @@ describe('comments', () => {
             replyToNickname: '바위',
             mine: true,
             deletable: true,
-            author: { id: 2, nickname: '나' },
+            author: { id: 2, nickname: '나', profileImageUrl: null },
           }),
         },
       },

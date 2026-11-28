@@ -33,7 +33,7 @@ export class PhotoError extends Error {
   }
 }
 
-async function readFile(uri: string): Promise<Blob> {
+export async function readFile(uri: string): Promise<Blob> {
   const response = await fetch(uri);
   return response.blob();
 }
@@ -74,7 +74,7 @@ export async function preparePhoto(asset: ImagePickerAsset): Promise<PreparedPho
   throw new PhotoError('사진이 너무 커서 올릴 수 없어요. 다른 사진을 골라 주세요.');
 }
 
-async function put(upload: PostUploadResponse, body: Blob) {
+export async function put(upload: Pick<PostUploadResponse, 'url' | 'headers'>, body: Blob) {
   const response = await fetch(upload.url, { method: 'PUT', headers: upload.headers, body });
   if (!response.ok) {
     throw new Error(`R2 PUT ${response.status}`);

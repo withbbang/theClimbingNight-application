@@ -8,6 +8,7 @@ export type ReportTargetAction = 'HIDE' | 'RESTORE' | 'DISMISS';
 export interface BlockedUserResponse {
   userId: number;
   nickname: string | null;
+  profileImageUrl: string | null;
   blockedAt: string;
 }
 
@@ -45,5 +46,8 @@ export interface ReportTargetResponse {
   quarantineUrls: string[];
   comment: ReportCommentResponse | null;
   userNickname: string | null;
+  /** USER 대상일 때만. 96px, 없으면 null. */
+  userProfileImageUrl: string | null;
+  userBio: string | null;
   cleanupFailed: boolean;
 }
