@@ -87,4 +87,20 @@ class OriginalStoreTest {
 			assertThat(files).containsExactly(root.resolve("profile/2026/12/11.jpg"));
 		}
 	}
+
+	@Test
+	void 기록한_경로에_다시_쓰면_같은_파일을_덮어쓴다() throws Exception {
+		// given
+		store().saveProfile(11L, new ByteArrayInputStream(new byte[] {1}), Instant.parse("2026-10-10T00:00:00Z"));
+
+		// when
+		String path = store().saveProfileAt("profile/2026/10/11.jpg", 11L, new ByteArrayInputStream(new byte[] {7, 8}));
+
+		// then
+		assertThat(path).isEqualTo("profile/2026/10/11.jpg");
+		assertThat(Files.readAllBytes(root.resolve("profile/2026/10/11.jpg"))).containsExactly(7, 8);
+		try (var files = Files.list(root.resolve("profile/2026/10"))) {
+			assertThat(files).hasSize(1);
+		}
+	}
 }

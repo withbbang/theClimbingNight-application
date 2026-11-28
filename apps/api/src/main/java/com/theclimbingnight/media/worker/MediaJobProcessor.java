@@ -6,6 +6,7 @@ import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.media.job.MediaJob;
 import com.theclimbingnight.media.job.MediaJobKind;
 import com.theclimbingnight.media.job.MediaJobRepository;
+import com.theclimbingnight.media.job.MediaJobScheduler;
 import com.theclimbingnight.media.job.MediaTargetType;
 import com.theclimbingnight.profile.entity.ProfileImage;
 import com.theclimbingnight.profile.entity.ProfileImageStatus;
@@ -40,12 +41,13 @@ public class MediaJobProcessor {
 	private final PostMediaRepository mediaRepository;
 	private final ProfileImageRepository profileImages;
 	private final UserRepository users;
+	private final MediaJobScheduler scheduler;
 	private final TransactionTemplate tx;
 	private final Clock clock;
 
 	public MediaJobProcessor(MediaJobRepository jobs, List<JobHandler> handlers, RetryPolicy retryPolicy,
 			PostRepository posts, PostMediaRepository mediaRepository, ProfileImageRepository profileImages,
-			UserRepository users, TransactionTemplate tx, Clock clock) {
+			UserRepository users, MediaJobScheduler scheduler, TransactionTemplate tx, Clock clock) {
 		this.jobs = jobs;
 		for (JobHandler h : handlers) {
 			HandlerKey key = new HandlerKey(h.kind(), h.targetType());
@@ -58,6 +60,7 @@ public class MediaJobProcessor {
 		this.mediaRepository = mediaRepository;
 		this.profileImages = profileImages;
 		this.users = users;
+		this.scheduler = scheduler;
 		this.tx = tx;
 		this.clock = clock;
 	}
@@ -130,7 +133,12 @@ public class MediaJobProcessor {
 		profileImages.findUserIdById(imageId).ifPresent(userId -> {
 			users.findByIdForUpdate(userId);
 			profileImages.findByIdForUpdate(imageId).filter(i -> i.getStatus() == ProfileImageStatus.PROCESSING)
-					.ifPresent(ProfileImage::markFailed);
+					.ifPresent(i -> {
+						i.markFailed();
+						// 처리 중 NAS에 둔 원본이 남지 않게, 내려진 사진처럼 공개 사본은 바로 원본은 30일 뒤 지운다.
+						// 두 처리기는 사진 상태를 보지 않고 키·경로만 보므로 FAILED 행에도 안전하다.
+						scheduler.onProfileImageDropped(i);
+					});
 		});
 	}
 

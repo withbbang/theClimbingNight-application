@@ -47,6 +47,7 @@ class MediaJobProcessorTest {
 	@Mock JobHandler quarantineHandler;
 	@Mock JobHandler profileProcessHandler;
 	@Mock ProfileImageRepository profileImages;
+	@Mock com.theclimbingnight.media.job.MediaJobScheduler scheduler;
 	@Mock com.theclimbingnight.user.repository.UserRepository users;
 
 	private MediaJobProcessor processor;
@@ -60,7 +61,7 @@ class MediaJobProcessorTest {
 		lenient().when(profileProcessHandler.kind()).thenReturn(MediaJobKind.PROCESS);
 		lenient().when(profileProcessHandler.targetType()).thenReturn(MediaTargetType.PROFILE_IMAGE);
 		processor = new MediaJobProcessor(jobs, List.of(processHandler, quarantineHandler, profileProcessHandler),
-				new RetryPolicy(), posts, mediaRepository, profileImages, users, WorkerFixtures.tx(),
+				new RetryPolicy(), posts, mediaRepository, profileImages, users, scheduler, WorkerFixtures.tx(),
 				Clock.fixed(NOW, ZoneOffset.UTC));
 	}
 
@@ -230,7 +231,7 @@ class MediaJobProcessorTest {
 		// when / then
 		org.assertj.core.api.Assertions.assertThatThrownBy(() -> new MediaJobProcessor(jobs,
 				List.of(processHandler, processHandler), new RetryPolicy(), posts, mediaRepository, profileImages,
-				users, WorkerFixtures.tx(), Clock.fixed(NOW, ZoneOffset.UTC)))
+				users, scheduler, WorkerFixtures.tx(), Clock.fixed(NOW, ZoneOffset.UTC)))
 				.isInstanceOf(IllegalStateException.class);
 	}
 
@@ -256,6 +257,8 @@ class MediaJobProcessorTest {
 		assertThat(image.getStatus()).isEqualTo(ProfileImageStatus.FAILED);
 		assertThat(media.getStatus()).isEqualTo(PostMediaStatus.PROCESSING);
 		verify(mediaRepository, never()).findById(anyLong());
+		// NAS 원본이 남지 않게 정리 작업을 만든다(잠금 순서 안에서)
+		verify(scheduler).onProfileImageDropped(image);
 	}
 
 	@Test

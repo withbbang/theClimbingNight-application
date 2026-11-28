@@ -90,7 +90,11 @@ export function useProfileImage() {
         return;
       }
     }
-    setPhase('slow');
+    // 30초가 지나도 적용 중이다. 늦게 끝나도 다음에 받을 때 바뀌도록 프로필을 무효화해 둔다.
+    await refreshProfile();
+    if (mounted.current) {
+      setPhase('slow');
+    }
   }
 
   async function pick() {

@@ -36,6 +36,11 @@ public class OriginalStore {
 		return write(PROFILE_DIR + MONTH_DIR.format(now) + "/" + profileImageId + ".jpg", profileImageId, in);
 	}
 
+	/** 이미 기록한 경로에 다시 쓴다. 재시도가 달을 넘겨도 새 파일을 만들어 먼저 쓴 원본을 버려두지 않게 한다. */
+	public String saveProfileAt(String relativePath, long profileImageId, InputStream in) throws IOException {
+		return write(relativePath, profileImageId, in);
+	}
+
 	private String write(String relative, long id, InputStream in) throws IOException {
 		Path target = resolve(relative);
 		Files.createDirectories(target.getParent());

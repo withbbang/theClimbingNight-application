@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useRole } from '@/hooks/use-role';
+import { useSession } from '@/hooks/use-session';
 import { useSubmit } from '@/hooks/use-submit';
 import { notifyError, notifySuccess } from '@/lib/haptics';
 import { deletePost, fetchMyInProgress, fetchPost, updatePost } from '@/lib/post-api';
@@ -25,14 +26,29 @@ export function useMyInProgress() {
   });
 }
 
-/** 정리가 끝난 글이 피드에 나오도록 피드와 상세를 다시 받는다. 내 글 목록은 다시 받지 않는다. */
+/** 내 프로필(글 수)과 사진 격자. 내 글이 바뀌면 같이 다시 받는다. */
+function useRefreshMyProfile() {
+  const client = useQueryClient();
+  const session = useSession();
+  const myId = session.status === 'authenticated' ? session.tokens.user.id : null;
+  return () =>
+    myId === null ? Promise.resolve() : client.invalidateQueries({ queryKey: ['users', myId] });
+}
+
+/** 정리가 끝난 글이 피드와 내 프로필 격자에 나오도록 다시 받는다. 내 글 목록은 다시 받지 않는다. */
 export function useRefreshFeed() {
   const client = useQueryClient();
-  return () => client.invalidateQueries({ predicate: ({ queryKey }) => isFeed(queryKey) });
+  const refreshMyProfile = useRefreshMyProfile();
+  return () =>
+    Promise.all([
+      client.invalidateQueries({ predicate: ({ queryKey }) => isFeed(queryKey) }),
+      refreshMyProfile(),
+    ]);
 }
 
 export function useDeleteMyPost() {
   const client = useQueryClient();
+  const refreshMyProfile = useRefreshMyProfile();
   const mutation = useMutation({
     // 204라 값이 없으므로 성공을 true로 알린다.
     mutationFn: (id: number) => deletePost(id).then(() => true),
@@ -40,6 +56,7 @@ export function useDeleteMyPost() {
     onError: notifyError,
     onSettled: () => {
       void client.invalidateQueries({ queryKey: ['posts'] });
+      void refreshMyProfile();
     },
   });
   return { ...mutation, submit: useSubmit(mutation) };

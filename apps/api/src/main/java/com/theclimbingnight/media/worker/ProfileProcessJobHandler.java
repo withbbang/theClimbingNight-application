@@ -100,7 +100,10 @@ public class ProfileProcessJobHandler implements JobHandler {
 		}
 		String originalPath;
 		try (InputStream in = Files.newInputStream(source)) {
-			originalPath = originals.saveProfile(imageId, in, clock.instant());
+			// 지난 시도가 이미 경로를 기록했으면 같은 경로에 다시 쓴다(달이 바뀐 재시도가 원본을 둘로 만들지 않게).
+			originalPath = image.getOriginalPath() != null
+					? originals.saveProfileAt(image.getOriginalPath(), imageId, in)
+					: originals.saveProfile(imageId, in, clock.instant());
 		}
 		// 그새 내려졌어도 경로를 남겨 PURGE_ORIGINAL이 지우게 한다. 잠가서 읽어야 내린 상태를 덮어쓰지 않는다.
 		tx.executeWithoutResult(s -> {

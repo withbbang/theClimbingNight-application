@@ -127,6 +127,7 @@ it('goes slow after 30 seconds of PROCESSING and stops asking', async () => {
 
   // then
   expect(result.current.phase).toBe('slow');
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['users', 1, 'profile'] });
   const calls = jest.mocked(profileApi.imageStatus).mock.calls.length;
   expect(calls).toBeLessThanOrEqual(16);
   await tick(60_000);

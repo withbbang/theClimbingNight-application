@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -127,6 +128,20 @@ class ProfileProcessJobHandlerTest {
 		assertThat(user.getProfileImageId()).isEqualTo(11L);
 		assertThat(current.getStatus()).isEqualTo(ProfileImageStatus.REMOVED);
 		assertDropJobs(savedJobs(), 10L);
+	}
+
+	@Test
+	void 재시도는_이미_기록한_원본_경로에_다시_써서_새_파일을_만들지_않는다() throws Exception {
+		// given: 지난 시도가 지난달 경로를 기록했다
+		image.recordOriginal("profile/2026/10/11.jpg");
+		given(originals.saveProfileAt(eq("profile/2026/10/11.jpg"), eq(11L), any())).willReturn("profile/2026/10/11.jpg");
+
+		// when
+		handler.handle(WorkerFixtures.profileJob(MediaJobKind.PROCESS, 11L, 1));
+
+		// then
+		verify(originals, never()).saveProfile(anyLong(), any(), any());
+		assertThat(image.getOriginalPath()).isEqualTo("profile/2026/10/11.jpg");
 	}
 
 	@Test
