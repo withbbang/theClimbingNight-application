@@ -77,7 +77,7 @@ public class ProfileQueryService {
 			List<PostMedia> files = media.getOrDefault(post.getId(), List.of());
 			boolean visible = post.getStatus() == PostStatus.VISIBLE;
 			String thumbnail = visible && !files.isEmpty() ? urls.publicUrl(files.get(0).thumbKey()) : null;
-			String status = mine ? (visible ? "VISIBLE" : "HIDDEN") : null;
+			String status = mine ? post.getStatus().name() : null;
 			return new GridPostResponse(post.getId(), thumbnail, files.size(), status);
 		}).toList();
 		return new CursorResponse<>(items, nextCursor);

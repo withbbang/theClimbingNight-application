@@ -120,7 +120,7 @@ class ProfileQueryServiceTest {
 		List<GridPostResponse> items = service.posts(ME, ME, null, 18).items();
 
 		// then
-		assertThat(items).extracting(GridPostResponse::status).containsExactly("VISIBLE", "HIDDEN", "HIDDEN");
+		assertThat(items).extracting(GridPostResponse::status).containsExactly("VISIBLE", "HIDDEN", "HIDDEN_PENDING");
 		assertThat(items.get(0).thumbnailUrl()).isEqualTo("https://m.example/p/k11/t.webp");
 		assertThat(items.get(1).thumbnailUrl()).isNull();
 		assertThat(items.get(2).thumbnailUrl()).isNull();
@@ -129,8 +129,21 @@ class ProfileQueryServiceTest {
 	}
 
 	@Test
-	void blockedEitherWayIs404() {
-		// given
+	void blockedByViewerIs404() {
+		// given: 내가 차단한 사람 (existsBetween은 어느 방향이든 true)
+		given(users.findById(OTHER)).willReturn(Optional.of(user(OTHER, true)));
+		given(blocks.existsBetween(ME, OTHER)).willReturn(true);
+
+		// when / then
+		assertThatThrownBy(() -> service.profile(ME, OTHER)).isInstanceOfSatisfying(BusinessException.class,
+				e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+		assertThatThrownBy(() -> service.posts(ME, OTHER, null, 18)).isInstanceOfSatisfying(BusinessException.class,
+				e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+	}
+
+	@Test
+	void blockingViewerIs404() {
+		// given: 나를 차단한 사람. 서비스는 (viewer, target) 순서로만 묻는다.
 		given(users.findById(OTHER)).willReturn(Optional.of(user(OTHER, true)));
 		given(blocks.existsBetween(ME, OTHER)).willReturn(true);
 
