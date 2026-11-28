@@ -120,7 +120,7 @@ media_jobs      + target_type(POST_MEDIA, PROFILE_IMAGE) NOT NULL DEFAULT 'POST_
 - 우선순위: 기존 표 그대로(`QUARANTINE`·`DELETE_MEDIA` > `RELEASE` > `PROCESS` > `PURGE_ORIGINAL`). 프로필 사진은 한 장·작은 크기라 게시물 처리를 오래 밀어내지 않는다.
 - 남용 방지 (검토 뒤 수정, 설계자 결정):
   - 새 업로드를 시작하면 그 사용자의 예전 `UPLOADING` 행을 바로 지운다. 올리다 그만둔 사진 때문에 막히는 일이 없다. 업로드 객체가 남았으면 1일 수명 주기가 지운다.
-  - `PROCESSING`은 최대 2개까지만 둔다. 넘으면 기존 검증 오류 코드로 거절한다(`api-conventions`의 코드 중 맞는 것을 쓴다). 재시도 대기 중인 사진도 센다.
+  - `PROCESSING`은 최대 2개까지만 둔다. 넘으면 `PROFILE_IMAGE_BUSY`(409)로 거절한다. 재시도 대기 중인 사진도 센다.
 - 지금 `target_id`로만 작업을 찾는 곳(`MediaJobScheduler.cancelQueued`, `MediaJobProcessor.failMedia`, `findPostIdsWithFailedCleanup` 등)은 모두 `target_type`도 조건에 넣는다. 게시물 사진 id와 프로필 사진 id가 겹치기 때문이다.
 - 만든 뒤 달라진 점: `MediaJobRepository.cancelQueued`는 더 이상 영속성 컨텍스트를 비우지 않는다. 호출한 쪽이 이미 읽어 둔 `MediaJob` 엔티티는 취소가 반영되지 않은 채일 수 있다. 워커가 프로필 처리를 확정할 때 잠그는 순서는 사용자 행 → 프로필 사진 행이다(탈퇴가 사용자 행을 먼저 잠그는 것과 같다).
 - 작업 처리기는 `(kind, target_type)`으로 나눈다. 프로필 사진은 `PROCESS`·`QUARANTINE`·`DELETE_MEDIA`·`PURGE_ORIGINAL`만 쓰고 `RELEASE`는 없다(7장).
@@ -130,7 +130,7 @@ media_jobs      + target_type(POST_MEDIA, PROFILE_IMAGE) NOT NULL DEFAULT 'POST_
 - 사용자 신고(`USER`) 대상에 조치 두 개를 연다: `REMOVE_PROFILE_IMAGE`, `CLEAR_BIO`. 지금은 `USER`에 `DISMISS`만 된다.
   - `REMOVE_PROFILE_IMAGE`: `profile_image_id = null`, 사진 REMOVED + `QUARANTINE`(공개본을 격리하고 캐시를 비움). 신고는 ACTIONED로 닫는다.
   - `CLEAR_BIO`: `bio = null`. 신고는 ACTIONED로 닫는다.
-  - 사진과 자기소개가 다 있으면 카드에 "둘 다 내리기" 버튼을 하나 더 두고, 앱이 `REMOVE_PROFILE_IMAGE` → `CLEAR_BIO`를 차례로 보낸다. 두 번째 요청은 신고가 이미 닫혀 있어도 조치하고 200을 준다(`close()`는 열린 신고가 없으면 아무것도 안 한다).
+  - 사진과 자기소개가 다 있으면 카드에 "둘 다 내리기" 버튼을 하나 더 두고, 앱이 `REMOVE_PROFILE_IMAGE` → `CLEAR_BIO`를 차례로 보낸다. 두 번째 요청은 신고가 이미 닫혀 있어도 조치하고 204를 준다(`close()`는 열린 신고가 없으면 아무것도 안 한다).
 - 복원은 없다. 내린 사진은 본인이 다시 올린다.
 - 보존 (검토 뒤 추가, 설계자 결정): 숨긴 게시물과 같은 기준을 쓴다. 운영진이 내린 사진은 `QUARANTINE`만 걸고 격리본과 NAS 원본을 모두 남기며 `PURGE_ORIGINAL`을 예약하지 않는다. 탈퇴할 때 그 사람의 모든 프로필 사진에 `DELETE_MEDIA` + 30일 뒤 `PURGE_ORIGINAL`을 걸어 함께 지운다. 본인이 바꾸거나 되돌린 사진만 30일 뒤 원본을 지운다. 보존 기간 문구는 `content-todo.md`의 신고 기록 보관 항목에 넣는다.
 - 신고 목록의 사용자 대상 카드에는 지금 프로필 사진(공개 URL, 96px)과 자기소개만 보여 준다. 조치해 신고가 닫히면 카드가 목록에서 빠지므로, 예전에 내린 사진은 보여 주지 않는다. 격리본은 분쟁에 대비한 기록이고, 그 사진을 보는 화면은 이번 범위 밖이다. (설계자 결정)
@@ -166,7 +166,7 @@ media_jobs      + target_type(POST_MEDIA, PROFILE_IMAGE) NOT NULL DEFAULT 'POST_
 ## 11. 인프라·문서 변경
 
 - 새 환경변수 없음(기존 미디어 버킷·토큰·경로 재사용).
-- 새 오류 코드: `USER_BIO_INVALID`(400), `PROFILE_IMAGE_BUSY`(409, 처리 중 2개 초과), `PROFILE_IMAGE_UPLOAD_INCOMPLETE`(409, 확정 때 객체 없음·크기 다름). `api-conventions` 스킬 표에 있다. 6장의 "기존 검증 오류 코드"는 `PROFILE_IMAGE_BUSY`로 정했다.
+- 새 오류 코드: `USER_BIO_INVALID`(400), `PROFILE_IMAGE_BUSY`(409, 처리 중 2개 초과), `PROFILE_IMAGE_UPLOAD_INCOMPLETE`(409, 확정 때 객체 없음·크기 다름). `api-conventions` 스킬 표에 있다.
 - 마이그레이션 V10: `users.bio`, `users.profile_image_id`, `profile_images`, `media_jobs.target_type`(기존 행은 `POST_MEDIA`), 프로필 격자용 인덱스 `posts(author_id, status, published_at, id)`.
 - `architecture.md` 10장 2단계 요약의 `profile_images` 줄, 피드 설계 9장 `profile_images` 컬럼, 11장 3번에 이 문서 링크.
 - `docs/content-todo.md`: 개인정보처리방침에 자기소개·프로필 사진 항목(수집·공개 범위·탈퇴 시 삭제), 임시조치 항목에 프로필 사진 포함 여부.
