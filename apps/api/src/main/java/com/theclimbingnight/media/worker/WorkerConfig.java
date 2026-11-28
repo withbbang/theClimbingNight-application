@@ -5,7 +5,10 @@ import com.theclimbingnight.feed.repository.PostRepository;
 import com.theclimbingnight.media.MediaProperties;
 import com.theclimbingnight.media.MediaUrls;
 import com.theclimbingnight.media.job.MediaJobRepository;
+import com.theclimbingnight.media.job.MediaJobScheduler;
 import com.theclimbingnight.media.storage.MediaStorage;
+import com.theclimbingnight.profile.repository.ProfileImageRepository;
+import com.theclimbingnight.user.repository.UserRepository;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
@@ -104,11 +107,37 @@ public class WorkerConfig {
 	}
 
 	@Bean
+	ProfileProcessJobHandler profileProcessJobHandler(MediaStorage storage, OriginalStore originals,
+			ImageTranscoder transcoder, UserRepository users, ProfileImageRepository images,
+			MediaJobScheduler scheduler, TransactionTemplate workerTransactionTemplate, Clock clock) {
+		return new ProfileProcessJobHandler(storage, originals, transcoder, users, images, scheduler,
+				workerTransactionTemplate, clock);
+	}
+
+	@Bean
+	ProfileQuarantineJobHandler profileQuarantineJobHandler(MediaStorage storage, CachePurger purger, MediaUrls urls,
+			ProfileImageRepository images, TransactionTemplate workerTransactionTemplate) {
+		return new ProfileQuarantineJobHandler(storage, purger, urls, images, workerTransactionTemplate);
+	}
+
+	@Bean
+	ProfileDeleteMediaJobHandler profileDeleteMediaJobHandler(MediaStorage storage, CachePurger purger,
+			MediaUrls urls, ProfileImageRepository images, TransactionTemplate workerTransactionTemplate) {
+		return new ProfileDeleteMediaJobHandler(storage, purger, urls, images, workerTransactionTemplate);
+	}
+
+	@Bean
+	ProfilePurgeOriginalJobHandler profilePurgeOriginalJobHandler(OriginalStore originals,
+			ProfileImageRepository images, TransactionTemplate workerTransactionTemplate) {
+		return new ProfilePurgeOriginalJobHandler(originals, images, workerTransactionTemplate);
+	}
+
+	@Bean
 	MediaJobProcessor mediaJobProcessor(MediaJobRepository jobs, List<JobHandler> handlers, RetryPolicy retryPolicy,
-			PostRepository posts, PostMediaRepository mediaRepository, TransactionTemplate workerTransactionTemplate,
-			Clock clock) {
-		return new MediaJobProcessor(jobs, handlers, retryPolicy, posts, mediaRepository, workerTransactionTemplate,
-				clock);
+			PostRepository posts, PostMediaRepository mediaRepository, ProfileImageRepository profileImages,
+			TransactionTemplate workerTransactionTemplate, Clock clock) {
+		return new MediaJobProcessor(jobs, handlers, retryPolicy, posts, mediaRepository, profileImages,
+				workerTransactionTemplate, clock);
 	}
 
 	@Bean

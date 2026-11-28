@@ -7,9 +7,12 @@ import com.theclimbingnight.media.job.MediaJob;
 import com.theclimbingnight.media.job.MediaJobKind;
 import com.theclimbingnight.media.job.MediaJobRepository;
 import com.theclimbingnight.media.job.MediaTargetType;
+import com.theclimbingnight.profile.entity.ProfileImage;
+import com.theclimbingnight.profile.entity.ProfileImageStatus;
+import com.theclimbingnight.profile.repository.ProfileImageRepository;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -19,9 +22,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 실행할 작업 하나를 가져와(조건부 UPDATE로 claim) 종류별 처리기에 넘긴다. 성공하면 DONE, 예외면 재시도 정책에 따라
- * 다시 QUEUED 또는 FAILED. 사진을 공개하는 작업(PROCESS·RELEASE)이 FAILED로 끝나면 사진도 FAILED로, 게시물이 아직
- * PENDING이면 게시물도 FAILED로 둔다. 숨긴 글의 상태는 바꾸지 않는다.
+ * 실행할 작업 하나를 가져와(조건부 UPDATE로 claim) (종류, 대상 종류)별 처리기에 넘긴다. 성공하면 DONE, 예외면 재시도
+ * 정책에 따라 다시 QUEUED 또는 FAILED. 게시물 사진을 공개하는 작업(PROCESS·RELEASE)이 FAILED로 끝나면 사진도 FAILED로,
+ * 게시물이 아직 PENDING이면 게시물도 FAILED로 둔다. 숨긴 글의 상태는 바꾸지 않는다. 프로필 사진 PROCESS가 FAILED로
+ * 끝나면 사진이 아직 PROCESSING일 때만 FAILED로 둔다(그새 내려진 사진은 REMOVED 그대로).
  */
 public class MediaJobProcessor {
 
@@ -29,20 +33,28 @@ public class MediaJobProcessor {
 	private static final PageRequest ONE = PageRequest.of(0, 1);
 
 	private final MediaJobRepository jobs;
-	private final Map<MediaJobKind, JobHandler> handlers = new EnumMap<>(MediaJobKind.class);
+	private final Map<HandlerKey, JobHandler> handlers = new HashMap<>();
 	private final RetryPolicy retryPolicy;
 	private final PostRepository posts;
 	private final PostMediaRepository mediaRepository;
+	private final ProfileImageRepository profileImages;
 	private final TransactionTemplate tx;
 	private final Clock clock;
 
 	public MediaJobProcessor(MediaJobRepository jobs, List<JobHandler> handlers, RetryPolicy retryPolicy,
-			PostRepository posts, PostMediaRepository mediaRepository, TransactionTemplate tx, Clock clock) {
+			PostRepository posts, PostMediaRepository mediaRepository, ProfileImageRepository profileImages,
+			TransactionTemplate tx, Clock clock) {
 		this.jobs = jobs;
-		handlers.forEach(h -> this.handlers.put(h.kind(), h));
+		for (JobHandler h : handlers) {
+			HandlerKey key = new HandlerKey(h.kind(), h.targetType());
+			if (this.handlers.putIfAbsent(key, h) != null) {
+				throw new IllegalStateException("처리기 중복: " + key);
+			}
+		}
 		this.retryPolicy = retryPolicy;
 		this.posts = posts;
 		this.mediaRepository = mediaRepository;
+		this.profileImages = profileImages;
 		this.tx = tx;
 		this.clock = clock;
 	}
@@ -68,9 +80,9 @@ public class MediaJobProcessor {
 			return true;
 		}
 		try {
-			JobHandler handler = handlers.get(job.getKind());
+			JobHandler handler = handlers.get(new HandlerKey(job.getKind(), job.getTargetType()));
 			if (handler == null) {
-				throw new IllegalStateException("처리기 없음: " + job.getKind());
+				throw new IllegalStateException("처리기 없음: " + job.getKind() + "/" + job.getTargetType());
 			}
 			handler.handle(job);
 		} catch (Exception e) {
@@ -101,7 +113,16 @@ public class MediaJobProcessor {
 					&& (job.getKind() == MediaJobKind.PROCESS || job.getKind() == MediaJobKind.RELEASE)) {
 				failMedia(job.getTargetId());
 			}
+			if (job.getTargetType() == MediaTargetType.PROFILE_IMAGE && job.getKind() == MediaJobKind.PROCESS) {
+				failProfileImage(job.getTargetId());
+			}
 		});
+	}
+
+	/** 사진 행을 잠가 읽어, 그새 되돌리기·탈퇴가 바꾼 REMOVED를 덮어쓰지 않는다. */
+	private void failProfileImage(long imageId) {
+		profileImages.findByIdForUpdate(imageId).filter(i -> i.getStatus() == ProfileImageStatus.PROCESSING)
+				.ifPresent(ProfileImage::markFailed);
 	}
 
 	private void failMedia(long mediaId) {
@@ -109,5 +130,8 @@ public class MediaJobProcessor {
 			media.markFailed();
 			posts.findByIdForUpdate(media.getPostId()).filter(ProcessJobHandler::isPending).ifPresent(Post::markFailed);
 		});
+	}
+
+	private record HandlerKey(MediaJobKind kind, MediaTargetType targetType) {
 	}
 }

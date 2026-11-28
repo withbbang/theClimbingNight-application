@@ -21,6 +21,10 @@ import com.theclimbingnight.media.job.MediaJob;
 import com.theclimbingnight.media.job.MediaJobKind;
 import com.theclimbingnight.media.job.MediaJobRepository;
 import com.theclimbingnight.media.job.MediaJobStatus;
+import com.theclimbingnight.media.job.MediaTargetType;
+import com.theclimbingnight.profile.entity.ProfileImage;
+import com.theclimbingnight.profile.entity.ProfileImageStatus;
+import com.theclimbingnight.profile.repository.ProfileImageRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneOffset;
@@ -41,19 +45,29 @@ class MediaJobProcessorTest {
 	@Mock PostMediaRepository mediaRepository;
 	@Mock JobHandler processHandler;
 	@Mock JobHandler quarantineHandler;
+	@Mock JobHandler profileProcessHandler;
+	@Mock ProfileImageRepository profileImages;
 
 	private MediaJobProcessor processor;
 
 	@BeforeEach
 	void setUp() {
 		lenient().when(processHandler.kind()).thenReturn(MediaJobKind.PROCESS);
+		lenient().when(processHandler.targetType()).thenReturn(MediaTargetType.POST_MEDIA);
 		lenient().when(quarantineHandler.kind()).thenReturn(MediaJobKind.QUARANTINE);
-		processor = new MediaJobProcessor(jobs, List.of(processHandler, quarantineHandler), new RetryPolicy(), posts,
-				mediaRepository, WorkerFixtures.tx(), Clock.fixed(NOW, ZoneOffset.UTC));
+		lenient().when(quarantineHandler.targetType()).thenReturn(MediaTargetType.POST_MEDIA);
+		lenient().when(profileProcessHandler.kind()).thenReturn(MediaJobKind.PROCESS);
+		lenient().when(profileProcessHandler.targetType()).thenReturn(MediaTargetType.PROFILE_IMAGE);
+		processor = new MediaJobProcessor(jobs, List.of(processHandler, quarantineHandler, profileProcessHandler),
+				new RetryPolicy(), posts, mediaRepository, profileImages, WorkerFixtures.tx(),
+				Clock.fixed(NOW, ZoneOffset.UTC));
 	}
 
 	private MediaJob givenClaimed(MediaJobKind kind, int attempts) {
-		MediaJob job = WorkerFixtures.job(kind, 11L, attempts);
+		return givenClaimed(WorkerFixtures.job(kind, 11L, attempts));
+	}
+
+	private MediaJob givenClaimed(MediaJob job) {
 		given(jobs.findClaimable(NOW, PageRequest.of(0, 1))).willReturn(List.of(job.getId()));
 		given(jobs.claim(job.getId(), NOW)).willReturn(1);
 		given(jobs.findById(job.getId())).willReturn(Optional.of(job));
@@ -180,5 +194,78 @@ class MediaJobProcessorTest {
 		verify(quarantineHandler, never()).handle(any());
 		assertThat(job.getStatus()).isEqualTo(MediaJobStatus.FAILED);
 		assertThat(job.getAttempts()).isEqualTo(4);
+	}
+
+	@Test
+	void 대상_종류에_맞는_처리기로_보낸다() throws Exception {
+		// given
+		MediaJob job = givenClaimed(WorkerFixtures.profileJob(MediaJobKind.PROCESS, 7L, 0));
+
+		// when
+		processor.runNext();
+
+		// then
+		verify(profileProcessHandler).handle(job);
+		verify(processHandler, never()).handle(any());
+		assertThat(job.getStatus()).isEqualTo(MediaJobStatus.DONE);
+	}
+
+	@Test
+	void 처리기가_없는_종류_쌍이면_실패로_기록한다() throws Exception {
+		// given: 프로필 사진에는 격리 처리기를 등록하지 않았다
+		MediaJob job = givenClaimed(WorkerFixtures.profileJob(MediaJobKind.QUARANTINE, 7L, 0));
+
+		// when
+		processor.runNext();
+
+		// then
+		verify(quarantineHandler, never()).handle(any());
+		assertThat(job.getStatus()).isEqualTo(MediaJobStatus.QUEUED);
+		assertThat(job.getLastError()).contains("처리기 없음");
+	}
+
+	@Test
+	void 같은_종류_쌍의_처리기를_두_번_등록하면_거부한다() {
+		// when / then
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> new MediaJobProcessor(jobs,
+				List.of(processHandler, processHandler), new RetryPolicy(), posts, mediaRepository, profileImages,
+				WorkerFixtures.tx(), Clock.fixed(NOW, ZoneOffset.UTC)))
+				.isInstanceOf(IllegalStateException.class);
+	}
+
+	@Test
+	void 프로필_처리가_최종_실패하면_프로필_사진만_FAILED이고_같은_id의_게시물_사진은_그대로다() throws Exception {
+		// given: id 7인 게시물 사진과 프로필 사진이 함께 있다
+		MediaJob job = givenClaimed(WorkerFixtures.profileJob(MediaJobKind.PROCESS, 7L, 2));
+		willThrow(new IllegalStateException("변환 실패")).given(profileProcessHandler).handle(job);
+		PostMedia media = WorkerFixtures.media(7L, PostMediaStatus.PROCESSING, "p/k7");
+		lenient().when(mediaRepository.findById(7L)).thenReturn(Optional.of(media));
+		ProfileImage image = WorkerFixtures.profileImage(7L, ProfileImageStatus.PROCESSING);
+		given(profileImages.findByIdForUpdate(7L)).willReturn(Optional.of(image));
+
+		// when
+		processor.runNext();
+
+		// then
+		assertThat(job.getStatus()).isEqualTo(MediaJobStatus.FAILED);
+		assertThat(image.getStatus()).isEqualTo(ProfileImageStatus.FAILED);
+		assertThat(media.getStatus()).isEqualTo(PostMediaStatus.PROCESSING);
+		verify(mediaRepository, never()).findById(anyLong());
+	}
+
+	@Test
+	void 프로필_처리가_최종_실패해도_이미_내린_사진은_REMOVED_그대로다() throws Exception {
+		// given: 처리 중에 사용자가 되돌렸다
+		MediaJob job = givenClaimed(WorkerFixtures.profileJob(MediaJobKind.PROCESS, 7L, 2));
+		willThrow(new IllegalStateException("업로드 없음")).given(profileProcessHandler).handle(job);
+		ProfileImage image = WorkerFixtures.profileImage(7L, ProfileImageStatus.REMOVED);
+		given(profileImages.findByIdForUpdate(7L)).willReturn(Optional.of(image));
+
+		// when
+		processor.runNext();
+
+		// then
+		assertThat(job.getStatus()).isEqualTo(MediaJobStatus.FAILED);
+		assertThat(image.getStatus()).isEqualTo(ProfileImageStatus.REMOVED);
 	}
 }

@@ -10,12 +10,15 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 
 /**
- * NAS의 원본 사진 폴더. DB에는 루트 기준 상대 경로 {@code yyyy/MM/{postMediaId}.jpg}만 둔다.
+ * NAS의 원본 사진 폴더. DB에는 루트 기준 상대 경로 {@code yyyy/MM/{postMediaId}.jpg}만 둔다. 프로필 사진은 파일 이름이
+ * 게시물 사진과 겹치지 않게 {@code profile/yyyy/MM/{profileImageId}.jpg}에 둔다.
  * 상대 경로가 루트 밖을 가리키면({@code ..}, 절대 경로) 거부한다.
  */
 public class OriginalStore {
 
 	private static final DateTimeFormatter MONTH_DIR = DateTimeFormatter.ofPattern("yyyy/MM").withZone(TimeZones.KST);
+
+	private static final String PROFILE_DIR = "profile/";
 
 	private final Path root;
 
@@ -25,10 +28,18 @@ public class OriginalStore {
 
 	/** 같은 폴더의 임시 파일에 다 쓴 뒤 옮겨서, 중간에 끊겨도 반쯤 쓴 원본이 남지 않게 한다. */
 	public String save(long mediaId, InputStream in, Instant now) throws IOException {
-		String relative = MONTH_DIR.format(now) + "/" + mediaId + ".jpg";
+		return write(MONTH_DIR.format(now) + "/" + mediaId + ".jpg", mediaId, in);
+	}
+
+	/** {@link #save}와 같이 임시 파일에 쓴 뒤 옮긴다. */
+	public String saveProfile(long profileImageId, InputStream in, Instant now) throws IOException {
+		return write(PROFILE_DIR + MONTH_DIR.format(now) + "/" + profileImageId + ".jpg", profileImageId, in);
+	}
+
+	private String write(String relative, long id, InputStream in) throws IOException {
 		Path target = resolve(relative);
 		Files.createDirectories(target.getParent());
-		Path temp = Files.createTempFile(target.getParent(), mediaId + "-", ".part");
+		Path temp = Files.createTempFile(target.getParent(), id + "-", ".part");
 		try {
 			Files.copy(in, temp, StandardCopyOption.REPLACE_EXISTING);
 			Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);

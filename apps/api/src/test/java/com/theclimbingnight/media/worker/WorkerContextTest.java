@@ -48,6 +48,16 @@ class WorkerContextTest {
 			assertThat(context.getBeansOfType(ScheduledTaskHolder.class).values())
 					.allSatisfy(holder -> assertThat(holder.getScheduledTasks()).isEmpty());
 			assertThat(context.getBean(MediaWorkerLoop.class).isRunning()).isTrue();
+			assertThat(context.getBeansOfType(com.theclimbingnight.media.job.MediaJobScheduler.class)).hasSize(1);
+			java.util.Collection<JobHandler> handlers = context.getBeansOfType(JobHandler.class).values();
+			assertThat(handlers).hasSize(9);
+			assertThat(handlers.stream().map(h -> h.kind() + "/" + h.targetType()).distinct()).hasSize(9);
+			assertThat(handlers.stream().filter(h -> h.targetType()
+					== com.theclimbingnight.media.job.MediaTargetType.PROFILE_IMAGE).map(JobHandler::kind))
+					.containsExactlyInAnyOrder(com.theclimbingnight.media.job.MediaJobKind.PROCESS,
+							com.theclimbingnight.media.job.MediaJobKind.QUARANTINE,
+							com.theclimbingnight.media.job.MediaJobKind.DELETE_MEDIA,
+							com.theclimbingnight.media.job.MediaJobKind.PURGE_ORIGINAL);
 			assertThat(context).isNotInstanceOf(WebServerApplicationContext.class)
 					.isNotInstanceOf(WebApplicationContext.class);
 			assertThat(context.getEnvironment().getProperty("app.worker.poll-interval", Duration.class))

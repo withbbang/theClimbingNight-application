@@ -73,4 +73,18 @@ class OriginalStoreTest {
 		assertThatThrownBy(() -> store.delete("2026/../../outside.jpg")).isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> store.exists("/etc/passwd")).isInstanceOf(IllegalArgumentException.class);
 	}
+
+	@Test
+	void 프로필_원본은_profile_폴더_아래_연_월_폴더에_저장한다() throws Exception {
+		// when: UTC로는 11월 30일 15시, 한국은 12월 1일 0시
+		String path = store().saveProfile(11L, new ByteArrayInputStream(new byte[] {4, 5}),
+				Instant.parse("2026-11-30T15:00:00Z"));
+
+		// then
+		assertThat(path).isEqualTo("profile/2026/12/11.jpg");
+		assertThat(Files.readAllBytes(root.resolve("profile/2026/12/11.jpg"))).containsExactly(4, 5);
+		try (var files = Files.list(root.resolve("profile/2026/12"))) {
+			assertThat(files).containsExactly(root.resolve("profile/2026/12/11.jpg"));
+		}
+	}
 }

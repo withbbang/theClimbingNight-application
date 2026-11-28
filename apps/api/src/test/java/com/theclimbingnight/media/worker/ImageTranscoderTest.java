@@ -113,4 +113,34 @@ class ImageTranscoderTest {
 				.hasMessageContaining("1")
 				.hasMessageContaining("Invalid data found");
 	}
+
+	@Test
+	void 정사각은_가운데를_잘라_320과_96_WebP로_만들고_키우지_않는다() throws Exception {
+		// given
+		given(runner.run(anyList(), eq(TIMEOUT))).willReturn(new ProcessResult(0, ""));
+
+		// when
+		ImageTranscoder.SquareImage image = transcoder.transcodeSquare(source, workDir);
+
+		// then
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<List<String>> captor = ArgumentCaptor.forClass(List.class);
+		verify(runner, org.mockito.Mockito.times(2)).run(captor.capture(), eq(TIMEOUT));
+		List<String> large = captor.getAllValues().get(0);
+		List<String> small = captor.getAllValues().get(1);
+		for (List<String> command : List.of(large, small)) {
+			assertThat(command).startsWith("ffmpeg");
+			assertThat(command).containsSequence("-protocol_whitelist", "file", "-f", "jpeg_pipe", "-i", source.toString());
+			assertThat(command).containsSubsequence("-map_metadata", "-1");
+			assertThat(command).containsSubsequence("-c:v", "libwebp", "-quality", "80");
+		}
+		assertThat(large.get(large.indexOf("-vf") + 1))
+				.isEqualTo("crop='min(iw,ih)':'min(iw,ih)',scale='min(320,iw)':-1,sidedata=mode=delete,metadata=mode=delete");
+		assertThat(small.get(small.indexOf("-vf") + 1))
+				.isEqualTo("crop='min(iw,ih)':'min(iw,ih)',scale='min(96,iw)':-1,sidedata=mode=delete,metadata=mode=delete");
+		assertThat(large).endsWith(workDir.resolve("l.webp").toString());
+		assertThat(small).endsWith(workDir.resolve("s.webp").toString());
+		assertThat(image.large()).isEqualTo(workDir.resolve("l.webp"));
+		assertThat(image.small()).isEqualTo(workDir.resolve("s.webp"));
+	}
 }

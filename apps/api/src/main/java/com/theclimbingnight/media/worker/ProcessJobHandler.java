@@ -143,7 +143,12 @@ public class ProcessJobHandler implements JobHandler {
 
 	/** 실패 처리 중의 정리. 정리 실패는 원래 예외에 덧붙이고 원래 예외를 그대로 던지게 한다. */
 	static void deletePublicQuietly(MediaStorage storage, String publicKey, Exception cause) {
-		for (String key : List.of(publicKey + PostMedia.DISPLAY_SUFFIX, publicKey + PostMedia.THUMB_SUFFIX)) {
+		deletePublicQuietly(storage, List.of(publicKey + PostMedia.DISPLAY_SUFFIX, publicKey + PostMedia.THUMB_SUFFIX),
+				cause);
+	}
+
+	static void deletePublicQuietly(MediaStorage storage, List<String> keys, Exception cause) {
+		for (String key : keys) {
 			try {
 				storage.deletePublic(key);
 			} catch (RuntimeException cleanup) {
@@ -186,7 +191,7 @@ public class ProcessJobHandler implements JobHandler {
 	}
 
 	/** 임시 폴더 정리 실패는 로그만 남긴다. 원래 예외를 덮거나 성공한 작업을 실패로 바꾸지 않는다. */
-	private static void deleteRecursively(Path dir) {
+	static void deleteRecursively(Path dir) {
 		if (!Files.exists(dir)) {
 			return;
 		}
