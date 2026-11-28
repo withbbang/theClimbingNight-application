@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Image } from 'expo-image';
@@ -20,13 +20,18 @@ import { useTheme } from '@/hooks/use-theme';
 import type { GridPostResponse } from '@/types/api/profile';
 
 const STAGGER_MS = 35;
-/** 첫 화면에 들어오는 칸까지만 차례로 나온다. 스크롤로 만나는 칸은 바로 나온다. */
-const MAX_STAGGER = 12;
+/** 첫 화면에 들어오는 칸(이 순서 앞)만 차례로 나온다. 스크롤로 만나는 칸은 바로 보인다. */
+export const MAX_STAGGER = 12;
 
 interface GridCellProps {
   post: GridPostResponse;
   /** 격자 안의 순서. 등장 순서를 정한다. */
   index: number;
+  /**
+   * 이 화면에서 이미 나타난 게시물 ID. 목록이 칸을 재활용하며 다시 그려도 다시 나타나지 않게 한다.
+   * 칸이 처음 나타나면 여기에 넣는다.
+   */
+  shown: Set<number>;
 }
 
 function cellLabel(post: GridPostResponse) {
@@ -37,22 +42,28 @@ function cellLabel(post: GridPostResponse) {
 }
 
 /** 격자 한 칸. 첫 사진의 썸네일을 정사각으로 채우고, 숨긴 글은 회색 칸에 "숨겨짐"만 둔다. */
-export function GridCell({ post, index }: GridCellProps) {
+export function GridCell({ post, index, shown }: GridCellProps) {
   const router = useRouter();
   const { colors, motion, space } = useTheme();
   const reduced = useReducedMotion();
   const press = usePressScale(0.95);
-  const appear = useSharedValue(reduced ? 1 : 0);
+  // 첫 화면의 칸이 처음 그려질 때만 나타나는 연출을 준다. 처음 그릴 때 한 번만 정한다.
+  const [enter] = useState(() => !reduced && index < MAX_STAGGER && !shown.has(post.id));
+  const appear = useSharedValue(enter ? 0 : 1);
   const hidden = post.thumbnailUrl === null;
+
+  useEffect(() => {
+    shown.add(post.id);
+  }, [post.id, shown]);
 
   // 칸이 사진을 붙이듯 살짝 작게 나타나 제자리로 커진다.
   useEffect(() => {
-    if (!reduced) {
-      appear.set(
-        withDelay(Math.min(index, MAX_STAGGER) * STAGGER_MS, withSpring(1, motion.spring)),
-      );
+    if (enter) {
+      appear.set(withDelay(index * STAGGER_MS, withSpring(1, motion.spring)));
     }
-  }, [appear, index, motion.spring, reduced]);
+    // 처음 그릴 때 한 번만 움직인다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const appearStyle = useAnimatedStyle(() => ({
     opacity: Math.min(1, Math.max(0, appear.get())),
@@ -60,7 +71,7 @@ export function GridCell({ post, index }: GridCellProps) {
   }));
 
   return (
-    <Animated.View style={[styles.slot, appearStyle]}>
+    <Animated.View testID="grid-cell" style={[styles.slot, appearStyle]}>
       <Animated.View style={press.style}>
         <Pressable
           accessibilityRole="button"

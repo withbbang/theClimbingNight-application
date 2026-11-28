@@ -1,5 +1,6 @@
 import { screen } from 'expo-router/testing-library';
 
+import { queryClient } from '@/lib/query-client';
 import { fail, mockServer, ok, renderApp } from '@/test-utils/app';
 import { post } from '@/test-utils/posts';
 import { press } from '@/test-utils/screen';
@@ -117,6 +118,7 @@ it('blocks the user after confirming and leaves the profile', async () => {
     'POST /blocks': ok({ userId: 7, nickname: '달이', profileImageUrl: null }),
   });
   const app = await renderApp('/users/7');
+  const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
 
   // when
   await press('달이 프로필 메뉴');
@@ -126,4 +128,6 @@ it('blocks the user after confirming and leaves the profile', async () => {
   // then
   expect(server.calls).toContainEqual({ method: 'POST', path: '/blocks', body: { userId: 7 } });
   expect(app.getPathname()).not.toBe('/users/7');
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['users', 7, 'profile'] });
+  invalidate.mockRestore();
 });

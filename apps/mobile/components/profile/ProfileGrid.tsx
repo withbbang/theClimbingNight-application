@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { FlashList } from '@shopify/flash-list';
@@ -49,6 +49,8 @@ export function ProfileGrid({
 }: ProfileGridProps) {
   const { space } = useTheme();
   const insets = useSafeAreaInsets();
+  // 이 화면에서 이미 나타난 칸. 재활용돼 다시 그려지는 칸이 다시 나타나는 연출을 하지 않게 한다.
+  const [shown] = useState(() => new Set<number>());
   return (
     <FlashList
       accessibilityLabel="게시물 격자"
@@ -57,7 +59,7 @@ export function ProfileGrid({
       renderItem={({ item }) => (
         <View testID="grid-row" style={[styles.row, { gap: GRID_GAP, marginBottom: GRID_GAP }]}>
           {item.posts.map((post, i) => (
-            <GridCell key={post.id} post={post} index={item.start + i} />
+            <GridCell key={post.id} post={post} index={item.start + i} shown={shown} />
           ))}
           {/* 마지막 줄이 덜 차도 칸 크기가 같게 빈자리를 채운다. */}
           {Array.from({ length: COLUMNS - item.posts.length }, (_, i) => (

@@ -41,3 +41,21 @@ it('falls back to the first letter when the image fails to load', async () => {
   expect(screen.getByText('달', HIDDEN)).toBeTruthy();
   expect(screen.queryByTestId('avatar-image', HIDDEN)).toBeNull();
 });
+
+it('does not crossfade by default and ties the image to its url for recycled rows', async () => {
+  // given / when
+  await render(<Avatar nickname="달이" imageUrl="https://media.test/a/1/s.webp" />);
+
+  // then
+  const image = screen.getByTestId('avatar-image', HIDDEN);
+  expect(image.props.transition ?? 0).toBe(0);
+  expect(image.props.recyclingKey).toBe('https://media.test/a/1/s.webp');
+});
+
+it('crossfades a new photo when asked', async () => {
+  // given / when
+  await render(<Avatar nickname="달이" imageUrl="https://media.test/a/1/l.webp" crossfade />);
+
+  // then
+  expect(screen.getByTestId('avatar-image', HIDDEN).props.transition).toBeGreaterThan(0);
+});

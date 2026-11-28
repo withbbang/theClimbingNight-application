@@ -55,6 +55,7 @@ function HeaderAvatar({ profile }: { profile: ProfileResponse }) {
         nickname={profile.nickname}
         imageUrl={profile.profileImage?.largeUrl}
         size={AVATAR_SIZE}
+        crossfade
       />
     </Animated.View>
   );

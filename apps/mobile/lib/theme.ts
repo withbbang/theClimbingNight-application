@@ -20,7 +20,7 @@ export interface Theme {
     holdOff: string;
     /** 사진 위에 얹는 아이콘. 사진은 모드와 상관없으니 두 모드에서 같다. */
     onPhoto: string;
-    /** 사진 위 아이콘의 그림자. */
+    /** 사진 위 아이콘 뒤에 옅게 까는 어둠(받침). */
     photoShade: string;
   };
   space(n: number): number;

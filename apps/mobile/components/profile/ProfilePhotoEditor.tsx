@@ -110,7 +110,12 @@ export function ProfilePhotoEditor({ nickname, imageUrl }: ProfilePhotoEditorPro
             {...press.handlers}
           >
             <Animated.View style={dimStyle}>
-              <Avatar nickname={nickname} imageUrl={image.preview ?? imageUrl} size={AVATAR_SIZE} />
+              <Avatar
+                nickname={nickname}
+                imageUrl={image.preview ?? imageUrl}
+                size={AVATAR_SIZE}
+                crossfade
+              />
             </Animated.View>
             <Animated.View
               style={[

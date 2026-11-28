@@ -74,6 +74,7 @@ function MyProfileLink({ id, nickname, role }: { id: number; nickname: string; r
             nickname={nickname}
             imageUrl={profile.data?.profileImage?.largeUrl}
             size={AVATAR_SIZE}
+            crossfade
           />
         </FadeInItem>
         <FadeInItem index={1}>
